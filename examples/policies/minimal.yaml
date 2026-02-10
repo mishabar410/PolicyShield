@@ -1,0 +1,42 @@
+# PolicyShield Minimal Example
+#
+# A simple starting point with just 2 rules to demonstrate the YAML format.
+# Copy this file and modify it to match your needs.
+#
+# Format reference:
+#   shield_name  — Name for this rule set
+#   version      — Version number of the rule set
+#   rules        — List of rule objects (see below)
+#
+# Each rule has:
+#   id           — Unique identifier (string)
+#   description  — Human-readable description (optional)
+#   when         — Conditions for matching:
+#     tool       — Tool name or list of tool names
+#     args_match — Argument conditions with predicates (regex, eq, contains)
+#     session    — Session state conditions (total_calls, tool_count.<name>)
+#     sender     — List of allowed senders
+#   then         — Verdict: allow | block | redact | approve
+#   severity     — Severity: low | medium | high | critical (default: medium)
+#   message      — Human-readable message explaining the verdict
+#   enabled      — Whether this rule is active (default: true)
+
+shield_name: my-agent-policy
+version: 1
+
+rules:
+  # Block any attempt to delete files
+  - id: no-delete
+    description: "Prevent file deletion"
+    when:
+      tool: delete_file
+    then: block
+    severity: high
+    message: "File deletion is not allowed. Ask the user to delete files manually."
+
+  # Allow reading files from any path
+  - id: allow-reads
+    description: "Always allow file reads"
+    when:
+      tool: read_file
+    then: allow

@@ -1,0 +1,44 @@
+shield_name: test-security
+version: 1
+
+rules:
+  - id: no-destructive-shell
+    description: "Block destructive shell commands"
+    when:
+      tool: exec
+      args_match:
+        command:
+          regex: "rm\\s+-rf|mkfs|dd\\s+if=|format\\s+c:"
+    then: block
+    severity: critical
+    message: "Destructive shell commands are not allowed. Use non-destructive alternatives."
+
+  - id: no-pii-external
+    description: "Block PII in external requests"
+    when:
+      tool:
+        - web_fetch
+        - web_search
+      args_match:
+        body:
+          regex: "\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Z|a-z]{2,}\\b|\\b\\d{3}-\\d{2}-\\d{4}\\b"
+    then: block
+    severity: high
+    message: "PII detected. Redact personal data before making external requests."
+
+  - id: rate-limit-web
+    description: "Rate limit web tool usage"
+    when:
+      tool: web_fetch
+      session:
+        tool_count.web_fetch:
+          gt: 10
+    then: block
+    severity: medium
+    message: "Too many web requests. Reduce frequency."
+
+  - id: allow-read
+    description: "Always allow file reads"
+    when:
+      tool: read_file
+    then: allow

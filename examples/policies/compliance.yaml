@@ -1,0 +1,37 @@
+# PolicyShield Compliance Policy
+#
+# Enforces data handling rules, rate limiting, and audit logging.
+
+shield_name: compliance
+version: 1
+
+rules:
+  - id: no-pii-to-external-api
+    description: "Prevent sending PII to external APIs"
+    when:
+      tool:
+        - web_fetch
+        - http_post
+        - api_call
+    then: redact
+    severity: high
+    message: "PII must be redacted before sending to external APIs."
+
+  - id: rate-limit-web
+    description: "Rate limit web requests to 10 per session"
+    when:
+      tool: web_fetch
+      session:
+        tool_count.web_fetch:
+          gt: 10
+    then: block
+    severity: medium
+    message: "Session web request limit (10) exceeded. Wait or start a new session."
+
+  - id: log-all-shell
+    description: "Allow but log all shell command executions"
+    when:
+      tool: exec
+    then: allow
+    severity: low
+    message: "Shell command logged for audit."

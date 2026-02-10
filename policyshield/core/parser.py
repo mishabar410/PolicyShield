@@ -57,13 +57,18 @@ def _parse_rule(raw: dict, file_path: str | None = None) -> RuleConfig:
                 file_path,
             )
 
+    # Normalize severity
+    severity_value = raw.get("severity", "LOW")
+    if isinstance(severity_value, str):
+        severity_value = severity_value.upper()
+
     return RuleConfig(
         id=raw["id"],
         description=raw.get("description", ""),
         when=raw.get("when", {}),
         then=then_value,
         message=raw.get("message"),
-        severity=raw.get("severity", "LOW"),
+        severity=severity_value,
         enabled=raw.get("enabled", True),
     )
 

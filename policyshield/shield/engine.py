@@ -136,6 +136,9 @@ class ShieldEngine:
             "tool_counts": dict(session.tool_counts),
             "taints": [t.value for t in session.taints],
         }
+        # Flatten tool_counts for dot-notation access (e.g. tool_count.web_fetch)
+        for tool, count in session.tool_counts.items():
+            session_state[f"tool_count.{tool}"] = count
 
         # Find best matching rule
         match = self._matcher.find_best_match(

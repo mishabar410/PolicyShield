@@ -1,0 +1,51 @@
+# PolicyShield Security Policy
+#
+# Blocks destructive operations, restricts PII in external requests,
+# and requires approval for network downloads.
+
+shield_name: security
+version: 1
+
+rules:
+  - id: no-destructive-shell
+    description: "Block destructive shell commands"
+    when:
+      tool: exec
+      args_match:
+        command:
+          regex: "rm\\s+-rf|mkfs|dd\\s+if=|format\\s+c:|fdisk"
+    then: block
+    severity: critical
+    message: "Destructive shell commands are not allowed. Use safe alternatives like 'find ... -delete' with proper filtering."
+
+  - id: no-pii-in-web
+    description: "Block PII in external web requests"
+    when:
+      tool:
+        - web_fetch
+        - web_search
+    then: block
+    severity: high
+    message: "PII detected in arguments. Redact all personal data before making external requests."
+
+  - id: approve-downloads
+    description: "Downloads via curl/wget require approval"
+    when:
+      tool: exec
+      args_match:
+        command:
+          regex: "curl|wget"
+    then: approve
+    severity: medium
+    message: "Network downloads require explicit approval. Verify the URL is trusted."
+
+  - id: no-write-outside-workspace
+    description: "Block writes outside the workspace directory"
+    when:
+      tool: write_file
+      args_match:
+        path:
+          regex: "^/(etc|usr|var|bin|sbin)/"
+    then: block
+    severity: critical
+    message: "Writing outside the workspace is not allowed. Only write to project directories."

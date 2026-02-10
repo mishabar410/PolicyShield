@@ -1,75 +1,98 @@
 # 🛡️ PolicyShield
 
-**Декларативный firewall для tool calls AI-агентов.**
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Tests](https://img.shields.io/badge/tests-passing-brightgreen.svg)](#development)
 
-Пишешь правила в YAML → PolicyShield исполняет их на каждом tool call → получаешь аудитный лог.
+**Declarative firewall for AI agent tool calls.**
+
+Write rules in YAML → PolicyShield enforces them on every tool call → get an audit log.
 
 ```yaml
 rules:
   - id: no-pii-external
-    description: "Запрет отправки PII на внешние сервисы"
+    description: "Block PII from being sent to external services"
     when:
       tool: [web_fetch, web_search]
-      args_match:
-        any_field: { contains_pattern: "pii" }
     then: block
     message: "PII detected. Redact before sending externally."
 ```
 
 ---
 
-## Зачем
+## Why
 
-AI-агенты взаимодействуют с миром через **tool calls**: shell-команды, файлы, HTTP, сообщения. Контроль над ними сегодня — либо промпты ("пожалуйста, не удаляй"), либо ad-hoc regex-проверки. Оба подхода ненадёжны, не покрывают все tools и не оставляют аудитного следа.
+AI agents interact with the world through **tool calls**: shell commands, files, HTTP, messages. Today's controls are either prompts ("please don't delete") or ad-hoc regex checks. Both are unreliable, don't cover all tools, and leave no audit trail.
 
-PolicyShield решает это:
-- **Декларативные правила** (YAML) вместо хардкода
-- **Runtime enforcement** на каждом tool call
-- **Repair loop** — при блокировке агент получает объяснение и может исправиться
-- **Audit trail** (JSONL) — доказательство compliance
+PolicyShield fixes this:
+- **Declarative rules** (YAML) instead of hardcoded checks
+- **Runtime enforcement** on every tool call
+- **Repair loop** — when blocked, the agent gets an explanation and can self-correct
+- **Audit trail** (JSONL) — proof of compliance
 
-## Чем отличается
+## Quick Start
 
-| Решение | Уровень работы | Repair loop | Audit |
-|---------|---------------|-------------|-------|
-| Guardrails AI | LLM output | ✗ | ✗ |
-| NeMo Guardrails | Conversational flow | ✗ | ✗ |
-| LlamaGuard | Safety classifier | ✗ | ✗ |
-| **PolicyShield** | **Tool calls** | **✓** | **✓** |
+```bash
+pip install policyshield
+```
 
----
+Create rules in `policies/rules.yaml`:
 
-## Как работает
+```yaml
+shield_name: my-agent
+version: 1
+rules:
+  - id: no-delete
+    when:
+      tool: delete_file
+    then: block
+    message: "File deletion is not allowed."
+```
+
+Validate and use:
+
+```bash
+policyshield validate ./policies/
+```
+
+```python
+from policyshield.shield import ShieldEngine
+
+engine = ShieldEngine("./policies/rules.yaml")
+result = engine.check("delete_file", {"path": "/data"})
+# result.verdict == Verdict.BLOCK
+```
+
+See the full [Quick Start Guide](docs/QUICKSTART.md) for more.
+
+## How It Works
 
 ```
-LLM хочет вызвать web_fetch(url="...?email=john@corp.com")
+LLM wants to call web_fetch(url="...?email=john@corp.com")
       │
       ▼
   PolicyShield pre-call check
       │
-      ├── PII обнаружен (email) → правило no-pii-external → BLOCK
+      ├── PII detected (email) → rule no-pii-external → BLOCK
       │
       ▼
-  Агенту возвращается counterexample:
+  Agent receives counterexample:
   "🛡️ BLOCKED: PII detected. Redact email before external request."
       │
       ▼
-  LLM перепланирует: web_fetch(url="...?email=[REDACTED]")
+  LLM replans: web_fetch(url="...?email=[REDACTED]")
       │
       ▼
-  PolicyShield: OK → ALLOW → tool выполняется
+  PolicyShield: OK → ALLOW → tool executes
 ```
 
-## Три столпа
+## Three Pillars
 
 ### 1. Rules — YAML DSL
 
-Человекочитаемые правила в знакомом формате (like GitHub Actions / K8s policies):
+Human-readable policies in a familiar format:
 
 ```yaml
-shield: security-v1
-version: 1
-
 rules:
   - id: no-destructive-shell
     when:
@@ -79,94 +102,80 @@ rules:
     then: block
     severity: critical
 
-  - id: approve-curl
-    when:
-      tool: exec
-      args_match:
-        command: { regex: "curl|wget" }
-    then: approve
-    
   - id: rate-limit-web
     when:
-      tool: [web_fetch, web_search]
+      tool: web_fetch
       session:
         tool_count.web_fetch: { gt: 20 }
     then: block
 ```
 
-### 2. Shield — Runtime enforcement
+### 2. Shield — Runtime Enforcement
 
-Middleware между LLM и tools. Вердикты:
-- **ALLOW** — tool call проходит
-- **BLOCK** — tool call блокируется, агент получает counterexample для исправления
-- **APPROVE** — human-in-the-loop (через Telegram/Discord/CLI)
-- **REDACT** — PII маскируется в аргументах или результатах
+Middleware between LLM and tools. Verdicts:
+- **ALLOW** — tool call proceeds
+- **BLOCK** — tool call blocked, agent gets counterexample
+- **APPROVE** — human-in-the-loop required
+- **REDACT** — PII masked in arguments or results
 
-### 3. Trace — Audit log
+### 3. Trace — Audit Log
 
-Каждое решение в JSONL:
-
-```jsonl
-{"ts":"2026-02-11T00:30:15Z","tool":"web_fetch","verdict":"BLOCK","rule":"no-pii-external","pii":["email"],"session":"tg:123"}
-{"ts":"2026-02-11T00:30:16Z","tool":"web_fetch","verdict":"ALLOW","session":"tg:123"}
-```
-
-CLI для просмотра:
-```bash
-policyshield trace show --session tg:123
-policyshield trace violations --last 7d
-```
-
----
-
-## Интеграция с nanobot
-
-PolicyShield работает с [nanobot](https://github.com/cjohndesign/nanobot) из коробки.
-
-### Установка
+Every decision recorded in JSONL:
 
 ```bash
-pip install policyshield
+policyshield trace show ./traces/trace.jsonl
+policyshield trace violations ./traces/trace.jsonl
 ```
 
-### Настройка
+## Examples
 
-Добавить секцию `shield` в `~/.nanobot/config.json`:
+See [`examples/policies/`](examples/policies/) for production-ready rule sets:
 
-```json
-{
-  "shield": {
-    "enabled": true,
-    "mode": "enforce",
-    "rules_path": "~/.nanobot/policies/"
-  }
-}
+| File | Description |
+|------|-------------|
+| [`security.yaml`](examples/policies/security.yaml) | Destructive commands, PII, downloads, workspace boundaries |
+| [`compliance.yaml`](examples/policies/compliance.yaml) | PII redaction, rate limiting, shell audit logging |
+| [`minimal.yaml`](examples/policies/minimal.yaml) | Minimal example with detailed comments |
+
+## Development
+
+```bash
+git clone https://github.com/policyshield/policyshield.git
+cd policyshield
+python -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
+
+# Run tests
+pytest tests/ -v
+
+# Lint
+ruff check policyshield/ tests/
+
+# Coverage
+pytest tests/ --cov=policyshield --cov-report=term-missing
 ```
 
-Создать правила в `~/.nanobot/policies/security.yaml` — и всё.
+## Documentation
 
----
-
-## Документация
-
-| Документ | Описание |
-|----------|----------|
-| [CLAUDE.md](CLAUDE.md) | Видение проекта, позиционирование, стратегия |
-| [TECHNICAL_SPEC.md](TECHNICAL_SPEC.md) | Техническая спецификация: YAML DSL, matcher, вердикты, PII, trace |
-| [INTEGRATION_SPEC.md](INTEGRATION_SPEC.md) | Интеграция с nanobot: архитектура, ShieldedToolRegistry, approval flow |
+| Document | Description |
+|----------|-------------|
+| [Quick Start](docs/QUICKSTART.md) | 5-minute setup guide |
+| [CLAUDE.md](CLAUDE.md) | Project vision, positioning, strategy |
+| [TECHNICAL_SPEC.md](TECHNICAL_SPEC.md) | Technical spec: YAML DSL, matcher, verdicts, PII, trace |
+| [INTEGRATION_SPEC.md](INTEGRATION_SPEC.md) | Nanobot integration: architecture, ShieldedToolRegistry, approval flow |
 
 ## Roadmap
 
-| Версия | Что включает |
-|--------|-------------|
-| **v0.1** | YAML DSL + BLOCK/ALLOW + L0 PII + Repair loop + JSONL trace |
-| **v0.2** | APPROVE (human-in-the-loop) + REDACT + Batch approve |
-| **v0.3** | Trace CLI + Rule linter + Rate limiting |
-| **v0.4** | LangChain / CrewAI адаптеры |
+| Version | Features |
+|---------|----------|
+| **v0.1** ✅ | YAML DSL + BLOCK/ALLOW/REDACT/APPROVE + L0 PII + Repair loop + JSONL trace + CLI |
+| **v0.2** | Human-in-the-loop approval (Telegram/Discord) + Batch approve |
+| **v0.3** | Rule linter + Advanced rate limiting + Hot reload |
+| **v0.4** | LangChain / CrewAI adapters |
 | **v1.0** | Stable API + PyPI publish |
 
 ---
 
-## Лицензия
+## License
 
-MIT
+[MIT](LICENSE)

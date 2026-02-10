@@ -26,15 +26,34 @@ class CompiledRule:
         # Compile tool pattern
         tool = when.get("tool")
         if tool:
-            compiled.tool_pattern = re.compile(f"^{tool}$")
+            if isinstance(tool, list):
+                # List of tool names → alternation regex
+                escaped = [re.escape(t) for t in tool]
+                compiled.tool_pattern = re.compile(f"^({'|'.join(escaped)})$")
+            else:
+                compiled.tool_pattern = re.compile(f"^{tool}$")
 
-        # Compile argument matchers
-        args = when.get("args", {})
+        # Compile argument matchers (support both 'args' and 'args_match')
+        args = when.get("args") or when.get("args_match") or {}
         if isinstance(args, dict):
             for field_name, condition in args.items():
                 if isinstance(condition, dict):
-                    predicate = condition.get("predicate", "regex")
-                    value = condition.get("value", "")
+                    # Support shorthand: {regex: "..."} or {eq: "..."}
+                    if "predicate" in condition:
+                        predicate = condition["predicate"]
+                        value = condition.get("value", "")
+                    elif "regex" in condition:
+                        predicate = "regex"
+                        value = condition["regex"]
+                    elif "eq" in condition:
+                        predicate = "eq"
+                        value = condition["eq"]
+                    elif "contains" in condition:
+                        predicate = "contains"
+                        value = condition["contains"]
+                    else:
+                        predicate = "regex"
+                        value = str(next(iter(condition.values()), ""))
                 else:
                     predicate = "regex"
                     value = str(condition)
@@ -89,7 +108,11 @@ class MatcherEngine:
             self._compiled.append(compiled)
 
             tool = rule.when.get("tool")
-            if tool and not any(c in tool for c in ("*", ".", "+", "?", "[", "|")):
+            if isinstance(tool, list):
+                # List of tool names — index each one
+                for t in tool:
+                    self._tool_index.setdefault(t, []).append(compiled)
+            elif tool and not any(c in tool for c in ("*", ".", "+", "?", "[", "|")):
                 # Exact tool name — index it
                 self._tool_index.setdefault(tool, []).append(compiled)
             else:
