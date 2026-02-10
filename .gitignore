@@ -7,7 +7,7 @@ __pycache__/
 *.egg
 dist/
 build/
-.eggs/
+demo.py
 
 # Virtual environments
 .venv/

@@ -24,6 +24,9 @@ rules:
       tool:
         - web_fetch
         - web_search
+      args_match:
+        body:
+          regex: "\\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}\\b|\\b\\d{3}-\\d{2}-\\d{4}\\b|\\b\\d{4}[- ]?\\d{4}[- ]?\\d{4}[- ]?\\d{4}\\b"
     then: block
     severity: high
     message: "PII detected in arguments. Redact all personal data before making external requests."
