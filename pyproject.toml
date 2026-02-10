@@ -1,0 +1,45 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "policyshield"
+version = "0.1.0"
+description = "Declarative firewall for AI agent tool calls"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [
+    { name = "PolicyShield Team" },
+]
+keywords = ["ai", "agent", "firewall", "policy", "security", "tool-calls"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+]
+dependencies = [
+    "pyyaml",
+    "pydantic>=2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "pytest-cov",
+    "ruff",
+]
+
+[project.scripts]
+policyshield = "policyshield.cli.main:app"
+
+[project.urls]
+Homepage = "https://github.com/policyshield/policyshield"
+Documentation = "https://github.com/policyshield/policyshield/docs"
+Repository = "https://github.com/policyshield/policyshield"
