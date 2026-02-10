@@ -1,0 +1,139 @@
+"""Session manager for PolicyShield — thread-safe session state management."""
+
+from __future__ import annotations
+
+import threading
+from datetime import datetime, timedelta
+
+from policyshield.core.models import PIIType, SessionState
+
+
+class SessionManager:
+    """Thread-safe session state manager.
+
+    Manages session lifecycle with TTL, max sessions, taint tracking,
+    and tool call counting.
+    """
+
+    def __init__(
+        self,
+        ttl_seconds: int = 3600,
+        max_sessions: int = 1000,
+    ):
+        self._ttl_seconds = ttl_seconds
+        self._max_sessions = max_sessions
+        self._sessions: dict[str, SessionState] = {}
+        self._lock = threading.Lock()
+
+    def get_or_create(self, session_id: str) -> SessionState:
+        """Get an existing session or create a new one.
+
+        Args:
+            session_id: Session identifier.
+
+        Returns:
+            The SessionState for this session.
+        """
+        with self._lock:
+            self._evict_expired()
+            if session_id in self._sessions:
+                return self._sessions[session_id]
+
+            # Evict oldest if at capacity
+            if len(self._sessions) >= self._max_sessions:
+                self._evict_oldest()
+
+            session = SessionState(
+                session_id=session_id,
+                created_at=datetime.now(),
+            )
+            self._sessions[session_id] = session
+            return session
+
+    def get(self, session_id: str) -> SessionState | None:
+        """Get a session by ID, or None if expired/missing.
+
+        Args:
+            session_id: Session identifier.
+
+        Returns:
+            SessionState or None.
+        """
+        with self._lock:
+            session = self._sessions.get(session_id)
+            if session and self._is_expired(session):
+                del self._sessions[session_id]
+                return None
+            return session
+
+    def increment(self, session_id: str, tool_name: str) -> SessionState:
+        """Increment tool call count for a session.
+
+        Args:
+            session_id: Session identifier.
+            tool_name: Name of the tool called.
+
+        Returns:
+            Updated SessionState.
+        """
+        session = self.get_or_create(session_id)
+        with self._lock:
+            session.increment(tool_name)
+        return session
+
+    def add_taint(self, session_id: str, pii_type: PIIType) -> None:
+        """Mark a session as tainted with a PII type.
+
+        Args:
+            session_id: Session identifier.
+            pii_type: The PII type detected.
+        """
+        session = self.get_or_create(session_id)
+        with self._lock:
+            session.taints.add(pii_type)
+
+    def remove(self, session_id: str) -> bool:
+        """Remove a session.
+
+        Args:
+            session_id: Session identifier.
+
+        Returns:
+            True if session was removed, False if not found.
+        """
+        with self._lock:
+            if session_id in self._sessions:
+                del self._sessions[session_id]
+                return True
+            return False
+
+    def stats(self) -> dict:
+        """Return session manager statistics.
+
+        Returns:
+            Dict with active_sessions, max_sessions, ttl_seconds.
+        """
+        with self._lock:
+            self._evict_expired()
+            return {
+                "active_sessions": len(self._sessions),
+                "max_sessions": self._max_sessions,
+                "ttl_seconds": self._ttl_seconds,
+            }
+
+    def _is_expired(self, session: SessionState) -> bool:
+        """Check if a session has exceeded its TTL."""
+        return datetime.now() - session.created_at > timedelta(seconds=self._ttl_seconds)
+
+    def _evict_expired(self) -> None:
+        """Remove all expired sessions. Must be called with lock held."""
+        expired = [sid for sid, s in self._sessions.items() if self._is_expired(s)]
+        for sid in expired:
+            del self._sessions[sid]
+
+    def _evict_oldest(self) -> None:
+        """Remove the oldest session. Must be called with lock held."""
+        if not self._sessions:
+            return
+        oldest_id = min(self._sessions, key=lambda sid: self._sessions[sid].created_at)
+        del self._sessions[oldest_id]

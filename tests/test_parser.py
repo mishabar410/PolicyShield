@@ -1,14 +1,11 @@
 """Tests for YAML rule parser."""
 
-import os
-import tempfile
-from pathlib import Path
 
 import pytest
 
 from policyshield.core.exceptions import PolicyShieldParseError
 from policyshield.core.models import Verdict
-from policyshield.core.parser import load_rules, parse_rule_file, validate_rule_set
+from policyshield.core.parser import load_rules, parse_rule_file
 
 
 VALID_YAML = """\
