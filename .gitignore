@@ -36,4 +36,11 @@ Thumbs.db
 
 # Traces (local only)
 traces/
+demo_traces/
 *.jsonl
+
+# Local-only docs (not for repo)
+CLAUDE.md
+TECHNICAL_SPEC.md
+INTEGRATION_SPEC.md
+*.docx
