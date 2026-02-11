@@ -6,6 +6,9 @@ Get PolicyShield running in 5 minutes.
 
 ```bash
 pip install policyshield
+
+# With LangChain support
+pip install policyshield[langchain]
 ```
 
 ## 2. Create Rules
@@ -32,13 +35,17 @@ rules:
 
 See [`examples/policies/`](../examples/policies/) for more examples.
 
-## 3. Validate Rules
+## 3. Validate & Lint Rules
 
 ```bash
+# Validate YAML syntax
 policyshield validate ./policies/
+
+# Static analysis (6 checks)
+policyshield lint ./policies/rules.yaml
 ```
 
-Expected output:
+Expected validate output:
 
 ```
 ✓ Valid: my-agent v1
@@ -63,7 +70,16 @@ else:
     pass
 ```
 
-### With ShieldedToolRegistry
+### With LangChain
+
+```python
+from policyshield.integrations.langchain import shield_all_tools
+
+safe_tools = shield_all_tools(my_tools, engine)
+# Use safe_tools with your LangChain agent
+```
+
+### With Nanobot (ShieldedToolRegistry)
 
 ```python
 from policyshield.integrations.nanobot import install_shield
@@ -72,7 +88,6 @@ registry = install_shield("./policies/rules.yaml")
 registry.register("read_file", my_read_file_func)
 registry.register("delete_file", my_delete_file_func)
 
-# Automatically checks policy before execution
 result = registry.execute("read_file", {"path": "/tmp/log"})  # ✓ Allowed
 result = registry.execute("delete_file", {"path": "/data"})    # ✗ PolicyViolation
 ```
@@ -88,7 +103,7 @@ with TraceRecorder("./traces/") as tracer:
     result = engine.check("delete_file", {"path": "/data"})
 ```
 
-## 6. View Traces
+## 6. View & Analyze Traces
 
 ```bash
 # Show all trace entries
@@ -99,10 +114,14 @@ policyshield trace violations ./traces/trace_*.jsonl
 
 # Filter by tool
 policyshield trace show ./traces/trace_*.jsonl --tool delete_file
+
+# Aggregated statistics
+policyshield trace stats ./traces/trace_*.jsonl
+policyshield trace stats ./traces/trace_*.jsonl --format json
 ```
 
 ## Next Steps
 
-- Read the [Technical Specification](../TECHNICAL_SPEC.md) for detailed architecture
 - See [example policies](../examples/policies/) for production-ready rule sets
-- Enable AUDIT mode to test rules without blocking: `ShieldEngine(rules, mode=ShieldMode.AUDIT)`
+- Check [`full.yaml`](../examples/policies/full.yaml) for all v0.2 features (rate limits, custom PII, approval)
+- Try [`langchain_demo.py`](../examples/langchain_demo.py) for LangChain integration

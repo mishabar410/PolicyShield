@@ -48,15 +48,12 @@ Repository = "https://github.com/policyshield/policyshield"
 [tool.hatch.build.targets.sdist]
 exclude = [
     "tests/",
-    "demo.py",
-    "demo_traces/",
     "prompts/",
     ".github/",
     ".venv/",
-    "nanobot/",
-    "*.docx",
-    "CLAUDE.md",
-    "TECHNICAL_SPEC.md",
-    "INTEGRATION_SPEC.md",
-    "ruff.toml",
+    "dist/",
 ]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"

@@ -7,7 +7,6 @@ __pycache__/
 *.egg
 dist/
 build/
-demo.py
 
 # Virtual environments
 .venv/
@@ -36,13 +35,14 @@ Thumbs.db
 
 # Traces (local only)
 traces/
-demo_traces/
 *.jsonl
 
-# Local-only docs (not for repo)
+# Local development files (not for repo)
 CLAUDE.md
 TECHNICAL_SPEC.md
 INTEGRATION_SPEC.md
 *.docx
 nanobot/
 prompts/
+demo.py
+demo_traces/
