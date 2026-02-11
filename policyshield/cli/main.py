@@ -49,10 +49,14 @@ def app(args: list[str] | None = None) -> int:
     show_parser.add_argument("--tool", help="Filter by tool name")
     show_parser.add_argument("--session", help="Filter by session ID")
 
-    # trace violations
     violations_parser = trace_subparsers.add_parser("violations", help="Show only violations (non-ALLOW)")
     violations_parser.add_argument("file", help="Path to JSONL trace file")
     violations_parser.add_argument("-n", "--limit", type=int, default=50, help="Max entries to show")
+
+    # trace stats
+    stats_parser = trace_subparsers.add_parser("stats", help="Show aggregated trace statistics")
+    stats_parser.add_argument("file", help="Path to JSONL trace file")
+    stats_parser.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
 
     parsed = parser.parse_args(args)
 
@@ -65,6 +69,8 @@ def app(args: list[str] | None = None) -> int:
             return _cmd_trace_show(parsed)
         elif parsed.trace_command == "violations":
             return _cmd_trace_violations(parsed)
+        elif parsed.trace_command == "stats":
+            return _cmd_trace_stats(parsed)
         else:
             trace_parser.print_help()
             return 1
@@ -154,6 +160,25 @@ def _cmd_trace_violations(parsed: argparse.Namespace) -> int:
         limit=parsed.limit,
         exclude_allow=True,
     )
+
+
+def _cmd_trace_stats(parsed: argparse.Namespace) -> int:
+    """Show aggregated trace statistics."""
+    from policyshield.trace.analyzer import TraceAnalyzer, format_stats
+
+    trace_path = Path(parsed.file)
+    if not trace_path.exists():
+        print(f"✗ Trace file not found: {parsed.file}", file=sys.stderr)
+        return 1
+
+    stats = TraceAnalyzer.from_file(trace_path)
+
+    if parsed.format == "json":
+        print(json.dumps(stats.to_dict(), indent=2))
+    else:
+        print(format_stats(stats))
+
+    return 0
 
 
 def _display_trace(
