@@ -78,6 +78,34 @@ def app(args: list[str] | None = None) -> int:
     export_parser.add_argument("--output", help="Output file path")
     export_parser.add_argument("--title", default="PolicyShield Trace Report", help="HTML report title")
 
+    # nanobot wrapper command
+    nanobot_parser = subparsers.add_parser(
+        "nanobot",
+        help="Run nanobot with PolicyShield enforcement",
+        description="Wraps nanobot's CLI with PolicyShield. All arguments after the flags are passed to nanobot.",
+    )
+    nanobot_parser.add_argument(
+        "--rules", "-r", required=True,
+        help="Path to YAML rules file",
+    )
+    nanobot_parser.add_argument(
+        "--mode", default="ENFORCE",
+        choices=["ENFORCE", "AUDIT", "DISABLED"],
+        help="Shield mode (default: ENFORCE)",
+    )
+    nanobot_parser.add_argument(
+        "--fail-open", action="store_true", default=True,
+        help="Shield errors don't block tools (default: True)",
+    )
+    nanobot_parser.add_argument(
+        "--fail-closed", action="store_true",
+        help="Shield errors block tool execution",
+    )
+    nanobot_parser.add_argument(
+        "nanobot_args", nargs=argparse.REMAINDER,
+        help="Arguments to pass to nanobot CLI",
+    )
+
     # config command
     config_parser = subparsers.add_parser("config", help="Manage policyshield config")
     config_subparsers = config_parser.add_subparsers(dest="config_command")
@@ -109,6 +137,8 @@ def app(args: list[str] | None = None) -> int:
         else:
             trace_parser.print_help()
             return 1
+    elif parsed.command == "nanobot":
+        return _cmd_nanobot(parsed, args)
     elif parsed.command == "config":
         if parsed.config_command == "validate":
             return _cmd_config_validate(parsed)
@@ -121,6 +151,82 @@ def app(args: list[str] | None = None) -> int:
             return 1
     else:
         parser.print_help()
+        return 1
+
+
+def _cmd_nanobot(parsed: argparse.Namespace, original_args: list[str] | None) -> int:
+    """Run nanobot with PolicyShield enforcement.
+
+    Patches AgentLoop.__init__ at the class level so that any AgentLoop
+    created by nanobot's CLI automatically gets PolicyShield wrapping.
+    Then delegates to nanobot's CLI entry point.
+    """
+    import functools
+
+    rules_path = parsed.rules
+    mode_str = parsed.mode
+    fail_open = not parsed.fail_closed
+
+    # Validate rules path
+    rules = Path(rules_path)
+    if not rules.exists():
+        print(f"✗ Rules file not found: {rules_path}", file=sys.stderr)
+        return 1
+
+    # Import nanobot
+    try:
+        from nanobot.agent.loop import AgentLoop
+    except ImportError:
+        print("✗ nanobot is not installed. Install it with: pip install nanobot", file=sys.stderr)
+        return 1
+
+    # Import our monkey-patch
+    from policyshield.integrations.nanobot.monkey_patch import shield_agent_loop
+
+    # Patch AgentLoop.__init__ at the class level
+    _original_init = AgentLoop.__init__
+
+    @functools.wraps(_original_init)
+    def _patched_init(self, *args, **kwargs):
+        _original_init(self, *args, **kwargs)
+        # Apply PolicyShield after the original init completes
+        try:
+            shield_agent_loop(
+                self,
+                rules_path=rules_path,
+                mode=mode_str,
+                fail_open=fail_open,
+            )
+            print(f"🛡️  PolicyShield active (mode={mode_str}, rules={rules_path})")
+        except RuntimeError:
+            # Already shielded (e.g. subagent inheriting from parent)
+            pass
+
+    AgentLoop.__init__ = _patched_init  # type: ignore[method-assign]
+
+    # Collect nanobot args
+    nanobot_argv = parsed.nanobot_args or []
+    # Strip leading '--' if present (REMAINDER may include it)
+    if nanobot_argv and nanobot_argv[0] == "--":
+        nanobot_argv = nanobot_argv[1:]
+
+    if not nanobot_argv:
+        print("Usage: policyshield nanobot --rules <RULES> [--mode MODE] <nanobot command>")
+        print("\nExample:")
+        print("  policyshield nanobot --rules rules.yaml agent -m 'Hello!'")
+        print("  policyshield nanobot --rules rules.yaml gateway")
+        return 1
+
+    # Delegate to nanobot CLI
+    try:
+        from nanobot.cli.commands import app as nanobot_app
+        sys.argv = ["nanobot"] + nanobot_argv
+        nanobot_app(standalone_mode=False)
+        return 0
+    except SystemExit as e:
+        return e.code if isinstance(e.code, int) else 0
+    except Exception as e:
+        print(f"✗ nanobot error: {e}", file=sys.stderr)
         return 1
 
 
