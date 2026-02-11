@@ -46,6 +46,7 @@ class ShieldEngine:
         approval_timeout: float = 300.0,
         approval_cache: ApprovalCache | None = None,
         fail_open: bool = True,
+        otel_exporter: object | None = None,
     ):
         """Initialize ShieldEngine.
 
@@ -59,6 +60,7 @@ class ShieldEngine:
             approval_backend: Optional approval backend for APPROVE verdicts.
             approval_timeout: Seconds to wait for approval response.
             fail_open: If True, errors in shield don't block tool calls.
+            otel_exporter: Optional OTelExporter for OpenTelemetry integration.
         """
         # Load rules
         if isinstance(rules, (str, Path)):
@@ -79,6 +81,7 @@ class ShieldEngine:
         self._approval_timeout = approval_timeout
         self._approval_cache = approval_cache
         self._fail_open = fail_open
+        self._otel = otel_exporter
         self._lock = threading.Lock()
         self._watcher = None
 
@@ -106,6 +109,11 @@ class ShieldEngine:
         start = time.monotonic()
         args = args or {}
 
+        # OTel: start span
+        span_ctx = None
+        if self._otel:
+            span_ctx = self._otel.on_check_start(tool_name, session_id, args)
+
         try:
             result = self._do_check(tool_name, args, session_id, sender)
         except Exception as e:
@@ -116,6 +124,10 @@ class ShieldEngine:
                 raise PolicyShieldError(f"Shield check failed: {e}") from e
 
         latency_ms = (time.monotonic() - start) * 1000
+
+        # OTel: end span
+        if self._otel:
+            self._otel.on_check_end(span_ctx, result, latency_ms)
 
         # In AUDIT mode, always allow but record the would-be verdict
         if self._mode == ShieldMode.AUDIT and result.verdict != Verdict.ALLOW:

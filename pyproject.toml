@@ -31,6 +31,11 @@ dependencies = [
 [project.optional-dependencies]
 langchain = ["langchain-core>=0.2"]
 crewai = ["crewai>=0.30"]
+otel = [
+    "opentelemetry-api>=1.20",
+    "opentelemetry-sdk>=1.20",
+    "opentelemetry-exporter-otlp-proto-grpc>=1.20",
+]
 dev = [
     "pytest",
     "pytest-asyncio",
