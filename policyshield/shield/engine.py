@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from policyshield.approval.base import ApprovalBackend, ApprovalRequest
+from policyshield.approval.cache import ApprovalCache, ApprovalStrategy
 from policyshield.core.exceptions import PolicyShieldError
 from policyshield.core.models import (
     RuleSet,
@@ -43,6 +44,7 @@ class ShieldEngine:
         rate_limiter: object | None = None,
         approval_backend: ApprovalBackend | None = None,
         approval_timeout: float = 300.0,
+        approval_cache: ApprovalCache | None = None,
         fail_open: bool = True,
     ):
         """Initialize ShieldEngine.
@@ -75,6 +77,7 @@ class ShieldEngine:
         self._rate_limiter = rate_limiter
         self._approval_backend = approval_backend
         self._approval_timeout = approval_timeout
+        self._approval_cache = approval_cache
         self._fail_open = fail_open
         self._lock = threading.Lock()
         self._watcher = None
@@ -218,6 +221,28 @@ class ShieldEngine:
                     rule_id=rule.id,
                     message="No approval backend configured",
                 )
+            # Determine strategy for this rule
+            strategy = None
+            if rule.approval_strategy:
+                try:
+                    strategy = ApprovalStrategy(rule.approval_strategy)
+                except ValueError:
+                    pass
+
+            # Check cache first
+            if self._approval_cache is not None:
+                cached = self._approval_cache.get(
+                    tool_name, rule.id, session_id, strategy=strategy
+                )
+                if cached is not None:
+                    if cached.approved:
+                        return self._verdict_builder.allow(rule=rule, args=args)
+                    return ShieldResult(
+                        verdict=Verdict.BLOCK,
+                        rule_id=rule.id,
+                        message="Approval denied (cached)",
+                    )
+
             req = ApprovalRequest.create(
                 tool_name=tool_name,
                 args=args,
@@ -235,6 +260,13 @@ class ShieldEngine:
                     rule_id=rule.id,
                     message="Approval timed out",
                 )
+
+            # Cache the response
+            if self._approval_cache is not None:
+                self._approval_cache.put(
+                    tool_name, rule.id, session_id, resp, strategy=strategy
+                )
+
             if resp.approved:
                 return self._verdict_builder.allow(rule=rule, args=args)
             return ShieldResult(

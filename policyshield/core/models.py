@@ -81,6 +81,7 @@ class RuleConfig(BaseModel):
     message: str | None = None
     severity: Severity = Severity.LOW
     enabled: bool = True
+    approval_strategy: str | None = None  # "once", "per_session", "per_rule", "per_tool"
 
 
 class RuleSet(BaseModel):
