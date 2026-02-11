@@ -78,7 +78,21 @@ See the full [Quick Start Guide](docs/QUICKSTART.md) for more.
 | Trace Log | JSONL audit trail for every decision |
 | CLI | `validate`, `trace show`, `trace violations` |
 
-### v0.2 (current)
+### v0.3 (current)
+
+| Feature | Description |
+|---------|-------------|
+| Async Engine | Full async/await ShieldEngine for FastAPI, aiohttp, async agents |
+| CrewAI Adapter | Wrap CrewAI tools with shield enforcement |
+| OpenTelemetry | OTLP export to Jaeger/Grafana (spans + metrics) |
+| Webhook Approval | HTTP webhook with HMAC signing for external approval |
+| Rule Testing | YAML test cases for policies (`policyshield test`) |
+| Policy Diff | Compare rule sets, detect additions/removals/changes |
+| Trace Export | Export JSONL to CSV or standalone HTML report |
+| Input Sanitizer | Normalize args, block prompt injection patterns |
+| Config File | Unified `policyshield.yaml` with env vars and JSON Schema |
+
+### v0.2
 
 | Feature | Description |
 |---------|-------------|

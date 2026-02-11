@@ -1,0 +1,48 @@
+# PolicyShield Configuration
+# See JSON Schema: policyshield/config/schema.json
+
+policyshield:
+  version: 1
+  mode: ENFORCE                 # ENFORCE | AUDIT | DISABLED
+
+  # ── Rules ──────────────────────────────────────────────
+  rules:
+    path: ./policies/           # Directory or single YAML file
+    watch: true                 # Auto-reload on file changes
+    watch_interval: 3.0         # Seconds between checks
+
+  # ── PII Detection ─────────────────────────────────────
+  pii:
+    enabled: true
+
+  # ── Input Sanitizer ────────────────────────────────────
+  sanitizer:
+    enabled: true
+    max_string_length: 10000
+    max_args_depth: 10
+    max_total_keys: 200
+    strip_whitespace: true
+    normalize_unicode: true
+    strip_null_bytes: true
+    strip_control_chars: true
+    blocked_patterns:
+      - "ignore\\s+previous\\s+instructions"
+      - "<script[^>]*>"
+
+  # ── Trace Recording ────────────────────────────────────
+  trace:
+    enabled: true
+    output_dir: ./traces/
+    batch_size: 100
+    privacy_mode: false
+
+  # ── OpenTelemetry ──────────────────────────────────────
+  otel:
+    enabled: false
+    service_name: policyshield
+    endpoint: http://localhost:4317
+
+  # ── Approval ───────────────────────────────────────────
+  approval:
+    backend: inmemory            # inmemory | cli | telegram | webhook
+    timeout: 120.0

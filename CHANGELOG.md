@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.3.0] - 2025-02-11
+
+### Added
+- AsyncShieldEngine with full async/await support
+- CrewAI BaseTool adapter (CrewAIShieldTool, shield_all_crewai_tools)
+- OpenTelemetry exporter (OTLP spans + metrics)
+- Webhook approval backend with HMAC-SHA256 signing
+- YAML-based rule testing framework (`policyshield test`)
+- Policy diff tool (`policyshield diff`)
+- Trace export: CSV and HTML report (`policyshield trace export`)
+- Input sanitizer with prompt injection protection
+- Unified config file (policyshield.yaml) with JSON Schema
+- 14 new E2E test scenarios for v0.3 features
+
 ## [0.2.0] - 2025-02-11
 
 ### Added
