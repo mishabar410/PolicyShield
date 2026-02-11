@@ -146,12 +146,11 @@ class ShieldEngine:
             self._trace(audit_result, session_id, tool_name, latency_ms, args)
             return audit_result
 
-        # Update session
-        self._session_mgr.increment(session_id, tool_name)
-
-        # Record rate limit usage
-        if self._rate_limiter is not None:
-            self._rate_limiter.record(tool_name, session_id)
+        # Update session & rate-limit only when the tool will actually execute
+        if result.verdict not in (Verdict.BLOCK, Verdict.APPROVE):
+            self._session_mgr.increment(session_id, tool_name)
+            if self._rate_limiter is not None:
+                self._rate_limiter.record(tool_name, session_id)
 
         # Record trace
         self._trace(result, session_id, tool_name, latency_ms, args)

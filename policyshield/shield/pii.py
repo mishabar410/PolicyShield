@@ -95,12 +95,15 @@ BUILTIN_PATTERNS: list[PIIPattern] = [
     ),
     PIIPattern(
         pii_type=PIIType.IP_ADDRESS,
-        pattern=re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b"),
+        pattern=re.compile(
+            r"\b(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}"
+            r"(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\b"
+        ),
         label="ip_address",
     ),
     PIIPattern(
         pii_type=PIIType.PASSPORT,
-        pattern=re.compile(r"\b[A-Z]{1,2}\d{6,9}\b"),
+        pattern=re.compile(r"\b[A-Z]{1,2}\d{7,9}\b"),
         label="passport",
     ),
     PIIPattern(
@@ -254,5 +257,36 @@ class PIIDetector:
                     start, end = match.span
                     value = value[:start] + match.masked_value + value[end:]
                 redacted[field_name] = value
+            elif "." in field_name:
+                # Nested field: navigate into the dict to redact in-place
+                parts = field_name.split(".")
+                self._redact_nested(redacted, parts, matches)
 
         return redacted, all_matches
+
+    def _redact_nested(
+        self,
+        data: dict[str, Any],
+        parts: list[str],
+        matches: list[PIIMatch],
+    ) -> None:
+        """Redact a nested field located at dot-separated path *parts*."""
+        obj: Any = data
+        for part in parts[:-1]:
+            if isinstance(obj, dict) and part in obj:
+                obj = obj[part]
+            elif isinstance(obj, list):
+                try:
+                    obj = obj[int(part)]
+                except (ValueError, IndexError):
+                    return
+            else:
+                return
+
+        key = parts[-1]
+        if isinstance(obj, dict) and key in obj and isinstance(obj[key], str):
+            value = obj[key]
+            for match in sorted(matches, key=lambda m: m.span[0], reverse=True):
+                start, end = match.span
+                value = value[:start] + match.masked_value + value[end:]
+            obj[key] = value

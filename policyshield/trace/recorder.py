@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import threading
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -46,6 +47,7 @@ class TraceRecorder:
         self._buffer: list[dict] = []
         self._file_path: Path | None = None
         self._record_count = 0
+        self._lock = threading.Lock()
 
         # Ensure output directory exists
         self._output_dir.mkdir(parents=True, exist_ok=True)
@@ -96,14 +98,20 @@ class TraceRecorder:
             else:
                 entry["args"] = args
 
-        self._buffer.append(entry)
-        self._record_count += 1
+        with self._lock:
+            self._buffer.append(entry)
+            self._record_count += 1
 
-        if len(self._buffer) >= self._batch_size:
-            self.flush()
+            if len(self._buffer) >= self._batch_size:
+                self._flush_unlocked()
 
     def flush(self) -> None:
         """Write buffered records to the trace file."""
+        with self._lock:
+            self._flush_unlocked()
+
+    def _flush_unlocked(self) -> None:
+        """Flush buffer without acquiring the lock (caller must hold it)."""
         if not self._buffer:
             return
 

@@ -75,8 +75,10 @@ class PolicyShieldTool(BaseTool):
         return self.wrapped_tool._run(tool_input)
 
     async def _arun(self, *args: Any, **kwargs: Any) -> str:
-        """Async version — delegates to sync for now."""
-        return self._run(*args, **kwargs)
+        """Async version — runs sync path in a thread to avoid blocking."""
+        import asyncio
+
+        return await asyncio.to_thread(self._run, *args, **kwargs)
 
 
 def shield_all_tools(

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -88,6 +89,7 @@ class AsyncShieldEngine:
         self._otel = otel_exporter
         self._sanitizer = sanitizer
         self._lock = asyncio.Lock()
+        self._reload_lock = threading.Lock()
 
     async def check(
         self,
@@ -152,12 +154,11 @@ class AsyncShieldEngine:
             self._trace(audit_result, session_id, tool_name, latency_ms, args)
             return audit_result
 
-        # Update session
-        self._session_mgr.increment(session_id, tool_name)
-
-        # Record rate limit usage
-        if self._rate_limiter is not None:
-            self._rate_limiter.record(tool_name, session_id)
+        # Update session & rate-limit only when the tool will actually execute
+        if result.verdict not in (Verdict.BLOCK, Verdict.APPROVE):
+            self._session_mgr.increment(session_id, tool_name)
+            if self._rate_limiter is not None:
+                self._rate_limiter.record(tool_name, session_id)
 
         # Record trace
         self._trace(result, session_id, tool_name, latency_ms, args)
@@ -392,8 +393,9 @@ class AsyncShieldEngine:
             logger.warning("reload_rules called but no path available")
             return
         new_ruleset = load_rules(reload_path)
-        self._rule_set = new_ruleset
-        self._matcher = MatcherEngine(self._rule_set)
+        with self._reload_lock:
+            self._rule_set = new_ruleset
+            self._matcher = MatcherEngine(self._rule_set)
         logger.info(
             "Rules reloaded from %s (%d rules)",
             reload_path,

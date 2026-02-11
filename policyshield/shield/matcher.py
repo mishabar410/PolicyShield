@@ -7,6 +7,9 @@ from dataclasses import dataclass, field
 
 from policyshield.core.models import RuleConfig, RuleSet, Severity, Verdict
 
+# Maximum length for regex patterns to prevent ReDoS
+MAX_PATTERN_LENGTH = 500
+
 
 @dataclass
 class CompiledRule:
@@ -57,6 +60,11 @@ class CompiledRule:
                 else:
                     predicate = "regex"
                     value = str(condition)
+                if len(value) > MAX_PATTERN_LENGTH:
+                    raise ValueError(
+                        f"Regex pattern for field '{field_name}' in rule "
+                        f"'{rule.id}' exceeds {MAX_PATTERN_LENGTH} characters"
+                    )
                 compiled.arg_patterns.append((field_name, predicate, re.compile(value)))
 
         # Compile sender pattern

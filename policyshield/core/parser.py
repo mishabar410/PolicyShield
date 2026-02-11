@@ -96,6 +96,7 @@ def _parse_rule(raw: dict, file_path: str | None = None) -> RuleConfig:
         message=raw.get("message"),
         severity=severity_value,
         enabled=raw.get("enabled", True),
+        approval_strategy=raw.get("approval_strategy"),
     )
 
 
