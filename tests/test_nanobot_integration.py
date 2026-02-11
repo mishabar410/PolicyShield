@@ -164,3 +164,66 @@ rules:
 
         registry = install_shield(str(yaml_file), existing_registry=FakeRegistry())
         assert isinstance(registry, ShieldedToolRegistry)
+
+
+# ── Session Propagation ────────────────────────────────────────────
+
+class TestSessionPropagation:
+    """Tests verifying session_id_var is correctly propagated."""
+
+    def test_session_id_propagated_to_engine(self, block_exec_engine):
+        """session_id_var.set('user123') → engine.check sees session_id='user123'."""
+        registry = ShieldedToolRegistry(block_exec_engine)
+        registry.register_func("echo", lambda message="": message)
+
+        captured_sessions: list[str] = []
+        original_check = block_exec_engine.check
+
+        def spy_check(tool_name, args=None, session_id="default", sender=None):
+            captured_sessions.append(session_id)
+            return original_check(tool_name, args=args, session_id=session_id, sender=sender)
+
+        block_exec_engine.check = spy_check  # type: ignore[assignment]
+
+        token = session_id_var.set("user123")
+        try:
+            asyncio.run(registry.execute("echo", {"message": "hi"}))
+        finally:
+            session_id_var.reset(token)
+
+        assert captured_sessions == ["user123"]
+
+    def test_session_id_reset_after_execute(self, allow_all_engine):
+        """After execute — session_id returns to default."""
+        assert session_id_var.get() == "default"
+        token = session_id_var.set("temp-session")
+        session_id_var.reset(token)
+        assert session_id_var.get() == "default"
+
+    def test_session_id_per_coroutine(self, allow_all_engine):
+        """Two concurrent executes with different session_ids — no cross-contamination."""
+        registry = ShieldedToolRegistry(allow_all_engine)
+        captured: list[str] = []
+
+        def capture_sid(**kw):
+            captured.append(session_id_var.get())
+            return "ok"
+
+        registry.register_func("tool", capture_sid)
+
+        async def run_with_session(sid: str):
+            token = session_id_var.set(sid)
+            try:
+                await registry.execute("tool", {})
+            finally:
+                session_id_var.reset(token)
+
+        async def main():
+            await asyncio.gather(
+                run_with_session("sess-A"),
+                run_with_session("sess-B"),
+            )
+
+        asyncio.run(main())
+        assert set(captured) == {"sess-A", "sess-B"}
+
