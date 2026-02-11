@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -53,8 +54,10 @@ class ShieldEngine:
         # Load rules
         if isinstance(rules, (str, Path)):
             self._rule_set = load_rules(rules)
+            self._rules_path: Path | None = Path(rules)
         else:
             self._rule_set = rules
+            self._rules_path = None
 
         self._mode = mode
         self._matcher = MatcherEngine(self._rule_set)
@@ -63,6 +66,8 @@ class ShieldEngine:
         self._verdict_builder = VerdictBuilder()
         self._tracer = trace_recorder
         self._fail_open = fail_open
+        self._lock = threading.Lock()
+        self._watcher = None
 
     def check(
         self,
@@ -240,15 +245,52 @@ class ShieldEngine:
 
         return self._verdict_builder.allow()
 
-    def reload_rules(self, path: str | Path) -> None:
-        """Reload rules from a new path.
+    def reload_rules(self, path: str | Path | None = None) -> None:
+        """Reload rules from a new path (thread-safe).
 
         Args:
-            path: Path to YAML file or directory.
+            path: Path to YAML file or directory. If None, reloads from original path.
         """
-        self._rule_set = load_rules(path)
-        self._matcher = MatcherEngine(self._rule_set)
-        logger.info("Rules reloaded from %s (%d rules)", path, len(self._rule_set.rules))
+        reload_path = Path(path) if path else self._rules_path
+        if reload_path is None:
+            logger.warning("reload_rules called but no path available")
+            return
+        new_ruleset = load_rules(reload_path)
+        with self._lock:
+            self._rule_set = new_ruleset
+            self._matcher = MatcherEngine(self._rule_set)
+        logger.info("Rules reloaded from %s (%d rules)", reload_path, len(new_ruleset.rules))
+
+    def start_watching(self, poll_interval: float = 2.0) -> None:
+        """Start watching YAML files for hot reload.
+
+        Args:
+            poll_interval: Seconds between checks.
+        """
+        if self._rules_path is None:
+            logger.warning("Cannot watch: engine was created with a RuleSet, not a path")
+            return
+        from policyshield.shield.watcher import RuleWatcher
+
+        self._watcher = RuleWatcher(
+            self._rules_path,
+            callback=self._hot_reload_callback,
+            poll_interval=poll_interval,
+        )
+        self._watcher.start()
+
+    def stop_watching(self) -> None:
+        """Stop watching files."""
+        if self._watcher:
+            self._watcher.stop()
+            self._watcher = None
+
+    def _hot_reload_callback(self, new_ruleset: RuleSet) -> None:
+        """Callback for the watcher to swap rules."""
+        with self._lock:
+            self._rule_set = new_ruleset
+            self._matcher = MatcherEngine(new_ruleset)
+        logger.info("Hot-reloaded %d rules", len(new_ruleset.rules))
 
     @property
     def mode(self) -> ShieldMode:
@@ -263,4 +305,11 @@ class ShieldEngine:
     @property
     def rule_count(self) -> int:
         """Return number of active rules."""
-        return self._matcher.rule_count
+        with self._lock:
+            return self._matcher.rule_count
+
+    @property
+    def rules(self) -> RuleSet:
+        """Return current rule set (thread-safe)."""
+        with self._lock:
+            return self._rule_set
