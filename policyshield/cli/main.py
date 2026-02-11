@@ -43,6 +43,13 @@ def app(args: list[str] | None = None) -> int:
     test_parser.add_argument("-v", "--verbose", action="store_true", help="Show details for each test")
     test_parser.add_argument("--json", dest="json_output", action="store_true", help="JSON output")
 
+    # diff command
+    diff_parser = subparsers.add_parser("diff", help="Compare two rule sets")
+    diff_parser.add_argument("old_path", help="Path to old rule file")
+    diff_parser.add_argument("new_path", help="Path to new rule file")
+    diff_parser.add_argument("--json", dest="json_output", action="store_true", help="JSON output")
+    diff_parser.add_argument("--exit-code", action="store_true", help="Exit 1 if differences found")
+
     # trace command
     trace_parser = subparsers.add_parser("trace", help="Inspect trace logs")
     trace_subparsers = trace_parser.add_subparsers(dest="trace_command")
@@ -72,6 +79,8 @@ def app(args: list[str] | None = None) -> int:
         return _cmd_lint(parsed.path)
     elif parsed.command == "test":
         return _cmd_test(parsed)
+    elif parsed.command == "diff":
+        return _cmd_diff(parsed)
     elif parsed.command == "trace":
         if parsed.trace_command == "show":
             return _cmd_trace_show(parsed)
@@ -206,6 +215,35 @@ def _cmd_test(parsed: argparse.Namespace) -> int:
         print(f"\n{suite.passed}/{suite.total} passed, {suite.failed} failed")
 
     return 1 if has_failures else 0
+
+
+def _cmd_diff(parsed: argparse.Namespace) -> int:
+    """Compare two rule sets and show differences."""
+    import json as _json
+
+    from policyshield.core.parser import load_rules
+    from policyshield.lint.differ import PolicyDiffer
+
+    try:
+        old_rules = load_rules(parsed.old_path)
+        new_rules = load_rules(parsed.new_path)
+    except Exception as e:
+        print(f"✗ {e}", file=sys.stderr)
+        return 1
+
+    d = PolicyDiffer.diff(old_rules, new_rules)
+    json_output = getattr(parsed, "json_output", False)
+    exit_code_flag = getattr(parsed, "exit_code", False)
+
+    if json_output:
+        print(_json.dumps(PolicyDiffer.diff_to_dict(d), indent=2, default=str))
+    else:
+        print(f"📋 Policy Diff: {parsed.old_path} → {parsed.new_path}\n")
+        print(PolicyDiffer.format_diff(d))
+
+    if exit_code_flag and d.has_changes:
+        return 1
+    return 0
 
 
 def _cmd_trace_show(parsed: argparse.Namespace) -> int:
