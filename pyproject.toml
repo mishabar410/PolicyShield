@@ -30,6 +30,7 @@ dependencies = [
 
 [project.optional-dependencies]
 langchain = ["langchain-core>=0.2"]
+crewai = ["crewai>=0.30"]
 dev = [
     "pytest",
     "pytest-asyncio",
