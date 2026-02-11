@@ -274,3 +274,66 @@ class TestPostCallPIIScan:
         registry.register_func("leak", lambda: pii_output)
         result = asyncio.run(registry.execute("leak", {}))
         assert result == pii_output
+
+
+# ── get_definitions filter ─────────────────────────────────────────
+
+
+class TestGetDefinitionsFilter:
+    """Tests verifying unconditionally blocked tools are hidden."""
+
+    def test_unconditionally_blocked_hidden(self):
+        """Tool with unconditional BLOCK rule → excluded from get_definitions."""
+        engine = ShieldEngine(
+            _make_ruleset([
+                RuleConfig(
+                    id="block-exec",
+                    when={"tool": "exec"},
+                    then=Verdict.BLOCK,
+                ),
+            ])
+        )
+        registry = ShieldedToolRegistry(engine)
+        registry.register_func("echo", lambda msg="": msg)
+        registry.register_func("exec", lambda cmd="": cmd)
+        # In standalone mode, get_definitions returns empty by default
+        blocked = registry._get_unconditionally_blocked_tools()
+        assert "exec" in blocked
+        assert "echo" not in blocked
+
+    def test_conditional_block_not_hidden(self):
+        """Rule with session conditions → not considered unconditional."""
+        engine = ShieldEngine(
+            _make_ruleset([
+                RuleConfig(
+                    id="rate-limit",
+                    when={"tool": "api", "session": {"total_calls": {"gt": 5}}},
+                    then=Verdict.BLOCK,
+                ),
+            ])
+        )
+        registry = ShieldedToolRegistry(engine)
+        blocked = registry._get_unconditionally_blocked_tools()
+        assert "api" not in blocked  # conditional on session
+
+    def test_disabled_rule_not_hidden(self):
+        """Disabled rule → tool not considered blocked."""
+        engine = ShieldEngine(
+            _make_ruleset([
+                RuleConfig(
+                    id="block-disabled",
+                    when={"tool": "exec"},
+                    then=Verdict.BLOCK,
+                    enabled=False,
+                ),
+            ])
+        )
+        registry = ShieldedToolRegistry(engine)
+        blocked = registry._get_unconditionally_blocked_tools()
+        assert "exec" not in blocked
+
+    def test_no_rules_returns_empty(self):
+        """No rules → no blocked tools."""
+        engine = ShieldEngine(_make_ruleset([]))
+        registry = ShieldedToolRegistry(engine)
+        assert registry._get_unconditionally_blocked_tools() == set()

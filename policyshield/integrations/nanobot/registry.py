@@ -147,3 +147,43 @@ class ShieldedToolRegistry(_NanobotToolRegistry):  # type: ignore[misc]
         if _HAS_NANOBOT:
             return super().tool_names  # type: ignore[return-value]
         return list(self._tools.keys())
+
+    # ── definition filtering ─────────────────────────────────────────
+
+    def get_definitions(self) -> list[dict[str, Any]]:
+        """Return tool schemas, excluding unconditionally blocked tools.
+
+        This prevents the LLM from seeing (and trying to call) tools
+        that PolicyShield will always block.
+        """
+        blocked = self._get_unconditionally_blocked_tools()
+        if not blocked:
+            if _HAS_NANOBOT:
+                return super().get_definitions()  # type: ignore[return-value]
+            return []
+        if _HAS_NANOBOT:
+            all_defs = super().get_definitions()  # type: ignore[return-value]
+        else:
+            all_defs = []
+        return [
+            d for d in all_defs
+            if d.get("function", {}).get("name") not in blocked
+        ]
+
+    def _get_unconditionally_blocked_tools(self) -> set[str]:
+        """Return set of tools that are unconditionally blocked.
+
+        A tool is "unconditionally blocked" if there's a rule with
+        ``then=BLOCK`` and ``when`` only matches on ``tool`` (no other
+        conditions like session, args, etc.).
+        """
+        blocked: set[str] = set()
+        for rule in self._engine._rule_set.rules:
+            if (
+                rule.enabled
+                and rule.then == Verdict.BLOCK
+                and set(rule.when.keys()) == {"tool"}
+            ):
+                blocked.add(rule.when["tool"])
+        return blocked
+
