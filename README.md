@@ -2,7 +2,7 @@
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-274_passing-brightgreen.svg)](#development)
+[![Tests](https://img.shields.io/badge/tests-437_passing-brightgreen.svg)](#development)
 
 **Declarative firewall for AI agent tool calls.**
 
@@ -84,6 +84,7 @@ See the full [Quick Start Guide](docs/QUICKSTART.md) for more.
 |---------|-------------|
 | Async Engine | Full async/await ShieldEngine for FastAPI, aiohttp, async agents |
 | CrewAI Adapter | Wrap CrewAI tools with shield enforcement |
+| Nanobot Integration | `ShieldedToolRegistry` extends nanobot's `ToolRegistry` with shield enforcement |
 | OpenTelemetry | OTLP export to Jaeger/Grafana (spans + metrics) |
 | Webhook Approval | HTTP webhook with HMAC signing for external approval |
 | Rule Testing | YAML test cases for policies (`policyshield test`) |
@@ -197,6 +198,21 @@ safe_tools = shield_all_tools([tool1, tool2], engine)
 
 See [`examples/langchain_demo.py`](examples/langchain_demo.py) for a full example.
 
+## Nanobot Integration
+
+```python
+from nanobot.agent.loop import AgentLoop
+
+# Enable PolicyShield in nanobot's agent loop
+loop = AgentLoop(
+    model="gpt-4",
+    shield_config={"rules": "policies/rules.yaml"},
+)
+# All tool calls now go through PolicyShield pre-check
+```
+
+See [`examples/nanobot_shield_example.py`](examples/nanobot_shield_example.py) for details.
+
 ## Examples
 
 See [`examples/policies/`](examples/policies/) for production-ready rule sets:
@@ -232,8 +248,8 @@ pytest tests/ --cov=policyshield --cov-report=term-missing
 |---------|----------|
 | **v0.1** ✅ | YAML DSL, BLOCK/ALLOW/REDACT/APPROVE verdicts, PII detection, repair loop, JSONL trace, CLI |
 | **v0.2** ✅ | Rule linter, hot reload, advanced PII, rate limiter, approval flow, batch approve, trace stats, LangChain adapter |
-| **v0.3** | CrewAI / AutoGen adapters, dashboard UI |
-| **v1.0** | Stable API, PyPI publish |
+| **v0.3** ✅ | Async engine, CrewAI / nanobot adapters, OTel, webhook approval, rule testing, policy diff, trace export, input sanitizer, config file |
+| **v1.0** | Stable API, PyPI publish, dashboard UI |
 
 ---
 

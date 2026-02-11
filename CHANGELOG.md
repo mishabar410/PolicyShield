@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.3.1] - 2025-02-11
+
+### Fixed
+- Session increment no longer fires on BLOCK/APPROVE verdicts (both sync and async engines)
+- `_parse_rule` now preserves `approval_strategy` field from YAML rules
+- `AsyncShieldEngine.reload_rules` protected with `threading.Lock` to prevent race conditions
+- ReDoS protection: regex patterns in rules capped at 500 characters
+- `redact_dict` now recursively redacts PII in nested dicts and lists
+- `TraceRecorder.record()` / `flush()` protected with `threading.Lock` for thread safety
+- LangChain `_arun` uses `asyncio.to_thread` instead of blocking sync call
+- IP address regex validates octet range (0–255), rejects `999.999.999.999`
+- Passport regex narrowed from 6–9 to 7–9 digits to reduce false positives
+
+### Added
+- Nanobot integration: `ShieldedToolRegistry` extends nanobot's `ToolRegistry` with async support
+- `install_shield()` helper to wrap existing nanobot registries
+- `AgentLoop.shield_config` parameter for optional PolicyShield enablement
+- 23 audit regression tests (`test_audit_fixes.py`), bringing total to 437
+
 ## [0.3.0] - 2025-02-11
 
 ### Added
