@@ -394,3 +394,55 @@ class TestContextEnrichment:
         )
         registry = ShieldedToolRegistry(engine)
         assert registry.get_constraints_summary() == ""
+
+
+# ── Subagent Shield Propagation ────────────────────────────────────
+
+
+class TestSubagentShieldPropagation:
+    """Tests verifying shield_config propagates to subagents."""
+
+    def test_subagent_manager_stores_shield_config(self):
+        """SubagentManager stores shield_config when provided."""
+        from unittest.mock import MagicMock
+
+        manager_cls = None
+        try:
+            from nanobot.agent.subagent import SubagentManager
+
+            manager_cls = SubagentManager
+        except ImportError:
+            pytest.skip("nanobot not available")
+
+        provider = MagicMock()
+        provider.get_default_model.return_value = "test-model"
+        bus = MagicMock()
+
+        config = {"rules_path": "rules.yaml", "mode": "ENFORCE"}
+        mgr = manager_cls(
+            provider=provider,
+            workspace=Path("/tmp/test"),
+            bus=bus,
+            shield_config=config,
+        )
+        assert mgr.shield_config == config
+
+    def test_subagent_manager_no_config(self):
+        """SubagentManager defaults shield_config to None."""
+        from unittest.mock import MagicMock
+
+        try:
+            from nanobot.agent.subagent import SubagentManager
+        except ImportError:
+            pytest.skip("nanobot not available")
+
+        provider = MagicMock()
+        provider.get_default_model.return_value = "test-model"
+        bus = MagicMock()
+
+        mgr = SubagentManager(
+            provider=provider,
+            workspace=Path("/tmp/test"),
+            bus=bus,
+        )
+        assert mgr.shield_config is None
