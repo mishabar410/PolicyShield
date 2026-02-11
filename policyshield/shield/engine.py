@@ -39,6 +39,7 @@ class ShieldEngine:
         pii_detector: PIIDetector | None = None,
         session_manager: SessionManager | None = None,
         trace_recorder: TraceRecorder | None = None,
+        rate_limiter: object | None = None,
         fail_open: bool = True,
     ):
         """Initialize ShieldEngine.
@@ -49,6 +50,7 @@ class ShieldEngine:
             pii_detector: Optional PII detector instance.
             session_manager: Optional session manager instance.
             trace_recorder: Optional trace recorder instance.
+            rate_limiter: Optional RateLimiter instance.
             fail_open: If True, errors in shield don't block tool calls.
         """
         # Load rules
@@ -65,6 +67,7 @@ class ShieldEngine:
         self._session_mgr = session_manager or SessionManager()
         self._verdict_builder = VerdictBuilder()
         self._tracer = trace_recorder
+        self._rate_limiter = rate_limiter
         self._fail_open = fail_open
         self._lock = threading.Lock()
         self._watcher = None
@@ -121,6 +124,10 @@ class ShieldEngine:
         # Update session
         self._session_mgr.increment(session_id, tool_name)
 
+        # Record rate limit usage
+        if self._rate_limiter is not None:
+            self._rate_limiter.record(tool_name, session_id)
+
         # Record trace
         self._trace(result, session_id, tool_name, latency_ms, args)
 
@@ -134,6 +141,16 @@ class ShieldEngine:
         sender: str | None,
     ) -> ShieldResult:
         """Internal check logic."""
+        # Rate limit check (before rule matching)
+        if self._rate_limiter is not None:
+            rl_result = self._rate_limiter.check(tool_name, session_id)
+            if not rl_result.allowed:
+                return ShieldResult(
+                    verdict=Verdict.BLOCK,
+                    rule_id="__rate_limit__",
+                    message=rl_result.message,
+                )
+
         # Get session state for condition matching
         session = self._session_mgr.get_or_create(session_id)
         session_state = {
