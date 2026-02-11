@@ -4,6 +4,11 @@ from policyshield.approval.base import ApprovalBackend, ApprovalRequest, Approva
 from policyshield.approval.cli_backend import CLIBackend
 from policyshield.approval.memory import InMemoryBackend
 from policyshield.approval.telegram import TelegramApprovalBackend
+from policyshield.approval.webhook import (
+    WebhookApprovalBackend,
+    compute_signature,
+    verify_signature,
+)
 
 __all__ = [
     "ApprovalBackend",
@@ -12,4 +17,8 @@ __all__ = [
     "CLIBackend",
     "InMemoryBackend",
     "TelegramApprovalBackend",
+    "WebhookApprovalBackend",
+    "compute_signature",
+    "verify_signature",
 ]
+
