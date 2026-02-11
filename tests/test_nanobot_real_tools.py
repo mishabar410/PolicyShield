@@ -11,12 +11,11 @@ import asyncio
 import sys
 import types
 from typing import Any
-from unittest import mock
+
 
 import pytest
 
-from policyshield.core.models import RuleConfig, RuleSet, ShieldMode, Verdict
-from policyshield.integrations.nanobot.installer import install_shield
+from policyshield.core.models import RuleConfig, RuleSet, Verdict
 from policyshield.integrations.nanobot.registry import ShieldedToolRegistry
 from policyshield.shield.engine import ShieldEngine
 

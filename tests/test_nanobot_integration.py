@@ -404,6 +404,7 @@ class TestSubagentShieldPropagation:
 
     def test_subagent_manager_stores_shield_config(self):
         """SubagentManager stores shield_config when provided."""
+        from pathlib import Path
         from unittest.mock import MagicMock
 
         manager_cls = None
@@ -429,6 +430,7 @@ class TestSubagentShieldPropagation:
 
     def test_subagent_manager_no_config(self):
         """SubagentManager defaults shield_config to None."""
+        from pathlib import Path
         from unittest.mock import MagicMock
 
         try:
