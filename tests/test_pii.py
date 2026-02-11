@@ -3,7 +3,7 @@
 import pytest
 
 from policyshield.core.models import PIIType
-from policyshield.shield.pii import PIIDetector, PIIPattern, _luhn_check
+from policyshield.shield.pii import PIIDetector, PIIPattern, _inn_check, _luhn_check, _snils_check
 
 import re
 
@@ -17,6 +17,35 @@ class TestLuhnCheck:
 
     def test_too_short(self):
         assert _luhn_check("123") is False
+
+
+class TestInnCheck:
+    """Tests for INN checksum validation."""
+
+    def test_valid_inn_10(self):
+        assert _inn_check("7707083893") is True
+
+    def test_invalid_inn_10(self):
+        assert _inn_check("7707083890") is False
+
+    def test_valid_inn_12(self):
+        assert _inn_check("500100732259") is True
+
+    def test_invalid_inn_12(self):
+        assert _inn_check("500100732250") is False
+
+    def test_wrong_length(self):
+        assert _inn_check("12345") is False
+
+
+class TestSnilsCheck:
+    """Tests for SNILS checksum validation."""
+
+    def test_valid_snils(self):
+        assert _snils_check("112-233-445 95") is True
+
+    def test_invalid_snils(self):
+        assert _snils_check("112-233-445 00") is False
 
 
 class TestPIIDetector:
@@ -103,3 +132,62 @@ class TestPIIDetector:
         redacted, matches = detector.redact_dict(data)
         assert redacted == data
         assert len(matches) == 0
+
+    # --- RU-specific PII tests ---
+
+    def test_detect_inn_10_valid(self, detector):
+        """Detect a valid 10-digit INN."""
+        matches = detector.scan("INN: 7707083893", "data")
+        inn_matches = [m for m in matches if m.pii_type == PIIType.INN]
+        assert len(inn_matches) == 1
+
+    def test_reject_inn_10_invalid(self, detector):
+        """Reject an INN with bad checksum."""
+        matches = detector.scan("INN: 7707083890", "data")
+        inn_matches = [m for m in matches if m.pii_type == PIIType.INN]
+        assert len(inn_matches) == 0
+
+    def test_detect_inn_12_valid(self, detector):
+        """Detect a valid 12-digit INN."""
+        matches = detector.scan("ИНН: 500100732259", "data")
+        inn_matches = [m for m in matches if m.pii_type == PIIType.INN]
+        assert len(inn_matches) == 1
+
+    def test_detect_snils_valid(self, detector):
+        """Detect a valid SNILS with correct checksum."""
+        matches = detector.scan("СНИЛС: 112-233-445 95", "data")
+        snils_matches = [m for m in matches if m.pii_type == PIIType.SNILS]
+        assert len(snils_matches) == 1
+
+    def test_reject_snils_invalid(self, detector):
+        """Reject a SNILS with wrong checksum."""
+        matches = detector.scan("СНИЛС: 112-233-445 00", "data")
+        snils_matches = [m for m in matches if m.pii_type == PIIType.SNILS]
+        assert len(snils_matches) == 0
+
+    def test_detect_ru_phone_plus7(self, detector):
+        """Detect a Russian phone: +7 (999) 123-45-67."""
+        matches = detector.scan("Тел: +7 (999) 123-45-67", "data")
+        ru_phone = [m for m in matches if m.pii_type == PIIType.RU_PHONE]
+        assert len(ru_phone) == 1
+
+    def test_detect_ru_phone_8(self, detector):
+        """Detect a Russian phone starting with 8."""
+        matches = detector.scan("Тел: 8(999)1234567", "data")
+        ru_phone = [m for m in matches if m.pii_type == PIIType.RU_PHONE]
+        assert len(ru_phone) == 1
+
+    def test_detect_ru_passport(self, detector):
+        """Detect a Russian passport number."""
+        matches = detector.scan("Паспорт: 45 06 123456", "data")
+        rp = [m for m in matches if m.pii_type == PIIType.RU_PASSPORT]
+        assert len(rp) == 1
+
+    def test_detect_multiple_ru_pii(self, detector):
+        """Detect multiple RU PII types in one text."""
+        text = "ИНН 7707083893, тел +7(999)123-45-67"
+        matches = detector.scan(text, "data")
+        types = {m.pii_type for m in matches}
+        assert PIIType.INN in types
+        assert PIIType.RU_PHONE in types
+

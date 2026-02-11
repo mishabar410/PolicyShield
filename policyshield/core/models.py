@@ -40,6 +40,11 @@ class PIIType(str, Enum):
     IP_ADDRESS = "IP_ADDRESS"
     PASSPORT = "PASSPORT"
     DATE_OF_BIRTH = "DATE_OF_BIRTH"
+    # RU-specific
+    INN = "INN"
+    SNILS = "SNILS"
+    RU_PASSPORT = "RU_PASSPORT"
+    RU_PHONE = "RU_PHONE"
     CUSTOM = "CUSTOM"
 
 

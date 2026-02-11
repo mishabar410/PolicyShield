@@ -31,6 +31,41 @@ def _luhn_check(number: str) -> bool:
     return total % 10 == 0
 
 
+def _inn_check(inn_str: str) -> bool:
+    """Validate Russian INN (10 or 12 digits) with checksum."""
+    digits = [int(d) for d in inn_str if d.isdigit()]
+    if len(digits) == 10:
+        weights = [2, 4, 10, 3, 5, 9, 4, 6, 8]
+        checksum = sum(d * w for d, w in zip(digits, weights)) % 11 % 10
+        return checksum == digits[9]
+    elif len(digits) == 12:
+        w11 = [7, 2, 4, 10, 3, 5, 9, 4, 6, 8]
+        w12 = [3, 7, 2, 4, 10, 3, 5, 9, 4, 6, 8]
+        c11 = sum(d * w for d, w in zip(digits, w11)) % 11 % 10
+        c12 = sum(d * w for d, w in zip(digits, w12)) % 11 % 10
+        return c11 == digits[10] and c12 == digits[11]
+    return False
+
+
+def _snils_check(snils_str: str) -> bool:
+    """Validate Russian SNILS (11 digits, format: XXX-XXX-XXX XX)."""
+    digits = [int(d) for d in snils_str if d.isdigit()]
+    if len(digits) != 11:
+        return False
+    first9 = digits[:9]
+    control = digits[9] * 10 + digits[10]
+    total = sum(d * (9 - i) for i, d in enumerate(first9))
+    if total < 100:
+        expected = total
+    elif total == 100 or total == 101:
+        expected = 0
+    else:
+        expected = total % 101
+        if expected == 100:
+            expected = 0
+    return expected == control
+
+
 # Built-in PII patterns
 BUILTIN_PATTERNS: list[PIIPattern] = [
     PIIPattern(
@@ -73,6 +108,27 @@ BUILTIN_PATTERNS: list[PIIPattern] = [
         pattern=re.compile(r"\b(?:\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}|\d{4}[/.-]\d{1,2}[/.-]\d{1,2})\b"),
         label="date_of_birth",
     ),
+    # --- RU-specific patterns ---
+    PIIPattern(
+        pii_type=PIIType.INN,
+        pattern=re.compile(r"\b\d{10}(?:\d{2})?\b"),
+        label="inn",
+    ),
+    PIIPattern(
+        pii_type=PIIType.SNILS,
+        pattern=re.compile(r"\b\d{3}-\d{3}-\d{3}\s?\d{2}\b"),
+        label="snils",
+    ),
+    PIIPattern(
+        pii_type=PIIType.RU_PASSPORT,
+        pattern=re.compile(r"\b\d{2}\s?\d{2}\s?\d{6}\b"),
+        label="ru_passport",
+    ),
+    PIIPattern(
+        pii_type=PIIType.RU_PHONE,
+        pattern=re.compile(r"(?:\+7|8)[\s(-]*\d{3}[\s)-]*\d{3}[\s-]*\d{2}[\s-]*\d{2}\b"),
+        label="ru_phone",
+    ),
 ]
 
 
@@ -109,6 +165,14 @@ class PIIDetector:
                 if pii_pattern.pii_type == PIIType.CREDIT_CARD:
                     digits = re.sub(r"[^\d]", "", matched_text)
                     if not _luhn_check(digits):
+                        continue
+                # Extra validation for INN
+                if pii_pattern.pii_type == PIIType.INN:
+                    if not _inn_check(matched_text):
+                        continue
+                # Extra validation for SNILS
+                if pii_pattern.pii_type == PIIType.SNILS:
+                    if not _snils_check(matched_text):
                         continue
 
                 matches.append(
