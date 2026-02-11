@@ -98,11 +98,12 @@ class TestShieldEngineRedact:
 
 
 class TestShieldEngineApprove:
-    def test_approve_required(self, approve_rules):
+    def test_approve_no_backend_blocks(self, approve_rules):
+        """Without approval backend, APPROVE rules result in BLOCK."""
         engine = ShieldEngine(approve_rules)
         result = engine.check("delete_user", {"user_id": "123"})
-        assert result.verdict == Verdict.APPROVE
-        assert "[APPROVE]" in result.message
+        assert result.verdict == Verdict.BLOCK
+        assert "no approval backend" in result.message.lower()
 
 
 class TestShieldEngineAudit:

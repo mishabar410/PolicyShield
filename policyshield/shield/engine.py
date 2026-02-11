@@ -8,6 +8,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+from policyshield.approval.base import ApprovalBackend, ApprovalRequest
 from policyshield.core.exceptions import PolicyShieldError
 from policyshield.core.models import (
     RuleSet,
@@ -40,6 +41,8 @@ class ShieldEngine:
         session_manager: SessionManager | None = None,
         trace_recorder: TraceRecorder | None = None,
         rate_limiter: object | None = None,
+        approval_backend: ApprovalBackend | None = None,
+        approval_timeout: float = 300.0,
         fail_open: bool = True,
     ):
         """Initialize ShieldEngine.
@@ -51,6 +54,8 @@ class ShieldEngine:
             session_manager: Optional session manager instance.
             trace_recorder: Optional trace recorder instance.
             rate_limiter: Optional RateLimiter instance.
+            approval_backend: Optional approval backend for APPROVE verdicts.
+            approval_timeout: Seconds to wait for approval response.
             fail_open: If True, errors in shield don't block tool calls.
         """
         # Load rules
@@ -68,6 +73,8 @@ class ShieldEngine:
         self._verdict_builder = VerdictBuilder()
         self._tracer = trace_recorder
         self._rate_limiter = rate_limiter
+        self._approval_backend = approval_backend
+        self._approval_timeout = approval_timeout
         self._fail_open = fail_open
         self._lock = threading.Lock()
         self._watcher = None
@@ -205,10 +212,35 @@ class ShieldEngine:
                 pii_matches=all_pii,
             )
         elif rule.then == Verdict.APPROVE:
-            return self._verdict_builder.approve(
-                rule=rule,
+            if self._approval_backend is None:
+                return ShieldResult(
+                    verdict=Verdict.BLOCK,
+                    rule_id=rule.id,
+                    message="No approval backend configured",
+                )
+            req = ApprovalRequest.create(
                 tool_name=tool_name,
                 args=args,
+                rule_id=rule.id,
+                message=rule.message or "Approval required",
+                session_id=session_id,
+            )
+            self._approval_backend.submit(req)
+            resp = self._approval_backend.wait_for_response(
+                req.request_id, timeout=self._approval_timeout
+            )
+            if resp is None:
+                return ShieldResult(
+                    verdict=Verdict.BLOCK,
+                    rule_id=rule.id,
+                    message="Approval timed out",
+                )
+            if resp.approved:
+                return self._verdict_builder.allow(rule=rule, args=args)
+            return ShieldResult(
+                verdict=Verdict.BLOCK,
+                rule_id=rule.id,
+                message=f"Approval denied by {resp.responder}" if resp.responder else "Approval denied",
             )
         else:
             return self._verdict_builder.allow(rule=rule, args=args)
