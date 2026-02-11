@@ -6,29 +6,9 @@
 
 **Declarative firewall for AI agent tool calls.**
 
-Write rules in YAML → PolicyShield enforces them on every tool call → get an audit log.
-
-```yaml
-rules:
-  - id: no-pii-external
-    description: "Block PII from being sent to external services"
-    when:
-      tool: [web_fetch, web_search]
-    then: block
-    message: "PII detected. Redact before sending externally."
-```
+Write rules in YAML → PolicyShield enforces them at runtime → get a full audit trail.
 
 ---
-
-## Why
-
-AI agents interact with the world through **tool calls**: shell commands, files, HTTP, messages. Today's controls are either prompts ("please don't delete") or ad-hoc regex checks. Both are unreliable, don't cover all tools, and leave no audit trail.
-
-PolicyShield fixes this:
-- **Declarative rules** (YAML) instead of hardcoded checks
-- **Runtime enforcement** on every tool call
-- **Repair loop** — when blocked, the agent gets an explanation and can self-correct
-- **Audit trail** (JSONL) — proof of compliance
 
 ## Quick Start
 
@@ -36,7 +16,7 @@ PolicyShield fixes this:
 pip install policyshield
 ```
 
-Create rules in `policies/rules.yaml`:
+**1. Define rules** in `policies/rules.yaml`:
 
 ```yaml
 shield_name: my-agent
@@ -47,13 +27,15 @@ rules:
       tool: delete_file
     then: block
     message: "File deletion is not allowed."
+
+  - id: no-pii-external
+    when:
+      tool: [web_fetch, web_search]
+    then: redact
+    message: "PII detected — redacting before external request."
 ```
 
-Validate and use:
-
-```bash
-policyshield validate ./policies/
-```
+**2. Enforce:**
 
 ```python
 from policyshield.shield import ShieldEngine
@@ -61,73 +43,97 @@ from policyshield.shield import ShieldEngine
 engine = ShieldEngine("./policies/rules.yaml")
 result = engine.check("delete_file", {"path": "/data"})
 # result.verdict == Verdict.BLOCK
+# result.message == "File deletion is not allowed."
 ```
 
-See the full [Quick Start Guide](docs/QUICKSTART.md) for more.
+**3. Validate & inspect:**
 
-## Features
+```bash
+policyshield validate ./policies/
+policyshield lint ./policies/rules.yaml
+policyshield trace show ./traces/trace.jsonl
+```
 
-### Core (v0.1)
+See the [Quick Start Guide](docs/QUICKSTART.md) for the full walkthrough.
 
-| Feature | Description |
-|---------|-------------|
-| YAML DSL | Human-readable rules with regex, glob, and exact match |
-| Verdicts | `ALLOW`, `BLOCK`, `APPROVE`, `REDACT` |
-| PII Detection | EMAIL, PHONE, CREDIT_CARD, SSN, IBAN, IP, PASSPORT, DOB |
-| Repair Loop | Agent gets structured counterexamples on block |
-| Trace Log | JSONL audit trail for every decision |
-| CLI | `validate`, `trace show`, `trace violations` |
-
-### v0.3 (current)
-
-| Feature | Description |
-|---------|-------------|
-| Async Engine | Full async/await ShieldEngine for FastAPI, aiohttp, async agents |
-| CrewAI Adapter | Wrap CrewAI tools with shield enforcement |
-| Nanobot Integration | `ShieldedToolRegistry` extends nanobot's `ToolRegistry` with shield enforcement |
-| OpenTelemetry | OTLP export to Jaeger/Grafana (spans + metrics) |
-| Webhook Approval | HTTP webhook with HMAC signing for external approval |
-| Rule Testing | YAML test cases for policies (`policyshield test`) |
-| Policy Diff | Compare rule sets, detect additions/removals/changes |
-| Trace Export | Export JSONL to CSV or standalone HTML report |
-| Input Sanitizer | Normalize args, block prompt injection patterns |
-| Config File | Unified `policyshield.yaml` with env vars and JSON Schema |
-
-### v0.2
-
-| Feature | Description |
-|---------|-------------|
-| Rule Linter | 6 static checks: duplicates, invalid regex, broad patterns, missing messages, conflicts, disabled rules |
-| Hot Reload | File-watcher auto-reloads YAML rules on change |
-| Advanced PII | RU patterns: INN (with checksum), SNILS, passport, phone; custom PII via YAML |
-| Rate Limiter | Sliding-window rate limits per tool, configurable in YAML |
-| Approval Flow | Human-in-the-loop `APPROVE` verdict with InMemory, CLI, and Telegram backends |
-| Batch Approve | Caching strategies: `once`, `per_session`, `per_rule`, `per_tool` |
-| Trace Stats | Aggregated statistics: verdict/tool/rule distribution, latency percentiles, block rate |
-| LangChain Adapter | `PolicyShieldTool` wraps any LangChain `BaseTool`; `shield_all_tools()` for bulk wrapping |
+---
 
 ## How It Works
 
 ```
-LLM wants to call web_fetch(url="...?email=john@corp.com")
+LLM calls web_fetch(url="...?email=john@corp.com")
       │
       ▼
   PolicyShield pre-call check
       │
-      ├── PII detected (email) → rule no-pii-external → BLOCK
+      ├─ PII detected (email) → rule no-pii-external → BLOCK
       │
       ▼
-  Agent receives counterexample:
-  "🛡️ BLOCKED: PII detected. Redact email before external request."
+  Agent gets structured explanation + counterexample
       │
       ▼
-  LLM replans: web_fetch(url="...?email=[REDACTED]")
+  LLM replans → web_fetch(url="...?email=[REDACTED]")
       │
       ▼
-  PolicyShield: OK → ALLOW → tool executes
+  PolicyShield → ALLOW → tool executes
 ```
 
-## Rules — YAML DSL
+---
+
+## Features
+
+| Category | What you get |
+|----------|-------------|
+| **YAML DSL** | Declarative rules with regex, glob, exact match, session conditions |
+| **Verdicts** | `ALLOW` · `BLOCK` · `REDACT` · `APPROVE` (human-in-the-loop) |
+| **PII Detection** | EMAIL, PHONE, CREDIT_CARD, SSN, IBAN, IP, PASSPORT, DOB + custom patterns |
+| **Async Engine** | Full `async`/`await` support for FastAPI, aiohttp, async agents |
+| **Approval Flow** | InMemory, CLI, Telegram, and Webhook backends with caching strategies |
+| **Rate Limiting** | Sliding-window per tool/session, configurable in YAML |
+| **Hot Reload** | File-watcher auto-reloads rules on change |
+| **Input Sanitizer** | Normalize args, block prompt injection patterns |
+| **OpenTelemetry** | OTLP export to Jaeger/Grafana (spans + metrics) |
+| **Trace & Audit** | JSONL log, stats, violations, CSV/HTML export |
+| **Rule Testing** | YAML test cases for policies (`policyshield test`) |
+| **Rule Linter** | Static analysis: duplicates, broad patterns, missing messages, conflicts |
+| **Policy Diff** | Compare rule sets, detect additions/removals/changes |
+| **Config File** | Unified `policyshield.yaml` with env-var support and JSON Schema |
+
+---
+
+## Integrations
+
+### LangChain
+
+```python
+from policyshield.integrations.langchain import PolicyShieldTool, shield_all_tools
+
+safe_tool = PolicyShieldTool(wrapped_tool=my_tool, engine=engine)
+safe_tools = shield_all_tools([tool1, tool2], engine)
+```
+
+### CrewAI
+
+```python
+from policyshield.integrations.crewai import shield_crewai_tools
+
+safe_tools = shield_crewai_tools([tool1, tool2], engine)
+```
+
+### Nanobot
+
+```python
+from nanobot.agent.loop import AgentLoop
+
+loop = AgentLoop(
+    model="gpt-4",
+    shield_config={"rules": "policies/rules.yaml"},
+)
+```
+
+---
+
+## Rules DSL
 
 ```yaml
 rules:
@@ -145,11 +151,6 @@ rules:
     then: approve
     approval_strategy: per_rule
 
-  - id: rate-limit-web
-    when:
-      tool: web_fetch
-    then: allow
-
 rate_limits:
   - tool: web_fetch
     max_calls: 10
@@ -161,68 +162,33 @@ pii_patterns:
     pattern: "EMP-\\d{6}"
 ```
 
+---
+
 ## CLI
 
 ```bash
-# Validate rules
-policyshield validate ./policies/
+policyshield validate ./policies/          # Validate rules
+policyshield lint ./policies/rules.yaml    # Static analysis (6 checks)
+policyshield test ./policies/              # Run YAML test cases
 
-# Lint rules (static analysis)
-policyshield lint ./policies/rules.yaml
-
-# View trace log
 policyshield trace show ./traces/trace.jsonl
 policyshield trace violations ./traces/trace.jsonl
-
-# Aggregated statistics
-policyshield trace stats ./traces/trace.jsonl
 policyshield trace stats ./traces/trace.jsonl --format json
+policyshield trace export ./traces/trace.jsonl -f html
 ```
 
-## LangChain Integration
-
-```bash
-pip install policyshield[langchain]
-```
-
-```python
-from langchain_core.tools import BaseTool
-from policyshield.integrations.langchain import PolicyShieldTool, shield_all_tools
-
-# Wrap a single tool
-safe_tool = PolicyShieldTool(wrapped_tool=my_tool, engine=engine)
-
-# Wrap all tools at once
-safe_tools = shield_all_tools([tool1, tool2], engine)
-```
-
-See [`examples/langchain_demo.py`](examples/langchain_demo.py) for a full example.
-
-## Nanobot Integration
-
-```python
-from nanobot.agent.loop import AgentLoop
-
-# Enable PolicyShield in nanobot's agent loop
-loop = AgentLoop(
-    model="gpt-4",
-    shield_config={"rules": "policies/rules.yaml"},
-)
-# All tool calls now go through PolicyShield pre-check
-```
-
-See [`examples/nanobot_shield_example.py`](examples/nanobot_shield_example.py) for details.
+---
 
 ## Examples
 
-See [`examples/policies/`](examples/policies/) for production-ready rule sets:
+| Example | Description |
+|---------|-------------|
+| [`examples/langchain_demo.py`](examples/langchain_demo.py) | LangChain tool wrapping |
+| [`examples/async_demo.py`](examples/async_demo.py) | Async engine usage |
+| [`examples/nanobot_shield_example.py`](examples/nanobot_shield_example.py) | Nanobot integration |
+| [`examples/policies/`](examples/policies/) | Production-ready rule sets (security, compliance, full) |
 
-| File | Description |
-|------|-------------|
-| [`full.yaml`](examples/policies/full.yaml) | All v0.2 features: rate limits, custom PII, approval strategy |
-| [`security.yaml`](examples/policies/security.yaml) | Destructive commands, PII, downloads, workspace boundaries |
-| [`compliance.yaml`](examples/policies/compliance.yaml) | PII redaction, rate limiting, shell audit logging |
-| [`minimal.yaml`](examples/policies/minimal.yaml) | Minimal example with detailed comments |
+---
 
 ## Development
 
@@ -232,24 +198,20 @@ cd policyshield
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev,langchain]"
 
-# Run tests
-pytest tests/ -v
-
-# Lint
-ruff check policyshield/ tests/
-
-# Coverage
-pytest tests/ --cov=policyshield --cov-report=term-missing
+pytest tests/ -v                 # 437 tests
+ruff check policyshield/ tests/  # Lint
 ```
+
+---
 
 ## Roadmap
 
-| Version | Features |
-|---------|----------|
-| **v0.1** ✅ | YAML DSL, BLOCK/ALLOW/REDACT/APPROVE verdicts, PII detection, repair loop, JSONL trace, CLI |
-| **v0.2** ✅ | Rule linter, hot reload, advanced PII, rate limiter, approval flow, batch approve, trace stats, LangChain adapter |
-| **v0.3** ✅ | Async engine, CrewAI / nanobot adapters, OTel, webhook approval, rule testing, policy diff, trace export, input sanitizer, config file |
-| **v1.0** | Stable API, PyPI publish, dashboard UI |
+| Version | Status |
+|---------|--------|
+| **v0.1** | ✅ Core: YAML DSL, verdicts, PII, repair loop, trace, CLI |
+| **v0.2** | ✅ Linter, hot reload, rate limiter, approval flow, LangChain adapter |
+| **v0.3** | ✅ Async engine, CrewAI/Nanobot, OTel, webhooks, rule testing, policy diff |
+| **v1.0** | 🚧 Stable API, PyPI publish, dashboard UI |
 
 ---
 
