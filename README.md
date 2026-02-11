@@ -128,36 +128,32 @@ rules:
     message: "File deletion is disabled."
 ```
 
-### Step 3. Add `shield_config` to your AgentLoop
+### Step 3. Add PolicyShield to your AgentLoop
 
-In your nanobot startup code, add one parameter:
+After creating your `AgentLoop`, call `shield_agent_loop()` to add enforcement:
 
 ```python
 from nanobot.agent.loop import AgentLoop
+from policyshield.integrations.nanobot import shield_agent_loop
 
-loop = AgentLoop(
-    bus=bus,
-    provider=provider,
-    workspace=workspace,
-    # ↓ Add this to enable PolicyShield ↓
-    shield_config={
-        "rules_path": "policies/rules.yaml",
-    },
-)
+# Create your agent loop as usual
+loop = AgentLoop(bus=bus, provider=provider, workspace=workspace)
+
+# ↓ Add this one line to enable PolicyShield ↓
+shield_agent_loop(loop, rules_path="policies/rules.yaml")
 ```
 
 That's it. Every tool call your agent makes will now pass through PolicyShield. Blocked tools return an error message to the LLM, which replans automatically.
 
 ### What happens under the hood
 
-When you pass `shield_config`, PolicyShield automatically:
+`shield_agent_loop()` monkey-patches your existing loop instance (no nanobot source changes needed):
 
 1. **Wraps the ToolRegistry** — every `execute()` call is checked against your rules
 2. **Filters blocked tools from LLM context** — the LLM never sees tools it can't use
 3. **Injects constraints into the system prompt** — the LLM knows what's forbidden
 4. **Scans tool results for PII** — post-call audit and tainting
-5. **Propagates to subagents** — spawned subagents get the same rules
-6. **Tracks sessions** — rate limits work per-conversation
+5. **Tracks sessions** — rate limits work per-conversation
 
 ### Optional: standalone mode (no AgentLoop)
 
@@ -185,11 +181,12 @@ result = await registry.execute("delete_file", {"path": "/etc/passwd"})
 ### Configuration options
 
 ```python
-shield_config = {
-    "rules_path": "policies/rules.yaml",  # Required. Path to YAML rules
-    "mode": "ENFORCE",  # ENFORCE (default) | AUDIT (log only) | DISABLED
-    "fail_open": True,  # True (default): shield errors don't block tools
-}
+shield_agent_loop(
+    loop,
+    rules_path="policies/rules.yaml",  # Required. Path to YAML rules
+    mode="ENFORCE",       # ENFORCE (default) | AUDIT (log only) | DISABLED
+    fail_open=True,       # True (default): shield errors don't block tools
+)
 ```
 
 See the [full nanobot integration guide](docs/nanobot_integration.md) for approval flows, custom PII patterns, rate limiting, and more.
