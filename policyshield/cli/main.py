@@ -33,6 +33,10 @@ def app(args: list[str] | None = None) -> int:
     validate_parser = subparsers.add_parser("validate", help="Validate rule files")
     validate_parser.add_argument("path", help="Path to YAML rule file or directory")
 
+    # lint command
+    lint_parser = subparsers.add_parser("lint", help="Lint rule files for potential issues")
+    lint_parser.add_argument("path", help="Path to YAML rule file or directory")
+
     # trace command
     trace_parser = subparsers.add_parser("trace", help="Inspect trace logs")
     trace_subparsers = trace_parser.add_subparsers(dest="trace_command")
@@ -54,6 +58,8 @@ def app(args: list[str] | None = None) -> int:
 
     if parsed.command == "validate":
         return _cmd_validate(parsed.path)
+    elif parsed.command == "lint":
+        return _cmd_lint(parsed.path)
     elif parsed.command == "trace":
         if parsed.trace_command == "show":
             return _cmd_trace_show(parsed)
@@ -83,6 +89,51 @@ def _cmd_validate(path: str) -> int:
     except PolicyShieldParseError as e:
         print(f"✗ Error: {e}", file=sys.stderr)
         return 1
+
+
+def _cmd_lint(path: str) -> int:
+    """Lint YAML rule files for potential issues."""
+    from policyshield.lint import RuleLinter
+
+    try:
+        ruleset = load_rules(path)
+    except PolicyShieldParseError as e:
+        print(f"✗ Error loading rules: {e}", file=sys.stderr)
+        return 1
+
+    linter = RuleLinter()
+    warnings = linter.lint(ruleset)
+
+    if not warnings:
+        print("✓ No issues found")
+        return 0
+
+    errors = 0
+    warning_count = 0
+    info_count = 0
+
+    for w in warnings:
+        if w.level == "ERROR":
+            icon = "✗"
+            errors += 1
+        elif w.level == "WARNING":
+            icon = "⚠"
+            warning_count += 1
+        else:
+            icon = "ℹ"
+            info_count += 1
+        print(f"{icon} {w.level} [{w.rule_id}] {w.check}: {w.message}")
+
+    parts = []
+    if errors:
+        parts.append(f"{errors} error{'s' if errors != 1 else ''}")
+    if warning_count:
+        parts.append(f"{warning_count} warning{'s' if warning_count != 1 else ''}")
+    if info_count:
+        parts.append(f"{info_count} info")
+    print(f"\n{', '.join(parts)}")
+
+    return 1 if errors > 0 else 0
 
 
 def _cmd_trace_show(parsed: argparse.Namespace) -> int:
