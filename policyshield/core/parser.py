@@ -10,6 +10,32 @@ from policyshield.core.exceptions import PolicyShieldParseError
 from policyshield.core.models import RuleConfig, RuleSet, Verdict
 
 
+def parse_sanitizer_config(data: dict) -> dict | None:
+    """Extract sanitizer configuration from parsed YAML data.
+
+    Returns a dict suitable for ``SanitizerConfig(**result)`` or *None* if no config present.
+    """
+    raw = data.get("sanitizer")
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        raise PolicyShieldParseError("'sanitizer' must be a mapping")
+    allowed_keys = {
+        "max_string_length",
+        "max_args_depth",
+        "max_total_keys",
+        "strip_whitespace",
+        "strip_null_bytes",
+        "normalize_unicode",
+        "strip_control_chars",
+        "blocked_patterns",
+    }
+    unknown = set(raw) - allowed_keys
+    if unknown:
+        raise PolicyShieldParseError(f"Unknown sanitizer keys: {unknown}")
+    return dict(raw)
+
+
 def parse_rule_file(file_path: str | Path) -> dict:
     """Parse a single YAML rule file and return raw dict.
 

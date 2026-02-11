@@ -47,6 +47,7 @@ class ShieldEngine:
         approval_cache: ApprovalCache | None = None,
         fail_open: bool = True,
         otel_exporter: object | None = None,
+        sanitizer: object | None = None,
     ):
         """Initialize ShieldEngine.
 
@@ -61,6 +62,7 @@ class ShieldEngine:
             approval_timeout: Seconds to wait for approval response.
             fail_open: If True, errors in shield don't block tool calls.
             otel_exporter: Optional OTelExporter for OpenTelemetry integration.
+            sanitizer: Optional InputSanitizer for arg sanitization.
         """
         # Load rules
         if isinstance(rules, (str, Path)):
@@ -82,6 +84,7 @@ class ShieldEngine:
         self._approval_cache = approval_cache
         self._fail_open = fail_open
         self._otel = otel_exporter
+        self._sanitizer = sanitizer
         self._lock = threading.Lock()
         self._watcher = None
 
@@ -163,6 +166,17 @@ class ShieldEngine:
         sender: str | None,
     ) -> ShieldResult:
         """Internal check logic."""
+        # Sanitize args (before any other processing)
+        if self._sanitizer is not None:
+            san_result = self._sanitizer.sanitize(args)
+            if san_result.rejected:
+                return ShieldResult(
+                    verdict=Verdict.BLOCK,
+                    rule_id="__sanitizer__",
+                    message=san_result.rejection_reason,
+                )
+            args = san_result.sanitized_args
+
         # Rate limit check (before rule matching)
         if self._rate_limiter is not None:
             rl_result = self._rate_limiter.check(tool_name, session_id)

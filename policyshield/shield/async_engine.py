@@ -49,6 +49,7 @@ class AsyncShieldEngine:
         approval_cache: ApprovalCache | None = None,
         fail_open: bool = True,
         otel_exporter: object | None = None,
+        sanitizer: object | None = None,
     ):
         """Initialize AsyncShieldEngine.
 
@@ -64,6 +65,7 @@ class AsyncShieldEngine:
             approval_cache: Optional approval cache for batch strategies.
             fail_open: If True, errors in shield don't block tool calls.
             otel_exporter: Optional OTelExporter for OpenTelemetry integration.
+            sanitizer: Optional InputSanitizer for arg sanitization.
         """
         if isinstance(rules, (str, Path)):
             self._rule_set = load_rules(rules)
@@ -84,6 +86,7 @@ class AsyncShieldEngine:
         self._approval_cache = approval_cache
         self._fail_open = fail_open
         self._otel = otel_exporter
+        self._sanitizer = sanitizer
         self._lock = asyncio.Lock()
 
     async def check(
@@ -169,6 +172,17 @@ class AsyncShieldEngine:
         sender: str | None,
     ) -> ShieldResult:
         """Internal check logic — offloads CPU-bound work to threads."""
+        # Sanitize args
+        if self._sanitizer is not None:
+            san_result = self._sanitizer.sanitize(args)
+            if san_result.rejected:
+                return ShieldResult(
+                    verdict=Verdict.BLOCK,
+                    rule_id="__sanitizer__",
+                    message=san_result.rejection_reason,
+                )
+            args = san_result.sanitized_args
+
         # Rate limit check
         if self._rate_limiter is not None:
             rl_result = self._rate_limiter.check(tool_name, session_id)
