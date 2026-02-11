@@ -71,6 +71,13 @@ def app(args: list[str] | None = None) -> int:
     stats_parser.add_argument("file", help="Path to JSONL trace file")
     stats_parser.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
 
+    # trace export
+    export_parser = trace_subparsers.add_parser("export", help="Export trace to CSV or HTML")
+    export_parser.add_argument("file", help="Path to JSONL trace file")
+    export_parser.add_argument("--format", choices=["csv", "html"], default="csv", help="Export format")
+    export_parser.add_argument("--output", help="Output file path")
+    export_parser.add_argument("--title", default="PolicyShield Trace Report", help="HTML report title")
+
     parsed = parser.parse_args(args)
 
     if parsed.command == "validate":
@@ -88,6 +95,8 @@ def app(args: list[str] | None = None) -> int:
             return _cmd_trace_violations(parsed)
         elif parsed.trace_command == "stats":
             return _cmd_trace_stats(parsed)
+        elif parsed.trace_command == "export":
+            return _cmd_trace_export(parsed)
         else:
             trace_parser.print_help()
             return 1
@@ -282,6 +291,33 @@ def _cmd_trace_stats(parsed: argparse.Namespace) -> int:
     else:
         print(format_stats(stats))
 
+    return 0
+
+
+def _cmd_trace_export(parsed: argparse.Namespace) -> int:
+    """Export trace to CSV or HTML."""
+    from datetime import datetime as _dt
+
+    from policyshield.trace.exporter import TraceExporter
+
+    trace_path = Path(parsed.file)
+    if not trace_path.exists():
+        print(f"✗ Trace file not found: {parsed.file}", file=sys.stderr)
+        return 1
+
+    fmt = parsed.format
+    output = getattr(parsed, "output", None)
+    if not output:
+        stamp = _dt.now().strftime("%Y%m%d")
+        output = f"trace_export_{stamp}.{fmt}"
+
+    if fmt == "csv":
+        count = TraceExporter.to_csv(trace_path, output)
+    else:
+        title = getattr(parsed, "title", "PolicyShield Trace Report")
+        count = TraceExporter.to_html(trace_path, output, title=title)
+
+    print(f"✓ Exported {count} records to {output}")
     return 0
 
 
