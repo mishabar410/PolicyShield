@@ -1,0 +1,188 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "PolicyShield Configuration",
+    "description": "JSON Schema for policyshield.yaml",
+    "type": "object",
+    "properties": {
+        "policyshield": {
+            "type": "object",
+            "properties": {
+                "version": {
+                    "type": "integer",
+                    "description": "Config schema version",
+                    "default": 1
+                },
+                "mode": {
+                    "type": "string",
+                    "enum": [
+                        "ENFORCE",
+                        "AUDIT",
+                        "DISABLED"
+                    ],
+                    "default": "ENFORCE"
+                },
+                "fail_open": {
+                    "type": "boolean",
+                    "default": true
+                },
+                "rules": {
+                    "type": "object",
+                    "properties": {
+                        "path": {
+                            "type": "string"
+                        },
+                        "watch": {
+                            "type": "boolean",
+                            "default": false
+                        },
+                        "watch_interval": {
+                            "type": "number",
+                            "default": 2.0
+                        }
+                    },
+                    "required": [
+                        "path"
+                    ]
+                },
+                "pii": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "default": true
+                        },
+                        "custom_patterns": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "name": {
+                                        "type": "string"
+                                    },
+                                    "pattern": {
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "name",
+                                    "pattern"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "rate_limiter": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "default": true
+                        }
+                    }
+                },
+                "sanitizer": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "default": false
+                        },
+                        "max_string_length": {
+                            "type": "integer",
+                            "default": 10000
+                        },
+                        "blocked_patterns": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
+                "trace": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "default": true
+                        },
+                        "output_dir": {
+                            "type": "string",
+                            "default": "./traces/"
+                        },
+                        "batch_size": {
+                            "type": "integer",
+                            "default": 100
+                        },
+                        "privacy_mode": {
+                            "type": "boolean",
+                            "default": false
+                        }
+                    }
+                },
+                "otel": {
+                    "type": "object",
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean",
+                            "default": false
+                        },
+                        "service_name": {
+                            "type": "string",
+                            "default": "policyshield"
+                        },
+                        "endpoint": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "approval": {
+                    "type": "object",
+                    "properties": {
+                        "backend": {
+                            "type": "string",
+                            "enum": [
+                                "inmemory",
+                                "cli",
+                                "telegram",
+                                "webhook"
+                            ],
+                            "default": "inmemory"
+                        },
+                        "timeout": {
+                            "type": "number",
+                            "default": 300.0
+                        },
+                        "telegram": {
+                            "type": "object",
+                            "properties": {
+                                "bot_token": {
+                                    "type": "string"
+                                },
+                                "chat_id": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "webhook": {
+                            "type": "object",
+                            "properties": {
+                                "url": {
+                                    "type": "string"
+                                },
+                                "secret": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "additionalProperties": false
+        }
+    },
+    "required": [
+        "policyshield"
+    ],
+    "additionalProperties": false
+}

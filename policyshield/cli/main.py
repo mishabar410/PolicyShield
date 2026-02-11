@@ -78,6 +78,15 @@ def app(args: list[str] | None = None) -> int:
     export_parser.add_argument("--output", help="Output file path")
     export_parser.add_argument("--title", default="PolicyShield Trace Report", help="HTML report title")
 
+    # config command
+    config_parser = subparsers.add_parser("config", help="Manage policyshield config")
+    config_subparsers = config_parser.add_subparsers(dest="config_command")
+    val_parser = config_subparsers.add_parser("validate", help="Validate config file")
+    val_parser.add_argument("path", nargs="?", default="policyshield.yaml", help="Config file path")
+    show_parser2 = config_subparsers.add_parser("show", help="Show resolved config")
+    show_parser2.add_argument("path", nargs="?", default=None, help="Config file path")
+    config_subparsers.add_parser("init", help="Create default policyshield.yaml")
+
     parsed = parser.parse_args(args)
 
     if parsed.command == "validate":
@@ -99,6 +108,16 @@ def app(args: list[str] | None = None) -> int:
             return _cmd_trace_export(parsed)
         else:
             trace_parser.print_help()
+            return 1
+    elif parsed.command == "config":
+        if parsed.config_command == "validate":
+            return _cmd_config_validate(parsed)
+        elif parsed.config_command == "show":
+            return _cmd_config_show(parsed)
+        elif parsed.config_command == "init":
+            return _cmd_config_init()
+        else:
+            config_parser.print_help()
             return 1
     else:
         parser.print_help()
@@ -320,6 +339,45 @@ def _cmd_trace_export(parsed: argparse.Namespace) -> int:
     print(f"✓ Exported {count} records to {output}")
     return 0
 
+
+def _cmd_config_validate(parsed: argparse.Namespace) -> int:
+    """Validate a policyshield config file."""
+    from policyshield.config.loader import validate_config_file
+
+    errors = validate_config_file(parsed.path)
+    if errors:
+        print(f"✗ Config errors in {parsed.path}:", file=sys.stderr)
+        for e in errors:
+            print(f"  - {e}", file=sys.stderr)
+        return 1
+    print(f"✓ Config valid: {parsed.path}")
+    return 0
+
+
+def _cmd_config_show(parsed: argparse.Namespace) -> int:
+    """Show resolved config."""
+    from policyshield.config.loader import load_config, render_config
+
+    try:
+        cfg = load_config(path=getattr(parsed, "path", None))
+    except (FileNotFoundError, ValueError) as e:
+        print(f"✗ {e}", file=sys.stderr)
+        return 1
+    print(render_config(cfg))
+    return 0
+
+
+def _cmd_config_init() -> int:
+    """Create default policyshield.yaml."""
+    from policyshield.config.loader import generate_default_config
+
+    target = Path("policyshield.yaml")
+    if target.exists():
+        print(f"✗ {target} already exists", file=sys.stderr)
+        return 1
+    target.write_text(generate_default_config(), encoding="utf-8")
+    print(f"✓ Created {target}")
+    return 0
 
 def _display_trace(
     file_path: str,
