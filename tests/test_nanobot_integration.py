@@ -337,3 +337,60 @@ class TestGetDefinitionsFilter:
         engine = ShieldEngine(_make_ruleset([]))
         registry = ShieldedToolRegistry(engine)
         assert registry._get_unconditionally_blocked_tools() == set()
+
+
+# ── Context Enrichment ─────────────────────────────────────────────
+
+
+class TestContextEnrichment:
+    """Tests verifying get_constraints_summary output."""
+
+    def test_summary_with_rules(self):
+        """Summary includes active rule descriptions."""
+        engine = ShieldEngine(
+            _make_ruleset([
+                RuleConfig(
+                    id="block-exec",
+                    description="No shell execution",
+                    when={"tool": "exec"},
+                    then=Verdict.BLOCK,
+                    message="exec is forbidden",
+                ),
+                RuleConfig(
+                    id="redact-send",
+                    description="Redact PII in messages",
+                    when={"tool": "send_message"},
+                    then=Verdict.REDACT,
+                ),
+            ])
+        )
+        registry = ShieldedToolRegistry(engine)
+        summary = registry.get_constraints_summary()
+        assert "PolicyShield Constraints" in summary
+        assert "BLOCK" in summary
+        assert "exec" in summary
+        assert "exec is forbidden" in summary
+        assert "REDACT" in summary
+        assert "send_message" in summary
+
+    def test_summary_empty_rules(self):
+        """No active rules → empty summary."""
+        engine = ShieldEngine(_make_ruleset([]))
+        registry = ShieldedToolRegistry(engine)
+        assert registry.get_constraints_summary() == ""
+
+    def test_summary_disabled_rules_excluded(self):
+        """Disabled rules → not shown in summary."""
+        engine = ShieldEngine(
+            _make_ruleset([
+                RuleConfig(
+                    id="disabled-rule",
+                    description="This is disabled",
+                    when={"tool": "exec"},
+                    then=Verdict.BLOCK,
+                    enabled=False,
+                ),
+            ])
+        )
+        registry = ShieldedToolRegistry(engine)
+        assert registry.get_constraints_summary() == ""

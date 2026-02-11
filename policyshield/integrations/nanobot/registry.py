@@ -187,3 +187,38 @@ class ShieldedToolRegistry(_NanobotToolRegistry):  # type: ignore[misc]
                 blocked.add(rule.when["tool"])
         return blocked
 
+    # ── context enrichment ───────────────────────────────────────────
+
+    def get_constraints_summary(self) -> str:
+        """Return a human-readable summary of active policy constraints.
+
+        Intended to be appended to the LLM system prompt so the model
+        knows about security boundaries *before* it attempts tool calls.
+
+        Returns:
+            Multi-line string summarising rules, or empty string if
+            no active rules exist.
+        """
+        active_rules = [
+            r for r in self._engine._rule_set.rules if r.enabled
+        ]
+        if not active_rules:
+            return ""
+
+        lines = ["## PolicyShield Constraints", ""]
+        lines.append(
+            "The following security policies are active. "
+            "Violating them will result in your tool call being blocked or modified."
+        )
+        lines.append("")
+
+        for rule in active_rules:
+            verdict_label = rule.then.name
+            tool_name = rule.when.get("tool", "*")
+            desc = rule.description or rule.id
+            line = f"- **{verdict_label}** `{tool_name}`: {desc}"
+            if rule.message:
+                line += f" — {rule.message}"
+            lines.append(line)
+
+        return "\n".join(lines)
