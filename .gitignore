@@ -42,7 +42,7 @@ CLAUDE.md
 TECHNICAL_SPEC.md
 INTEGRATION_SPEC.md
 *.docx
-nanobot/
+/nanobot/
 prompts/
 demo.py
 demo_traces/
