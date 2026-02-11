@@ -189,19 +189,23 @@ class TestShieldedToolRegistryE2E:
     """Scenario 10: Full integration with ShieldedToolRegistry."""
 
     def test_registry_blocks_destructive(self):
+        import asyncio
+
         engine = ShieldEngine(FIXTURES_DIR / "security.yaml")
         registry = ShieldedToolRegistry(engine)
 
         exec_called = []
         read_called = []
-        registry.register("exec", lambda **kw: exec_called.append(kw))
-        registry.register("read_file", lambda **kw: read_called.append(kw))
+        registry.register_func("exec", lambda **kw: exec_called.append(kw) or "ok")
+        registry.register_func("read_file", lambda **kw: read_called.append(kw) or "ok")
 
-        # Blocked call
-        with pytest.raises(PolicyViolation):
-            registry.execute("exec", {"command": "rm -rf /"})
+        # Blocked call returns shield message
+        result = asyncio.run(registry.execute("exec", {"command": "rm -rf /"}))
+        assert "BLOCKED" in result
         assert len(exec_called) == 0  # exec was NOT called
 
         # Allowed call
-        registry.execute("read_file", {"path": "/tmp"})
+        result = asyncio.run(registry.execute("read_file", {"path": "/tmp"}))
+        assert result == "ok"
         assert len(read_called) == 1  # read_file WAS called
+
