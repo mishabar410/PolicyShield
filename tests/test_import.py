@@ -10,7 +10,7 @@ def test_import_policyshield():
 def test_version():
     import policyshield
 
-    assert policyshield.__version__ == "0.1.0"
+    assert policyshield.__version__ == "0.2.0"
 
 
 def test_import_core():

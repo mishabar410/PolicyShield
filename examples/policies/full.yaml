@@ -1,0 +1,60 @@
+# Full PolicyShield Rules Example (v0.2)
+# Demonstrates all v0.2 features: rate limits, PII patterns, approval strategy
+
+shield_name: acme-ai-firewall
+version: 2
+
+# Custom PII patterns
+pii_patterns:
+  - name: EMPLOYEE_ID
+    pattern: "EMP-\\d{6}"
+  - name: PROJECT_CODE
+    pattern: "PROJ-[A-Z]{3}-\\d{4}"
+
+# Rate limits (sliding window)
+rate_limits:
+  - tool: web_fetch
+    max_calls: 10
+    window_seconds: 60
+    per_session: true
+    message: "Too many web requests — slow down"
+  - tool: exec
+    max_calls: 3
+    window_seconds: 300
+    per_session: false
+    message: "Global exec limit reached"
+
+# Rules
+rules:
+  # Block dangerous shell commands
+  - id: no-destructive-shell
+    when:
+      tool: exec
+      args_match:
+        command:
+          regex: "(rm\\s+-rf|mkfs|dd\\s+if=|shutdown|reboot)"
+    then: block
+    message: "Destructive commands are forbidden"
+    severity: critical
+
+  # Require approval for file deletion
+  - id: approve-file-delete
+    when:
+      tool: delete_file
+    then: approve
+    message: "File deletion requires human approval"
+    approval_strategy: per_rule
+
+  # Redact PII in outbound messages
+  - id: redact-pii-outbound
+    when:
+      tool: send_email
+    then: redact
+    message: "PII redacted from outbound email"
+
+  # Allow read-only operations
+  - id: allow-reads
+    when:
+      tool: read_file
+    then: allow
+    severity: low
