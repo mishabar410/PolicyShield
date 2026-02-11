@@ -314,12 +314,20 @@ class BaseShieldEngine:
         if self._mode == ShieldMode.DISABLED:
             return self._verdict_builder.allow()
 
-        if isinstance(result, dict):
-            pii_matches = self._pii.scan_dict(result)
-            for pm in pii_matches:
-                self._session_mgr.add_taint(session_id, pm.pii_type)
+        pii_matches: list = []
 
-        return self._verdict_builder.allow()
+        if isinstance(result, str):
+            pii_matches = self._pii.scan(result)
+        elif isinstance(result, dict):
+            pii_matches = self._pii.scan_dict(result)
+
+        for pm in pii_matches:
+            self._session_mgr.add_taint(session_id, pm.pii_type)
+
+        return ShieldResult(
+            verdict=Verdict.ALLOW,
+            pii_matches=pii_matches,
+        )
 
     # ------------------------------------------------------------------ #
     #  Rule management                                                    #

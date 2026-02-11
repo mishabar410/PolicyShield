@@ -227,3 +227,50 @@ class TestSessionPropagation:
         asyncio.run(main())
         assert set(captured) == {"sess-A", "sess-B"}
 
+
+# ── Post-call PII Scan ─────────────────────────────────────────────
+
+
+class TestPostCallPIIScan:
+    """Tests verifying post-call PII scan on tool results."""
+
+    def test_postcall_clean_result(self, allow_all_engine):
+        """Tool returns clean text → no PII → result unchanged."""
+        registry = ShieldedToolRegistry(allow_all_engine)
+        registry.register_func("echo", lambda msg="": msg)
+        result = asyncio.run(registry.execute("echo", {"msg": "hello world"}))
+        assert result == "hello world"
+
+    def test_postcall_detects_email(self, allow_all_engine):
+        """Tool returns string with email → PII detected, session tainted."""
+        registry = ShieldedToolRegistry(allow_all_engine)
+        registry.register_func("read", lambda: "Contact: user@example.com")
+        result = asyncio.run(registry.execute("read", {}))
+        # Result is still returned (post-check doesn't block)
+        assert "user@example.com" in result
+        # Verify session taint was added
+        session = allow_all_engine._session_mgr.get_or_create("default")
+        from policyshield.core.models import PIIType
+
+        assert PIIType.EMAIL in session.taints
+
+    def test_postcall_error_failopen(self, allow_all_engine):
+        """post_check raises exception → fail_open → result still returned."""
+        registry = ShieldedToolRegistry(allow_all_engine, fail_open=True)
+        registry.register_func("echo", lambda msg="": msg)
+
+        # Monkey-patch post_check to raise
+        def bad_post_check(*_a, **_kw):
+            raise RuntimeError("post-check boom")
+
+        allow_all_engine.post_check = bad_post_check  # type: ignore[assignment]
+        result = asyncio.run(registry.execute("echo", {"msg": "data"}))
+        assert result == "data"
+
+    def test_postcall_returns_result(self, allow_all_engine):
+        """Tool result is always returned regardless of PII findings."""
+        registry = ShieldedToolRegistry(allow_all_engine)
+        pii_output = "SSN: 123-45-6789, Email: a@b.com"
+        registry.register_func("leak", lambda: pii_output)
+        result = asyncio.run(registry.execute("leak", {}))
+        assert result == pii_output

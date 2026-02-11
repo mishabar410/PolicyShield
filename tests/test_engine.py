@@ -218,3 +218,15 @@ rules:
         engine = ShieldEngine(block_exec_rules)
         result = engine.post_check("exec", {"output": "done"})
         assert result.verdict == Verdict.ALLOW
+
+    def test_post_check_string_pii(self, block_exec_rules):
+        """post_check on string with email → pii_matches contains EMAIL."""
+        engine = ShieldEngine(block_exec_rules)
+        result = engine.post_check("exec", "Contact: test@example.com today")
+        assert result.verdict == Verdict.ALLOW
+        assert len(result.pii_matches) > 0
+        from policyshield.core.models import PIIType
+
+        pii_types = {m.pii_type for m in result.pii_matches}
+        assert PIIType.EMAIL in pii_types
+

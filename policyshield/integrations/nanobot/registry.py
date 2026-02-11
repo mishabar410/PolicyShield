@@ -99,16 +99,36 @@ class ShieldedToolRegistry(_NanobotToolRegistry):  # type: ignore[misc]
 
         # Delegate to parent's execute (nanobot) or standalone fallback
         if _HAS_NANOBOT:
-            return await super().execute(name, params)
+            tool_result = await super().execute(name, params)
+        else:
+            # Standalone fallback
+            func = self._tools.get(name)
+            if not func:
+                return f"Error: Tool '{name}' not found"
+            try:
+                tool_result = str(func(**params))
+            except Exception as exc:
+                return f"Error executing {name}: {exc}"
 
-        # Standalone fallback
-        func = self._tools.get(name)
-        if not func:
-            return f"Error: Tool '{name}' not found"
+        # Post-call PII scan on tool output
         try:
-            return str(func(**params))
+            post_result = self._engine.post_check(
+                tool_name=name,
+                result=tool_result,
+                session_id=session_id,
+            )
+            if post_result.pii_matches:
+                logger.info(
+                    "POST-CHECK %s: %d PII match(es) in output",
+                    name,
+                    len(post_result.pii_matches),
+                )
         except Exception as exc:
-            return f"Error executing {name}: {exc}"
+            if self._fail_open:
+                logger.warning("Post-check error (fail-open): %s", exc)
+            # Post-check errors never block the result
+
+        return tool_result
 
     # ── standalone helpers (when nanobot not installed) ───────────────
 
