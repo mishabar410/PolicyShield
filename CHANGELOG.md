@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.4.0] - 2025-02-12
+
+### Added
+- Session ID propagation from `AgentLoop` to `ShieldEngine` for per-session rate limiting
+- Post-call PII scan: tool results are scanned and tainted PII types are recorded
+- `get_definitions()` override: unconditionally blocked tools are hidden from LLM context
+- Context enrichment: active policy constraints are injected into the LLM system prompt
+- Subagent shield propagation via `SubagentManager.shield_config`
+- `approval_backend` parameter in `install_shield()` for CLI/Telegram/Webhook approval flows
+- Comprehensive nanobot integration guide (`docs/nanobot_integration.md`)
+- Working examples: `nanobot_shield_example.py`, `nanobot_shield_agentloop.py`, `nanobot_rules.yaml`
+- Integration tests with real nanobot `Tool` objects (`test_nanobot_real_tools.py`)
+- 26 new tests, bringing total to 461
+
 ## [0.3.1] - 2025-02-11
 
 ### Fixed

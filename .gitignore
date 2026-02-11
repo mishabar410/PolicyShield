@@ -46,3 +46,5 @@ nanobot/
 prompts/
 demo.py
 demo_traces/
+.gemini/
+.antigravityignore

@@ -2,7 +2,8 @@
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-459_passing-brightgreen.svg)](#development)
+[![CI](https://github.com/mishabar410/PolicyShield/actions/workflows/ci.yml/badge.svg)](https://github.com/mishabar410/PolicyShield/actions/workflows/ci.yml)
+[![Coverage: 92%](https://img.shields.io/badge/coverage-92%25-brightgreen.svg)](#development)
 
 **Declarative firewall for AI agent tool calls.**
 
@@ -213,8 +214,8 @@ policyshield trace export ./traces/trace.jsonl -f html
 ## Development
 
 ```bash
-git clone https://github.com/policyshield/policyshield.git
-cd policyshield
+git clone https://github.com/mishabar410/PolicyShield.git
+cd PolicyShield
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev,langchain]"
 
