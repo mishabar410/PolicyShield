@@ -15,9 +15,7 @@ Covers:
 from __future__ import annotations
 
 import asyncio
-import textwrap
 import threading
-import time
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
@@ -29,14 +27,12 @@ from policyshield.core.models import (
     PIIType,
     RuleConfig,
     RuleSet,
-    Severity,
     Verdict,
 )
 from policyshield.core.parser import _parse_rule, load_rules
 from policyshield.shield.engine import ShieldEngine
 from policyshield.shield.matcher import MAX_PATTERN_LENGTH, MatcherEngine
 from policyshield.shield.pii import PIIDetector
-from policyshield.shield.session import SessionManager
 from policyshield.trace.recorder import TraceRecorder
 
 
@@ -190,8 +186,8 @@ class TestAsyncReloadRulesThreadSafety:
             [{"id": "r1", "when": {"tool": "t"}, "then": "BLOCK"}],
         )
         engine = AsyncShieldEngine(str(rules_path))
-        assert hasattr(engine, "_reload_lock")
-        assert isinstance(engine._reload_lock, type(threading.Lock()))
+        assert hasattr(engine, "_lock")
+        assert isinstance(engine._lock, type(threading.Lock()))
 
     def test_reload_rules_does_not_corrupt(self, tmp_path):
         """Concurrent reload + check should not raise."""

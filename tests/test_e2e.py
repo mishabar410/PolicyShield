@@ -12,7 +12,7 @@ import pytest
 
 from policyshield.cli.main import app
 from policyshield.core.models import ShieldMode, Verdict
-from policyshield.integrations.nanobot.registry import PolicyViolation, ShieldedToolRegistry
+from policyshield.integrations.nanobot.registry import ShieldedToolRegistry
 from policyshield.shield.engine import ShieldEngine
 from policyshield.trace.recorder import TraceRecorder
 
