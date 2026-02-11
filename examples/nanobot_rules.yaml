@@ -1,0 +1,37 @@
+# PolicyShield rules for nanobot integration example
+shield_name: nanobot-example
+version: 1
+rules:
+  - id: block-exec-rm
+    description: "Block destructive rm commands"
+    when:
+      tool: exec
+      args:
+        command:
+          contains: "rm "
+    then: BLOCK
+    message: "Destructive 'rm' commands are not allowed"
+    severity: CRITICAL
+
+  - id: block-exec-sudo
+    description: "Block sudo commands"
+    when:
+      tool: exec
+      args:
+        command:
+          contains: "sudo"
+    then: BLOCK
+    message: "Sudo commands are not allowed"
+    severity: CRITICAL
+
+  - id: redact-pii-message
+    description: "Redact PII from outgoing messages"
+    when:
+      tool: send_message
+    then: REDACT
+
+  - id: redact-pii-write
+    description: "Redact PII from file writes"
+    when:
+      tool: write_file
+    then: REDACT
