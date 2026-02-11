@@ -18,6 +18,7 @@ def install_shield(
     existing_registry: Any | None = None,
     sanitizer: Any | None = None,
     trace_recorder: Any | None = None,
+    approval_backend: Any | None = None,
 ) -> ShieldedToolRegistry:
     """Create a ShieldedToolRegistry with PolicyShield enforcement.
 
@@ -29,6 +30,7 @@ def install_shield(
             If provided, all registered tools are copied over.
         sanitizer: Optional InputSanitizer instance.
         trace_recorder: Optional TraceRecorder instance.
+        approval_backend: Optional ApprovalBackend for APPROVE verdicts.
 
     Returns:
         Configured ShieldedToolRegistry.
@@ -39,6 +41,7 @@ def install_shield(
         fail_open=fail_open,
         sanitizer=sanitizer,
         trace_recorder=trace_recorder,
+        approval_backend=approval_backend,
     )
     registry = ShieldedToolRegistry(engine=engine, fail_open=fail_open)
 

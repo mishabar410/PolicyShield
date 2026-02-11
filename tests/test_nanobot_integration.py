@@ -446,3 +446,41 @@ class TestSubagentShieldPropagation:
             bus=bus,
         )
         assert mgr.shield_config is None
+
+
+# ── Approval Flow ──────────────────────────────────────────────────
+
+
+class TestApprovalFlow:
+    """Tests verifying approval flow in nanobot integration."""
+
+    def test_approve_verdict_returns_message(self):
+        """APPROVE verdict → returns pending message, tool not executed."""
+        engine = ShieldEngine(
+            _make_ruleset([
+                RuleConfig(
+                    id="approve-write",
+                    when={"tool": "write_file"},
+                    then=Verdict.APPROVE,
+                    message="File writes require approval",
+                ),
+            ])
+        )
+        registry = ShieldedToolRegistry(engine)
+        executed = []
+        registry.register_func("write_file", lambda path="": executed.append(path))
+        result = asyncio.run(registry.execute("write_file", {"path": "/etc/passwd"}))
+        # Without approval backend, APPROVE falls back to BLOCKED
+        assert "BLOCKED" in result or "APPROVAL REQUIRED" in result
+        assert len(executed) == 0  # Tool was NOT executed
+
+    def test_install_shield_with_approval_backend(self):
+        """install_shield accepts and passes approval_backend to engine."""
+        from policyshield.approval.cli_backend import CLIBackend
+
+        backend = CLIBackend(input_func=lambda _: "n")
+        registry = install_shield(
+            rules_path="examples/nanobot_rules.yaml",
+            approval_backend=backend,
+        )
+        assert registry._engine._approval_backend is backend

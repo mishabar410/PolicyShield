@@ -2,7 +2,7 @@
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-437_passing-brightgreen.svg)](#development)
+[![Tests](https://img.shields.io/badge/tests-459_passing-brightgreen.svg)](#development)
 
 **Declarative firewall for AI agent tool calls.**
 
@@ -122,14 +122,32 @@ safe_tools = shield_crewai_tools([tool1, tool2], engine)
 
 ### Nanobot
 
+**AgentLoop** (automatic tool wrapping + session propagation):
+
 ```python
 from nanobot.agent.loop import AgentLoop
 
 loop = AgentLoop(
-    model="gpt-4",
-    shield_config={"rules": "policies/rules.yaml"},
+    bus=bus, provider=provider, workspace=workspace,
+    shield_config={
+        "rules_path": "policies/rules.yaml",
+        "mode": "ENFORCE",
+        "fail_open": True,
+    },
 )
 ```
+
+**Standalone** (no LLM required):
+
+```python
+from policyshield.integrations.nanobot.installer import install_shield
+
+registry = install_shield(rules_path="policies/rules.yaml")
+registry.register_func("echo", lambda message="": message)
+result = await registry.execute("echo", {"message": "hello"})
+```
+
+Features: pre-call enforcement, post-call PII scan, LLM context enrichment, definition filtering, subagent propagation, approval flow. See the [full integration guide](docs/nanobot_integration.md).
 
 ---
 
@@ -185,7 +203,9 @@ policyshield trace export ./traces/trace.jsonl -f html
 |---------|-------------|
 | [`examples/langchain_demo.py`](examples/langchain_demo.py) | LangChain tool wrapping |
 | [`examples/async_demo.py`](examples/async_demo.py) | Async engine usage |
-| [`examples/nanobot_shield_example.py`](examples/nanobot_shield_example.py) | Nanobot integration |
+| [`examples/nanobot_shield_example.py`](examples/nanobot_shield_example.py) | Nanobot standalone integration |
+| [`examples/nanobot_shield_agentloop.py`](examples/nanobot_shield_agentloop.py) | AgentLoop configuration reference |
+| [`examples/nanobot_rules.yaml`](examples/nanobot_rules.yaml) | Nanobot policy rules |
 | [`examples/policies/`](examples/policies/) | Production-ready rule sets (security, compliance, full) |
 
 ---
@@ -198,7 +218,7 @@ cd policyshield
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev,langchain]"
 
-pytest tests/ -v                 # 437 tests
+pytest tests/ -v                 # 459 tests
 ruff check policyshield/ tests/  # Lint
 ```
 
