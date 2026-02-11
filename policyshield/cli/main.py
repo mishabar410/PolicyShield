@@ -37,6 +37,12 @@ def app(args: list[str] | None = None) -> int:
     lint_parser = subparsers.add_parser("lint", help="Lint rule files for potential issues")
     lint_parser.add_argument("path", help="Path to YAML rule file or directory")
 
+    # test command
+    test_parser = subparsers.add_parser("test", help="Run YAML-based rule tests")
+    test_parser.add_argument("path", help="Path to test file or directory")
+    test_parser.add_argument("-v", "--verbose", action="store_true", help="Show details for each test")
+    test_parser.add_argument("--json", dest="json_output", action="store_true", help="JSON output")
+
     # trace command
     trace_parser = subparsers.add_parser("trace", help="Inspect trace logs")
     trace_subparsers = trace_parser.add_subparsers(dest="trace_command")
@@ -64,6 +70,8 @@ def app(args: list[str] | None = None) -> int:
         return _cmd_validate(parsed.path)
     elif parsed.command == "lint":
         return _cmd_lint(parsed.path)
+    elif parsed.command == "test":
+        return _cmd_test(parsed)
     elif parsed.command == "trace":
         if parsed.trace_command == "show":
             return _cmd_trace_show(parsed)
@@ -140,6 +148,64 @@ def _cmd_lint(path: str) -> int:
     print(f"\n{', '.join(parts)}")
 
     return 1 if errors > 0 else 0
+
+
+def _cmd_test(parsed: argparse.Namespace) -> int:
+    """Run YAML-based rule tests."""
+    from policyshield.testing.runner import TestRunner
+
+    runner = TestRunner()
+    target = Path(parsed.path)
+    verbose = parsed.verbose
+    json_output = getattr(parsed, "json_output", False)
+
+    try:
+        if target.is_dir():
+            suites = runner.run_directory(target)
+        else:
+            suites = [runner.run_file(target)]
+    except (FileNotFoundError, ValueError) as e:
+        print(f"✗ {e}", file=sys.stderr)
+        return 1
+
+    if json_output:
+        out = []
+        for s in suites:
+            suite_data = {
+                "suite": s.name,
+                "total": s.total,
+                "passed": s.passed,
+                "failed": s.failed,
+                "results": [
+                    {
+                        "name": r.test_case.name,
+                        "passed": r.passed,
+                        "actual_verdict": r.actual_verdict.value,
+                        "failure_reason": r.failure_reason,
+                    }
+                    for r in s.results
+                ],
+            }
+            out.append(suite_data)
+        print(json.dumps(out, indent=2))
+        has_failures = any(s.failed > 0 for s in suites)
+        return 1 if has_failures else 0
+
+    # Text output
+    has_failures = False
+    for suite in suites:
+        print(f"\n🧪 Test Suite: {suite.name}")
+        for r in suite.results:
+            if r.passed:
+                print(f"  ✓ {r.test_case.name}")
+            else:
+                has_failures = True
+                print(f"  ✗ {r.test_case.name}")
+                if verbose and r.failure_reason:
+                    print(f"    {r.failure_reason}")
+        print(f"\n{suite.passed}/{suite.total} passed, {suite.failed} failed")
+
+    return 1 if has_failures else 0
 
 
 def _cmd_trace_show(parsed: argparse.Namespace) -> int:

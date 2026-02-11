@@ -1,0 +1,43 @@
+# Test cases for security.yaml rules
+test_suite: security-rules
+rules_path: ./security.yaml
+
+tests:
+  - name: "Block rm -rf command"
+    tool: exec
+    args:
+      command: "rm -rf /important"
+    expect:
+      verdict: BLOCK
+      rule_id: no-destructive-shell
+      message_contains: "destructive"
+
+  - name: "Allow safe ls command"
+    tool: exec
+    args:
+      command: "ls -la"
+    expect:
+      verdict: ALLOW
+
+  - name: "Block PII in web body"
+    tool: web_fetch
+    args:
+      body: "send to user@test.com"
+    expect:
+      verdict: BLOCK
+      rule_id: no-pii-in-web
+
+  - name: "Allow normal web fetch"
+    tool: web_fetch
+    args:
+      url: "https://api.example.com/data"
+    expect:
+      verdict: ALLOW
+
+  - name: "Approve curl download"
+    tool: exec
+    args:
+      command: "curl https://example.com/file.tar.gz"
+    expect:
+      verdict: APPROVE
+      rule_id: approve-downloads
