@@ -71,6 +71,20 @@ def app(args: list[str] | None = None) -> int:
     stats_parser.add_argument("file", help="Path to JSONL trace file")
     stats_parser.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
 
+    # trace search
+    search_parser = trace_subparsers.add_parser("search", help="Search traces with filters")
+    search_parser.add_argument("--dir", default="./traces", help="Trace directory (default: ./traces)")
+    search_parser.add_argument("--tool", help="Filter by tool name")
+    search_parser.add_argument("--verdict", help="Filter by verdict (ALLOW, BLOCK, REDACT, APPROVE)")
+    search_parser.add_argument("--session", help="Filter by session ID")
+    search_parser.add_argument("--text", help="Full-text search in args, message, tool")
+    search_parser.add_argument("--rule", help="Filter by rule ID")
+    search_parser.add_argument("--pii", help="Filter by PII type")
+    search_parser.add_argument("--from", dest="time_from", help="Start time (ISO datetime)")
+    search_parser.add_argument("--to", dest="time_to", help="End time (ISO datetime)")
+    search_parser.add_argument("--limit", type=int, default=50, help="Max results (default: 50)")
+    search_parser.add_argument("--format", choices=["table", "json"], default="table", help="Output format")
+
     # trace export
     export_parser = trace_subparsers.add_parser("export", help="Export trace to CSV or HTML")
     export_parser.add_argument("file", help="Path to JSONL trace file")
@@ -151,6 +165,8 @@ def app(args: list[str] | None = None) -> int:
             return _cmd_trace_violations(parsed)
         elif parsed.trace_command == "stats":
             return _cmd_trace_stats(parsed)
+        elif parsed.trace_command == "search":
+            return _cmd_trace_search(parsed)
         elif parsed.trace_command == "export":
             return _cmd_trace_export(parsed)
         else:
@@ -459,6 +475,54 @@ def _cmd_trace_stats(parsed: argparse.Namespace) -> int:
         print(json.dumps(stats.to_dict(), indent=2))
     else:
         print(format_stats(stats))
+
+    return 0
+
+
+def _cmd_trace_search(parsed: argparse.Namespace) -> int:
+    """Search traces with filters."""
+    from datetime import datetime as _dt
+
+    from policyshield.trace.search import SearchQuery, TraceSearchEngine
+
+    trace_dir = Path(parsed.dir)
+    if not trace_dir.exists():
+        print(f"✗ Trace directory not found: {parsed.dir}", file=sys.stderr)
+        return 1
+
+    query = SearchQuery(
+        tool=parsed.tool,
+        verdict=parsed.verdict,
+        session_id=parsed.session,
+        text=parsed.text,
+        rule_id=parsed.rule,
+        pii_type=parsed.pii,
+        time_from=_dt.fromisoformat(parsed.time_from) if parsed.time_from else None,
+        time_to=_dt.fromisoformat(parsed.time_to) if parsed.time_to else None,
+        limit=parsed.limit,
+    )
+
+    engine = TraceSearchEngine(trace_dir)
+    result = engine.search(query)
+
+    if parsed.format == "json":
+        output = {
+            "total": result.total,
+            "records": result.records,
+        }
+        print(json.dumps(output, indent=2, default=str))
+    else:
+        if not result.records:
+            print(f"No results found (total: {result.total})")
+            return 0
+        for rec in result.records:
+            verdict = rec.get("verdict", "?")
+            tool = rec.get("tool", "?")
+            ts = rec.get("timestamp", "?")
+            session = rec.get("session_id", "?")
+            icon = "✓" if verdict == "ALLOW" else "✗"
+            print(f"{icon} [{verdict}] {tool} | session={session} | {ts}")
+        print(f"\n({len(result.records)} of {result.total} shown)")
 
     return 0
 
