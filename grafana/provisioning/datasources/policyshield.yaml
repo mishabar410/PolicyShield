@@ -1,0 +1,12 @@
+# Grafana Provisioning for PolicyShield Dashboard
+# Place this file in /etc/grafana/provisioning/datasources/
+
+apiVersion: 1
+
+datasources:
+  - name: PolicyShield-Prometheus
+    type: prometheus
+    access: proxy
+    url: http://localhost:9090
+    isDefault: true
+    editable: true

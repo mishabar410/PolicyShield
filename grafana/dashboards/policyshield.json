@@ -1,0 +1,168 @@
+{
+    "annotations": {
+        "list": []
+    },
+    "editable": true,
+    "fiscalYearStartMonth": 0,
+    "graphTooltip": 0,
+    "id": null,
+    "links": [],
+    "liveNow": false,
+    "panels": [
+        {
+            "title": "Verdict Distribution",
+            "type": "piechart",
+            "datasource": "PolicyShield-Prometheus",
+            "gridPos": {
+                "h": 8,
+                "w": 8,
+                "x": 0,
+                "y": 0
+            },
+            "targets": [
+                {
+                    "expr": "policyshield_verdicts_allow",
+                    "legendFormat": "ALLOW"
+                },
+                {
+                    "expr": "policyshield_verdicts_block",
+                    "legendFormat": "BLOCK"
+                },
+                {
+                    "expr": "policyshield_verdicts_redact",
+                    "legendFormat": "REDACT"
+                },
+                {
+                    "expr": "policyshield_verdicts_approve",
+                    "legendFormat": "APPROVE"
+                }
+            ]
+        },
+        {
+            "title": "Block Rate",
+            "type": "gauge",
+            "datasource": "PolicyShield-Prometheus",
+            "gridPos": {
+                "h": 8,
+                "w": 8,
+                "x": 8,
+                "y": 0
+            },
+            "targets": [
+                {
+                    "expr": "policyshield_block_rate",
+                    "legendFormat": "Block Rate"
+                }
+            ],
+            "fieldConfig": {
+                "defaults": {
+                    "unit": "percentunit",
+                    "max": 1,
+                    "thresholds": {
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            },
+                            {
+                                "color": "yellow",
+                                "value": 0.1
+                            },
+                            {
+                                "color": "red",
+                                "value": 0.3
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+        {
+            "title": "Total Verdicts",
+            "type": "stat",
+            "datasource": "PolicyShield-Prometheus",
+            "gridPos": {
+                "h": 8,
+                "w": 8,
+                "x": 16,
+                "y": 0
+            },
+            "targets": [
+                {
+                    "expr": "policyshield_verdicts_total",
+                    "legendFormat": "Total"
+                }
+            ]
+        },
+        {
+            "title": "Tool Call Counts",
+            "type": "barchart",
+            "datasource": "PolicyShield-Prometheus",
+            "gridPos": {
+                "h": 10,
+                "w": 12,
+                "x": 0,
+                "y": 8
+            },
+            "targets": [
+                {
+                    "expr": "policyshield_tool_calls",
+                    "legendFormat": "{{tool}}"
+                }
+            ]
+        },
+        {
+            "title": "Tool Block Counts",
+            "type": "barchart",
+            "datasource": "PolicyShield-Prometheus",
+            "gridPos": {
+                "h": 10,
+                "w": 12,
+                "x": 12,
+                "y": 8
+            },
+            "targets": [
+                {
+                    "expr": "policyshield_tool_blocks",
+                    "legendFormat": "{{tool}}"
+                }
+            ]
+        },
+        {
+            "title": "PII Detections",
+            "type": "table",
+            "datasource": "PolicyShield-Prometheus",
+            "gridPos": {
+                "h": 8,
+                "w": 24,
+                "x": 0,
+                "y": 18
+            },
+            "targets": [
+                {
+                    "expr": "policyshield_pii_detections",
+                    "legendFormat": "{{type}} in {{tool}}",
+                    "format": "table"
+                }
+            ]
+        }
+    ],
+    "schemaVersion": 38,
+    "style": "dark",
+    "tags": [
+        "policyshield",
+        "security"
+    ],
+    "templating": {
+        "list": []
+    },
+    "time": {
+        "from": "now-1h",
+        "to": "now"
+    },
+    "timepicker": {},
+    "timezone": "",
+    "title": "PolicyShield Dashboard",
+    "uid": "policyshield-main",
+    "version": 1
+}
