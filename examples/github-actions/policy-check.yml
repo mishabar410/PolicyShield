@@ -1,0 +1,24 @@
+# Example: PolicyShield Policy Check Workflow
+#
+# Add this to your repository's .github/workflows/ directory
+# to automatically validate rules on every PR.
+
+name: Policy Check
+
+on:
+  pull_request:
+    paths:
+      - 'policies/**'
+      - 'tests/test_rules.yaml'
+
+jobs:
+  lint-rules:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lint PolicyShield rules
+        uses: mishabar410/PolicyShield/.github/actions/lint-rules@main
+        with:
+          rules-path: policies/
+          test-path: tests/test_rules.yaml

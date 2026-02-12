@@ -1,0 +1,50 @@
+name: 'PolicyShield Lint Rules'
+description: 'Validate and lint PolicyShield rules in your repository'
+
+inputs:
+  rules-path:
+    description: 'Path to rules YAML file or directory'
+    required: false
+    default: 'policies/'
+  test-path:
+    description: 'Path to test YAML file or directory'
+    required: false
+    default: ''
+  python-version:
+    description: 'Python version to use'
+    required: false
+    default: '3.12'
+  policyshield-version:
+    description: 'PolicyShield version to install'
+    required: false
+    default: 'latest'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install PolicyShield
+      shell: bash
+      run: |
+        if [ "${{ inputs.policyshield-version }}" = "latest" ]; then
+          pip install policyshield
+        else
+          pip install "policyshield==${{ inputs.policyshield-version }}"
+        fi
+
+    - name: Validate rules
+      shell: bash
+      run: policyshield validate ${{ inputs.rules-path }}
+
+    - name: Lint rules
+      shell: bash
+      run: policyshield lint ${{ inputs.rules-path }}
+
+    - name: Run rule tests
+      shell: bash
+      if: inputs.test-path != ''
+      run: policyshield test ${{ inputs.test-path }}
