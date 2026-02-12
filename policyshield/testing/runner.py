@@ -186,27 +186,18 @@ class TestRunner:
 
         # Check verdict
         if shield_result.verdict != case.expect_verdict:
-            reasons.append(
-                f"Expected verdict={case.expect_verdict.value}, "
-                f"got {shield_result.verdict.value}"
-            )
+            reasons.append(f"Expected verdict={case.expect_verdict.value}, got {shield_result.verdict.value}")
 
         # Check rule_id
         if case.expect_rule_id is not None:
             if shield_result.rule_id != case.expect_rule_id:
-                reasons.append(
-                    f"Expected rule_id={case.expect_rule_id!r}, "
-                    f"got {shield_result.rule_id!r}"
-                )
+                reasons.append(f"Expected rule_id={case.expect_rule_id!r}, got {shield_result.rule_id!r}")
 
         # Check message_contains
         if case.expect_message_contains is not None:
             msg = shield_result.message or ""
             if case.expect_message_contains.lower() not in msg.lower():
-                reasons.append(
-                    f"Expected message containing {case.expect_message_contains!r}, "
-                    f"got {msg!r}"
-                )
+                reasons.append(f"Expected message containing {case.expect_message_contains!r}, got {msg!r}")
 
         # Check PII
         if case.expect_pii_detected is not None:
@@ -214,10 +205,7 @@ class TestRunner:
             actual_set = {p.upper() for p in actual_pii}
             if not expected_set.issubset(actual_set):
                 missing = expected_set - actual_set
-                reasons.append(
-                    f"Expected PII types {expected_set}, "
-                    f"got {actual_set} (missing {missing})"
-                )
+                reasons.append(f"Expected PII types {expected_set}, got {actual_set} (missing {missing})")
 
         passed = len(reasons) == 0
         return TestResult(

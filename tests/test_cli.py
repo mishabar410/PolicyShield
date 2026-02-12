@@ -33,9 +33,24 @@ rules:
 def trace_file(tmp_path):
     f = tmp_path / "trace.jsonl"
     entries = [
-        {"timestamp": "2024-01-01T00:00:00", "session_id": "s1", "tool": "exec", "verdict": "BLOCK", "rule_id": "r1", "latency_ms": 1.5},
+        {
+            "timestamp": "2024-01-01T00:00:00",
+            "session_id": "s1",
+            "tool": "exec",
+            "verdict": "BLOCK",
+            "rule_id": "r1",
+            "latency_ms": 1.5,
+        },
         {"timestamp": "2024-01-01T00:00:01", "session_id": "s1", "tool": "read", "verdict": "ALLOW", "latency_ms": 0.5},
-        {"timestamp": "2024-01-01T00:00:02", "session_id": "s2", "tool": "write", "verdict": "REDACT", "rule_id": "r2", "pii_types": ["EMAIL"], "latency_ms": 2.0},
+        {
+            "timestamp": "2024-01-01T00:00:02",
+            "session_id": "s2",
+            "tool": "write",
+            "verdict": "REDACT",
+            "rule_id": "r2",
+            "pii_types": ["EMAIL"],
+            "latency_ms": 2.0,
+        },
     ]
     with open(f, "w") as fh:
         for entry in entries:

@@ -113,9 +113,7 @@ class TestApprovalCacheEngineIntegration:
         )
         backend = InMemoryBackend()
         cache = ApprovalCache(strategy=strategy)
-        engine = ShieldEngine(
-            rules, approval_backend=backend, approval_cache=cache
-        )
+        engine = ShieldEngine(rules, approval_backend=backend, approval_cache=cache)
         return engine, backend
 
     def test_engine_batch_approve_integration(self):
@@ -125,6 +123,7 @@ class TestApprovalCacheEngineIntegration:
 
         def approve_first():
             import time
+
             time.sleep(0.05)
             pending = backend.pending()
             if pending:
@@ -149,6 +148,7 @@ class TestApprovalCacheEngineIntegration:
 
         def approve():
             import time
+
             time.sleep(0.05)
             pending = backend.pending()
             if pending:

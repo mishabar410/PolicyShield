@@ -46,9 +46,7 @@ class InputSanitizer:
         self._config = config or SanitizerConfig()
         self._compiled_patterns: list[re.Pattern] | None = None
         if self._config.blocked_patterns:
-            self._compiled_patterns = [
-                re.compile(p, re.IGNORECASE) for p in self._config.blocked_patterns
-            ]
+            self._compiled_patterns = [re.compile(p, re.IGNORECASE) for p in self._config.blocked_patterns]
 
     def sanitize(self, args: dict) -> SanitizeResult:
         """Sanitize *args* according to the current config."""

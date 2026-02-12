@@ -65,6 +65,7 @@ def _write(tmp_path: Path, name: str, content: str) -> Path:
 
 # ── tests ──────────────────────────────────────────────────────────
 
+
 def test_load_default(tmp_path, monkeypatch):
     """Default config without a file."""
     monkeypatch.chdir(tmp_path)

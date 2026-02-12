@@ -190,4 +190,3 @@ class TestPIIDetector:
         types = {m.pii_type for m in matches}
         assert PIIType.INN in types
         assert PIIType.RU_PHONE in types
-

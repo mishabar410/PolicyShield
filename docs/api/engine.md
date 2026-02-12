@@ -1,8 +1,13 @@
 # Shield Engine API
 
-::: policyshield.engine
+::: policyshield.shield.engine
     options:
       show_source: true
       members:
         - ShieldEngine
+
+::: policyshield.shield.async_engine
+    options:
+      show_source: true
+      members:
         - AsyncShieldEngine

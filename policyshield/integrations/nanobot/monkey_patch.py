@@ -59,9 +59,7 @@ def shield_agent_loop(
         raise RuntimeError("PolicyShield is already installed on this AgentLoop")
 
     if not hasattr(loop, "tools") or not hasattr(loop, "_process_message"):
-        raise TypeError(
-            f"Expected a nanobot AgentLoop, got {type(loop).__name__}"
-        )
+        raise TypeError(f"Expected a nanobot AgentLoop, got {type(loop).__name__}")
 
     shield_mode = ShieldMode[mode.upper()]
     shield_config = {

@@ -43,9 +43,7 @@ class TestTelegramBackendUnit:
 
     def test_submit_sends_message(self):
         backend = self._make_backend()
-        backend._client.post.return_value = FakeHttpResponse(
-            {"ok": True, "result": {"message_id": 42}}
-        )
+        backend._client.post.return_value = FakeHttpResponse({"ok": True, "result": {"message_id": 42}})
         backend._client.get.return_value = FakeHttpResponse({"ok": True, "result": []})
 
         req = _make_request()
@@ -63,9 +61,7 @@ class TestTelegramBackendUnit:
 
     def test_submit_stores_pending(self):
         backend = self._make_backend()
-        backend._client.post.return_value = FakeHttpResponse(
-            {"ok": True, "result": {"message_id": 42}}
-        )
+        backend._client.post.return_value = FakeHttpResponse({"ok": True, "result": {"message_id": 42}})
         backend._client.get.return_value = FakeHttpResponse({"ok": True, "result": []})
 
         req = _make_request()
@@ -75,9 +71,7 @@ class TestTelegramBackendUnit:
 
     def test_respond_sets_event(self):
         backend = self._make_backend()
-        backend._client.post.return_value = FakeHttpResponse(
-            {"ok": True, "result": {"message_id": 42}}
-        )
+        backend._client.post.return_value = FakeHttpResponse({"ok": True, "result": {"message_id": 42}})
         backend._client.get.return_value = FakeHttpResponse({"ok": True, "result": []})
 
         req = _make_request()
@@ -91,9 +85,7 @@ class TestTelegramBackendUnit:
 
     def test_timeout_returns_none(self):
         backend = self._make_backend()
-        backend._client.post.return_value = FakeHttpResponse(
-            {"ok": True, "result": {"message_id": 42}}
-        )
+        backend._client.post.return_value = FakeHttpResponse({"ok": True, "result": {"message_id": 42}})
         backend._client.get.return_value = FakeHttpResponse({"ok": True, "result": []})
 
         req = _make_request()
@@ -104,9 +96,7 @@ class TestTelegramBackendUnit:
 
     def test_process_updates_approve(self):
         backend = self._make_backend()
-        backend._client.post.return_value = FakeHttpResponse(
-            {"ok": True, "result": {"message_id": 42}}
-        )
+        backend._client.post.return_value = FakeHttpResponse({"ok": True, "result": {"message_id": 42}})
         backend._client.get.return_value = FakeHttpResponse({"ok": True, "result": []})
 
         req = _make_request()
@@ -114,20 +104,25 @@ class TestTelegramBackendUnit:
         backend._stop_event.set()  # Stop auto-polling so we can control it
 
         import time
+
         time.sleep(0.1)
 
         # Simulate callback query
-        backend._client.get.return_value = FakeHttpResponse({
-            "ok": True,
-            "result": [{
-                "update_id": 1,
-                "callback_query": {
-                    "id": "cb1",
-                    "data": f"approve:{req.request_id}",
-                    "from": {"username": "testuser"},
-                },
-            }],
-        })
+        backend._client.get.return_value = FakeHttpResponse(
+            {
+                "ok": True,
+                "result": [
+                    {
+                        "update_id": 1,
+                        "callback_query": {
+                            "id": "cb1",
+                            "data": f"approve:{req.request_id}",
+                            "from": {"username": "testuser"},
+                        },
+                    }
+                ],
+            }
+        )
         backend._client.post.return_value = FakeHttpResponse({"ok": True})
 
         backend._process_updates()
@@ -140,9 +135,7 @@ class TestTelegramBackendUnit:
 
     def test_process_updates_deny(self):
         backend = self._make_backend()
-        backend._client.post.return_value = FakeHttpResponse(
-            {"ok": True, "result": {"message_id": 42}}
-        )
+        backend._client.post.return_value = FakeHttpResponse({"ok": True, "result": {"message_id": 42}})
         backend._client.get.return_value = FakeHttpResponse({"ok": True, "result": []})
 
         req = _make_request()
@@ -150,19 +143,24 @@ class TestTelegramBackendUnit:
         backend._stop_event.set()
 
         import time
+
         time.sleep(0.1)
 
-        backend._client.get.return_value = FakeHttpResponse({
-            "ok": True,
-            "result": [{
-                "update_id": 2,
-                "callback_query": {
-                    "id": "cb2",
-                    "data": f"deny:{req.request_id}",
-                    "from": {"username": "admin"},
-                },
-            }],
-        })
+        backend._client.get.return_value = FakeHttpResponse(
+            {
+                "ok": True,
+                "result": [
+                    {
+                        "update_id": 2,
+                        "callback_query": {
+                            "id": "cb2",
+                            "data": f"deny:{req.request_id}",
+                            "from": {"username": "admin"},
+                        },
+                    }
+                ],
+            }
+        )
         backend._client.post.return_value = FakeHttpResponse({"ok": True})
 
         backend._process_updates()
@@ -174,9 +172,7 @@ class TestTelegramBackendUnit:
 
     def test_multiple_pending(self):
         backend = self._make_backend()
-        backend._client.post.return_value = FakeHttpResponse(
-            {"ok": True, "result": {"message_id": 42}}
-        )
+        backend._client.post.return_value = FakeHttpResponse({"ok": True, "result": {"message_id": 42}})
         backend._client.get.return_value = FakeHttpResponse({"ok": True, "result": []})
 
         for i in range(3):

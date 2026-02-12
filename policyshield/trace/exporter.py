@@ -89,9 +89,7 @@ class TraceExporter:
             buf.write(f"<p><strong>Block rate:</strong> {stats.block_rate * 100:.1f}%</p>\n")
             buf.write(f"<p><strong>Unique sessions:</strong> {stats.session_count}</p>\n")
             if stats.time_range:
-                buf.write(
-                    f"<p><strong>Time range:</strong> {stats.time_range[0]} → {stats.time_range[1]}</p>\n"
-                )
+                buf.write(f"<p><strong>Time range:</strong> {stats.time_range[0]} → {stats.time_range[1]}</p>\n")
             # Verdict breakdown
             if stats.verdict_counts:
                 buf.write("<h3>Verdict Breakdown</h3>\n")

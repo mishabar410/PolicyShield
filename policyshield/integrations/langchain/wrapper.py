@@ -6,8 +6,7 @@ try:
     from langchain_core.tools import BaseTool, ToolException
 except ImportError as e:
     raise ImportError(
-        "langchain-core is required for LangChain integration. "
-        "Install it with: pip install policyshield[langchain]"
+        "langchain-core is required for LangChain integration. Install it with: pip install policyshield[langchain]"
     ) from e
 
 from typing import Any
@@ -81,9 +80,7 @@ class PolicyShieldTool(BaseTool):
         return await asyncio.to_thread(self._run, *args, **kwargs)
 
 
-def shield_all_tools(
-    tools: list[BaseTool], engine: ShieldEngine, **kwargs: Any
-) -> list[PolicyShieldTool]:
+def shield_all_tools(tools: list[BaseTool], engine: ShieldEngine, **kwargs: Any) -> list[PolicyShieldTool]:
     """Wrap all LangChain tools with PolicyShield.
 
     Usage:

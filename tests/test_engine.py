@@ -20,52 +20,60 @@ def make_ruleset(rules: list[RuleConfig]) -> RuleSet:
 
 @pytest.fixture
 def block_exec_rules():
-    return make_ruleset([
-        RuleConfig(
-            id="block-exec",
-            description="Block exec calls",
-            when={"tool": "exec"},
-            then=Verdict.BLOCK,
-            message="exec is not allowed",
-        )
-    ])
+    return make_ruleset(
+        [
+            RuleConfig(
+                id="block-exec",
+                description="Block exec calls",
+                when={"tool": "exec"},
+                then=Verdict.BLOCK,
+                message="exec is not allowed",
+            )
+        ]
+    )
 
 
 @pytest.fixture
 def redact_rules():
-    return make_ruleset([
-        RuleConfig(
-            id="redact-pii",
-            description="Redact PII in arguments",
-            when={"tool": "send_email"},
-            then=Verdict.REDACT,
-        )
-    ])
+    return make_ruleset(
+        [
+            RuleConfig(
+                id="redact-pii",
+                description="Redact PII in arguments",
+                when={"tool": "send_email"},
+                then=Verdict.REDACT,
+            )
+        ]
+    )
 
 
 @pytest.fixture
 def approve_rules():
-    return make_ruleset([
-        RuleConfig(
-            id="approve-delete",
-            description="Deletion requires approval",
-            when={"tool": "delete_user"},
-            then=Verdict.APPROVE,
-        )
-    ])
+    return make_ruleset(
+        [
+            RuleConfig(
+                id="approve-delete",
+                description="Deletion requires approval",
+                when={"tool": "delete_user"},
+                then=Verdict.APPROVE,
+            )
+        ]
+    )
 
 
 @pytest.fixture
 def rate_limit_rules():
-    return make_ruleset([
-        RuleConfig(
-            id="rate-limit",
-            description="Rate limit after 5 calls",
-            when={"tool": "api_call", "session": {"total_calls": {"gt": 5}}},
-            then=Verdict.BLOCK,
-            message="Rate limit exceeded",
-        )
-    ])
+    return make_ruleset(
+        [
+            RuleConfig(
+                id="rate-limit",
+                description="Rate limit after 5 calls",
+                when={"tool": "api_call", "session": {"total_calls": {"gt": 5}}},
+                then=Verdict.BLOCK,
+                message="Rate limit exceeded",
+            )
+        ]
+    )
 
 
 class TestShieldEngineAllow:
@@ -144,9 +152,7 @@ class TestShieldEngineTrace:
 class TestShieldEngineFailOpen:
     def test_fail_open_on_error(self):
         """Shield should allow if internal error and fail_open=True."""
-        rules = make_ruleset([
-            RuleConfig(id="r1", when={"tool": "test"}, then=Verdict.BLOCK)
-        ])
+        rules = make_ruleset([RuleConfig(id="r1", when={"tool": "test"}, then=Verdict.BLOCK)])
         engine = ShieldEngine(rules, fail_open=True)
 
         # Monkey-patch to cause error
@@ -229,4 +235,3 @@ rules:
 
         pii_types = {m.pii_type for m in result.pii_matches}
         assert PIIType.EMAIL in pii_types
-

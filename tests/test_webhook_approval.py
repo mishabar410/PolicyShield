@@ -133,9 +133,7 @@ def test_sync_hmac_signature():
         captured_headers.update(dict(request.headers))
         return httpx.Response(200, json={"approved": True})
 
-    backend = _make_backend(
-        handler, webhook_url="https://example.com/webhook", secret="my-secret"
-    )
+    backend = _make_backend(handler, webhook_url="https://example.com/webhook", secret="my-secret")
     _patched_submit(backend, _make_request())
 
     assert "x-policyshield-signature" in captured_headers

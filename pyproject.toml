@@ -48,6 +48,7 @@ dev = [
     "pytest-asyncio",
     "pytest-cov",
     "ruff",
+    "tomli; python_version < '3.11'",
 ]
 all = [
     "policyshield[langchain,crewai,otel,nanobot,docs,dev]",

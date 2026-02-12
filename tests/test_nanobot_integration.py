@@ -20,14 +20,16 @@ def _make_ruleset(rules: list[RuleConfig]) -> RuleSet:
 @pytest.fixture
 def block_exec_engine():
     return ShieldEngine(
-        _make_ruleset([
-            RuleConfig(
-                id="block-exec",
-                when={"tool": "exec"},
-                then=Verdict.BLOCK,
-                message="exec is blocked",
-            ),
-        ]),
+        _make_ruleset(
+            [
+                RuleConfig(
+                    id="block-exec",
+                    when={"tool": "exec"},
+                    then=Verdict.BLOCK,
+                    message="exec is blocked",
+                ),
+            ]
+        ),
     )
 
 
@@ -68,9 +70,11 @@ class TestShieldedRegistryStandalone:
 
     def test_redact_proceeds(self):
         """REDACT verdict should still execute the tool."""
-        rules = _make_ruleset([
-            RuleConfig(id="redact-pii", when={"tool": "send"}, then=Verdict.REDACT),
-        ])
+        rules = _make_ruleset(
+            [
+                RuleConfig(id="redact-pii", when={"tool": "send"}, then=Verdict.REDACT),
+            ]
+        )
         engine = ShieldEngine(rules)
         registry = ShieldedToolRegistry(engine)
 
@@ -167,6 +171,7 @@ rules:
 
 
 # ── Session Propagation ────────────────────────────────────────────
+
 
 class TestSessionPropagation:
     """Tests verifying session_id_var is correctly propagated."""
@@ -285,13 +290,15 @@ class TestGetDefinitionsFilter:
     def test_unconditionally_blocked_hidden(self):
         """Tool with unconditional BLOCK rule → excluded from get_definitions."""
         engine = ShieldEngine(
-            _make_ruleset([
-                RuleConfig(
-                    id="block-exec",
-                    when={"tool": "exec"},
-                    then=Verdict.BLOCK,
-                ),
-            ])
+            _make_ruleset(
+                [
+                    RuleConfig(
+                        id="block-exec",
+                        when={"tool": "exec"},
+                        then=Verdict.BLOCK,
+                    ),
+                ]
+            )
         )
         registry = ShieldedToolRegistry(engine)
         registry.register_func("echo", lambda msg="": msg)
@@ -304,13 +311,15 @@ class TestGetDefinitionsFilter:
     def test_conditional_block_not_hidden(self):
         """Rule with session conditions → not considered unconditional."""
         engine = ShieldEngine(
-            _make_ruleset([
-                RuleConfig(
-                    id="rate-limit",
-                    when={"tool": "api", "session": {"total_calls": {"gt": 5}}},
-                    then=Verdict.BLOCK,
-                ),
-            ])
+            _make_ruleset(
+                [
+                    RuleConfig(
+                        id="rate-limit",
+                        when={"tool": "api", "session": {"total_calls": {"gt": 5}}},
+                        then=Verdict.BLOCK,
+                    ),
+                ]
+            )
         )
         registry = ShieldedToolRegistry(engine)
         blocked = registry._get_unconditionally_blocked_tools()
@@ -319,14 +328,16 @@ class TestGetDefinitionsFilter:
     def test_disabled_rule_not_hidden(self):
         """Disabled rule → tool not considered blocked."""
         engine = ShieldEngine(
-            _make_ruleset([
-                RuleConfig(
-                    id="block-disabled",
-                    when={"tool": "exec"},
-                    then=Verdict.BLOCK,
-                    enabled=False,
-                ),
-            ])
+            _make_ruleset(
+                [
+                    RuleConfig(
+                        id="block-disabled",
+                        when={"tool": "exec"},
+                        then=Verdict.BLOCK,
+                        enabled=False,
+                    ),
+                ]
+            )
         )
         registry = ShieldedToolRegistry(engine)
         blocked = registry._get_unconditionally_blocked_tools()
@@ -348,21 +359,23 @@ class TestContextEnrichment:
     def test_summary_with_rules(self):
         """Summary includes active rule descriptions."""
         engine = ShieldEngine(
-            _make_ruleset([
-                RuleConfig(
-                    id="block-exec",
-                    description="No shell execution",
-                    when={"tool": "exec"},
-                    then=Verdict.BLOCK,
-                    message="exec is forbidden",
-                ),
-                RuleConfig(
-                    id="redact-send",
-                    description="Redact PII in messages",
-                    when={"tool": "send_message"},
-                    then=Verdict.REDACT,
-                ),
-            ])
+            _make_ruleset(
+                [
+                    RuleConfig(
+                        id="block-exec",
+                        description="No shell execution",
+                        when={"tool": "exec"},
+                        then=Verdict.BLOCK,
+                        message="exec is forbidden",
+                    ),
+                    RuleConfig(
+                        id="redact-send",
+                        description="Redact PII in messages",
+                        when={"tool": "send_message"},
+                        then=Verdict.REDACT,
+                    ),
+                ]
+            )
         )
         registry = ShieldedToolRegistry(engine)
         summary = registry.get_constraints_summary()
@@ -382,15 +395,17 @@ class TestContextEnrichment:
     def test_summary_disabled_rules_excluded(self):
         """Disabled rules → not shown in summary."""
         engine = ShieldEngine(
-            _make_ruleset([
-                RuleConfig(
-                    id="disabled-rule",
-                    description="This is disabled",
-                    when={"tool": "exec"},
-                    then=Verdict.BLOCK,
-                    enabled=False,
-                ),
-            ])
+            _make_ruleset(
+                [
+                    RuleConfig(
+                        id="disabled-rule",
+                        description="This is disabled",
+                        when={"tool": "exec"},
+                        then=Verdict.BLOCK,
+                        enabled=False,
+                    ),
+                ]
+            )
         )
         registry = ShieldedToolRegistry(engine)
         assert registry.get_constraints_summary() == ""
@@ -459,14 +474,16 @@ class TestApprovalFlow:
     def test_approve_verdict_returns_message(self):
         """APPROVE verdict → returns pending message, tool not executed."""
         engine = ShieldEngine(
-            _make_ruleset([
-                RuleConfig(
-                    id="approve-write",
-                    when={"tool": "write_file"},
-                    then=Verdict.APPROVE,
-                    message="File writes require approval",
-                ),
-            ])
+            _make_ruleset(
+                [
+                    RuleConfig(
+                        id="approve-write",
+                        when={"tool": "write_file"},
+                        then=Verdict.APPROVE,
+                        message="File writes require approval",
+                    ),
+                ]
+            )
         )
         registry = ShieldedToolRegistry(engine)
         executed = []

@@ -25,9 +25,7 @@ class InMemoryBackend(ApprovalBackend):
             self._requests[request.request_id] = request
             self._events[request.request_id] = threading.Event()
 
-    def wait_for_response(
-        self, request_id: str, timeout: float = 300.0
-    ) -> ApprovalResponse | None:
+    def wait_for_response(self, request_id: str, timeout: float = 300.0) -> ApprovalResponse | None:
         event = self._events.get(request_id)
         if event is None:
             return None

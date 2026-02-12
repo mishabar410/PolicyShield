@@ -21,4 +21,3 @@ __all__ = [
     "compute_signature",
     "verify_signature",
 ]
-

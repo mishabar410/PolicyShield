@@ -62,43 +62,47 @@ class TestPolicyShieldTool:
 
     def test_block_raises_exception(self):
         tool = FakeTool()
-        engine = _make_engine([
-            RuleConfig(
-                id="block-fake",
-                when={"tool": "fake_tool"},
-                then=Verdict.BLOCK,
-                message="Tool blocked",
-            )
-        ])
+        engine = _make_engine(
+            [
+                RuleConfig(
+                    id="block-fake",
+                    when={"tool": "fake_tool"},
+                    then=Verdict.BLOCK,
+                    message="Tool blocked",
+                )
+            ]
+        )
         wrapped = PolicyShieldTool(wrapped_tool=tool, engine=engine)
         with pytest.raises(ToolException, match="BLOCKED"):
             wrapped._run(input="test")
 
     def test_block_return_message(self):
         tool = FakeTool()
-        engine = _make_engine([
-            RuleConfig(
-                id="block-fake",
-                when={"tool": "fake_tool"},
-                then=Verdict.BLOCK,
-                message="Tool blocked",
-            )
-        ])
-        wrapped = PolicyShieldTool(
-            wrapped_tool=tool, engine=engine, block_behavior="return_message"
+        engine = _make_engine(
+            [
+                RuleConfig(
+                    id="block-fake",
+                    when={"tool": "fake_tool"},
+                    then=Verdict.BLOCK,
+                    message="Tool blocked",
+                )
+            ]
         )
+        wrapped = PolicyShieldTool(wrapped_tool=tool, engine=engine, block_behavior="return_message")
         result = wrapped._run(input="test")
         assert "BLOCKED" in result
 
     def test_redact_passes_modified_args(self):
         tool = FakeTool()
-        engine = _make_engine([
-            RuleConfig(
-                id="redact-fake",
-                when={"tool": "fake_tool"},
-                then=Verdict.REDACT,
-            )
-        ])
+        engine = _make_engine(
+            [
+                RuleConfig(
+                    id="redact-fake",
+                    when={"tool": "fake_tool"},
+                    then=Verdict.REDACT,
+                )
+            ]
+        )
         wrapped = PolicyShieldTool(wrapped_tool=tool, engine=engine)
         # REDACT will still execute the tool with potentially modified args
         result = wrapped._run(input="test@example.com")
@@ -114,9 +118,7 @@ class TestPolicyShieldTool:
     def test_session_id_passed(self):
         tool = FakeTool()
         engine = _make_engine([])
-        wrapped = PolicyShieldTool(
-            wrapped_tool=tool, engine=engine, session_id="custom-session"
-        )
+        wrapped = PolicyShieldTool(wrapped_tool=tool, engine=engine, session_id="custom-session")
         assert wrapped.session_id == "custom-session"
 
 

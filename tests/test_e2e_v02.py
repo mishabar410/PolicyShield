@@ -144,9 +144,7 @@ class TestE2EApproval:
         rules = RuleSet(
             shield_name="test",
             version=1,
-            rules=[
-                RuleConfig(id="approve-it", when={"tool": "delete"}, then=Verdict.APPROVE)
-            ],
+            rules=[RuleConfig(id="approve-it", when={"tool": "delete"}, then=Verdict.APPROVE)],
         )
         backend = InMemoryBackend()
         engine = ShieldEngine(rules, approval_backend=backend, approval_timeout=2.0)
@@ -167,9 +165,7 @@ class TestE2EApproval:
         rules = RuleSet(
             shield_name="test",
             version=1,
-            rules=[
-                RuleConfig(id="approve-it", when={"tool": "delete"}, then=Verdict.APPROVE)
-            ],
+            rules=[RuleConfig(id="approve-it", when={"tool": "delete"}, then=Verdict.APPROVE)],
         )
         backend = InMemoryBackend()
         engine = ShieldEngine(rules, approval_backend=backend, approval_timeout=2.0)
@@ -190,9 +186,7 @@ class TestE2EApproval:
         rules = RuleSet(
             shield_name="test",
             version=1,
-            rules=[
-                RuleConfig(id="approve-it", when={"tool": "delete"}, then=Verdict.APPROVE)
-            ],
+            rules=[RuleConfig(id="approve-it", when={"tool": "delete"}, then=Verdict.APPROVE)],
         )
         backend = InMemoryBackend()
         engine = ShieldEngine(rules, approval_backend=backend, approval_timeout=0.1)
@@ -215,9 +209,7 @@ class TestE2EApproval:
         )
         backend = InMemoryBackend()
         cache = ApprovalCache(strategy=ApprovalStrategy.PER_RULE)
-        engine = ShieldEngine(
-            rules, approval_backend=backend, approval_cache=cache, approval_timeout=2.0
-        )
+        engine = ShieldEngine(rules, approval_backend=backend, approval_cache=cache, approval_timeout=2.0)
 
         def approve():
             time.sleep(0.05)
@@ -242,9 +234,7 @@ class TestE2ETraceStats:
             rules = RuleSet(
                 shield_name="test",
                 version=1,
-                rules=[
-                    RuleConfig(id="block-exec", when={"tool": "exec"}, then=Verdict.BLOCK)
-                ],
+                rules=[RuleConfig(id="block-exec", when={"tool": "exec"}, then=Verdict.BLOCK)],
             )
             engine = ShieldEngine(rules, trace_recorder=tracer)
             engine.check("exec", {"cmd": "rm"})

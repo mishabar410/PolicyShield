@@ -7,11 +7,13 @@ from policyshield.shield.sanitizer import InputSanitizer, SanitizerConfig
 
 # ── helpers ────────────────────────────────────────────────────────
 
+
 def _make(*, config: SanitizerConfig | None = None) -> InputSanitizer:
     return InputSanitizer(config)
 
 
 # ── tests ──────────────────────────────────────────────────────────
+
 
 def test_passthrough():
     """Clean args pass through unchanged."""

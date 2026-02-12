@@ -128,10 +128,7 @@ class WebhookApprovalBackend(ApprovalBackend):
 
     def pending(self) -> list[ApprovalRequest]:
         """Return requests with no response yet."""
-        return [
-            r for rid, r in self._requests.items()
-            if rid not in self._responses
-        ]
+        return [r for rid, r in self._requests.items() if rid not in self._responses]
 
     # ── Internal helpers ─────────────────────────────────────────────
 

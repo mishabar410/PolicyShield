@@ -22,6 +22,7 @@ from policyshield.shield.engine import ShieldEngine
 
 # ── Lightweight Tool ABC mirroring nanobot ───────────────────────────
 
+
 class ToolBase:
     """Minimal nanobot-compatible Tool ABC (no external deps)."""
 
@@ -60,6 +61,7 @@ class ToolBase:
 
 
 # ── Concrete test tools ──────────────────────────────────────────────
+
 
 class EchoTool(ToolBase):
     @property
@@ -121,6 +123,7 @@ class LeakyTool(ToolBase):
 
 
 # ── Helpers ───────────────────────────────────────────────────────────
+
 
 def _make_ruleset(rules: list[RuleConfig]) -> RuleSet:
     return RuleSet(shield_name="test", version=1, rules=rules)
@@ -188,6 +191,7 @@ def _mock_nanobot_import(monkeypatch):
     # Reload registry module so _HAS_NANOBOT picks up the mock
     import importlib
     import policyshield.integrations.nanobot.registry as reg_mod
+
     importlib.reload(reg_mod)
 
     yield
@@ -198,10 +202,12 @@ def _mock_nanobot_import(monkeypatch):
 
 # ── Tests ─────────────────────────────────────────────────────────────
 
+
 class TestRealToolAllow:
     def test_real_tool_allow(self):
         """EchoTool → no matching rule → ALLOW → tool executes."""
         from policyshield.integrations.nanobot.registry import ShieldedToolRegistry as SR
+
         registry = SR(ShieldEngine(_make_ruleset([])), fail_open=True)
         registry.register(EchoTool())
         result = asyncio.run(registry.execute("echo", {"message": "hello"}))
@@ -212,16 +218,19 @@ class TestRealToolBlock:
     def test_real_tool_block(self):
         """ExecTool → BLOCK rule → shield message returned."""
         from policyshield.integrations.nanobot.registry import ShieldedToolRegistry as SR
+
         registry = SR(
             ShieldEngine(
-                _make_ruleset([
-                    RuleConfig(
-                        id="block-exec",
-                        when={"tool": "exec"},
-                        then=Verdict.BLOCK,
-                        message="exec is blocked",
-                    ),
-                ])
+                _make_ruleset(
+                    [
+                        RuleConfig(
+                            id="block-exec",
+                            when={"tool": "exec"},
+                            then=Verdict.BLOCK,
+                            message="exec is blocked",
+                        ),
+                    ]
+                )
             ),
             fail_open=True,
         )
@@ -235,22 +244,23 @@ class TestRealToolRedact:
     def test_real_tool_redact(self):
         """Redact rule → modified args → tool still executes."""
         from policyshield.integrations.nanobot.registry import ShieldedToolRegistry as SR
+
         registry = SR(
             ShieldEngine(
-                _make_ruleset([
-                    RuleConfig(
-                        id="redact-echo",
-                        when={"tool": "echo"},
-                        then=Verdict.REDACT,
-                    ),
-                ])
+                _make_ruleset(
+                    [
+                        RuleConfig(
+                            id="redact-echo",
+                            when={"tool": "echo"},
+                            then=Verdict.REDACT,
+                        ),
+                    ]
+                )
             ),
             fail_open=True,
         )
         registry.register(EchoTool())
-        result = asyncio.run(
-            registry.execute("echo", {"message": "email: user@company.com"})
-        )
+        result = asyncio.run(registry.execute("echo", {"message": "email: user@company.com"}))
         # Tool ran, so result starts with "Echo:"
         assert "Echo:" in result
 
@@ -259,6 +269,7 @@ class TestRealToolNotFound:
     def test_real_tool_not_found(self):
         """Unregistered tool → 'not found' error."""
         from policyshield.integrations.nanobot.registry import ShieldedToolRegistry as SR
+
         registry = SR(ShieldEngine(_make_ruleset([])), fail_open=True)
         result = asyncio.run(registry.execute("nonexistent", {}))
         assert "not found" in result.lower()
@@ -268,12 +279,14 @@ class TestRealToolPostCallPII:
     def test_real_tool_postcall_pii(self):
         """LeakyTool returns email → post-check detects PII, session tainted."""
         from policyshield.integrations.nanobot.registry import ShieldedToolRegistry as SR
+
         engine = ShieldEngine(_make_ruleset([]))
         registry = SR(engine=engine, fail_open=True)
         registry.register(LeakyTool())
         result = asyncio.run(registry.execute("read_data", {}))
         assert "user@example.com" in result
         from policyshield.core.models import PIIType
+
         session = engine._session_mgr.get_or_create("default")
         assert PIIType.EMAIL in session.taints
 
@@ -282,6 +295,7 @@ class TestRealToolSchema:
     def test_real_tool_schema(self):
         """get_definitions() contains real tool schemas."""
         from policyshield.integrations.nanobot.registry import ShieldedToolRegistry as SR
+
         registry = SR(ShieldEngine(_make_ruleset([])), fail_open=True)
         registry.register(EchoTool())
         registry.register(ExecTool())
@@ -298,6 +312,7 @@ class TestRealToolValidation:
     def test_missing_required_param(self):
         """Missing required param → validation error."""
         from policyshield.integrations.nanobot.registry import ShieldedToolRegistry as SR
+
         registry = SR(ShieldEngine(_make_ruleset([])), fail_open=True)
         registry.register(EchoTool())
         result = asyncio.run(registry.execute("echo", {}))

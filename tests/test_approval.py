@@ -102,6 +102,7 @@ class TestInMemoryBackend:
 
         def approve_after_delay():
             import time
+
             time.sleep(0.05)
             backend.respond(req.request_id, approved=True)
 
@@ -159,6 +160,7 @@ class TestEngineApproval:
 
         def approve_first_pending():
             import time
+
             time.sleep(0.05)
             for req in backend.pending():
                 backend.respond(req.request_id, approved=True, responder="admin")
@@ -179,6 +181,7 @@ class TestEngineApproval:
 
         def deny():
             import time
+
             time.sleep(0.05)
             for req in backend.pending():
                 backend.respond(req.request_id, approved=False, responder="admin")

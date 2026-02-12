@@ -1,6 +1,5 @@
 """Tests for YAML rule parser."""
 
-
 import pytest
 
 from policyshield.core.exceptions import PolicyShieldParseError

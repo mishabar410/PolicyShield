@@ -11,10 +11,10 @@ from policyshield.approval.base import ApprovalResponse
 class ApprovalStrategy(str, Enum):
     """How to cache approval decisions."""
 
-    ONCE = "once"                   # approve only this exact call
-    PER_SESSION = "per_session"     # approve all such calls in this session
-    PER_RULE = "per_rule"           # approve all calls of this rule globally
-    PER_TOOL = "per_tool"           # approve all calls of this tool in session
+    ONCE = "once"  # approve only this exact call
+    PER_SESSION = "per_session"  # approve all such calls in this session
+    PER_RULE = "per_rule"  # approve all calls of this rule globally
+    PER_TOOL = "per_tool"  # approve all calls of this tool in session
 
 
 class ApprovalCache:
@@ -66,9 +66,7 @@ class ApprovalCache:
             if session_id is None:
                 self._cache.clear()
             else:
-                keys_to_remove = [
-                    k for k in self._cache if k.startswith(f"{session_id}:")
-                ]
+                keys_to_remove = [k for k in self._cache if k.startswith(f"{session_id}:")]
                 for k in keys_to_remove:
                     del self._cache[k]
 

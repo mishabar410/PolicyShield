@@ -85,24 +85,31 @@ def app(args: list[str] | None = None) -> int:
         description="Wraps nanobot's CLI with PolicyShield. All arguments after the flags are passed to nanobot.",
     )
     nanobot_parser.add_argument(
-        "--rules", "-r", required=True,
+        "--rules",
+        "-r",
+        required=True,
         help="Path to YAML rules file",
     )
     nanobot_parser.add_argument(
-        "--mode", default="ENFORCE",
+        "--mode",
+        default="ENFORCE",
         choices=["ENFORCE", "AUDIT", "DISABLED"],
         help="Shield mode (default: ENFORCE)",
     )
     nanobot_parser.add_argument(
-        "--fail-open", action="store_true", default=True,
+        "--fail-open",
+        action="store_true",
+        default=True,
         help="Shield errors don't block tools (default: True)",
     )
     nanobot_parser.add_argument(
-        "--fail-closed", action="store_true",
+        "--fail-closed",
+        action="store_true",
         help="Shield errors block tool execution",
     )
     nanobot_parser.add_argument(
-        "nanobot_args", nargs=argparse.REMAINDER,
+        "nanobot_args",
+        nargs=argparse.REMAINDER,
         help="Arguments to pass to nanobot CLI",
     )
 
@@ -110,7 +117,8 @@ def app(args: list[str] | None = None) -> int:
     init_parser = subparsers.add_parser("init", help="Scaffold a new PolicyShield project")
     init_parser.add_argument("directory", nargs="?", default=".", help="Target directory (default: current directory)")
     init_parser.add_argument(
-        "--preset", default="minimal",
+        "--preset",
+        default="minimal",
         choices=["minimal", "security", "compliance"],
         help="Rule preset (default: minimal)",
     )
@@ -255,6 +263,7 @@ def _cmd_nanobot(parsed: argparse.Namespace, original_args: list[str] | None) ->
     # Delegate to nanobot CLI
     try:
         from nanobot.cli.commands import app as nanobot_app
+
         sys.argv = ["nanobot"] + nanobot_argv
         nanobot_app(standalone_mode=False)
         return 0
@@ -519,6 +528,7 @@ def _cmd_config_init() -> int:
     target.write_text(generate_default_config(), encoding="utf-8")
     print(f"✓ Created {target}")
     return 0
+
 
 def _display_trace(
     file_path: str,

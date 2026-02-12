@@ -206,9 +206,7 @@ class BaseShieldEngine:
 
         # Check cache first
         if self._approval_cache is not None:
-            cached = self._approval_cache.get(
-                tool_name, rule.id, session_id, strategy=strategy
-            )
+            cached = self._approval_cache.get(tool_name, rule.id, session_id, strategy=strategy)
             if cached is not None:
                 if cached.approved:
                     return self._verdict_builder.allow(rule=rule, args=args)
@@ -226,9 +224,7 @@ class BaseShieldEngine:
             session_id=session_id,
         )
         self._approval_backend.submit(req)
-        resp = self._approval_backend.wait_for_response(
-            req.request_id, timeout=self._approval_timeout
-        )
+        resp = self._approval_backend.wait_for_response(req.request_id, timeout=self._approval_timeout)
         if resp is None:
             return ShieldResult(
                 verdict=Verdict.BLOCK,
@@ -238,9 +234,7 @@ class BaseShieldEngine:
 
         # Cache the response
         if self._approval_cache is not None:
-            self._approval_cache.put(
-                tool_name, rule.id, session_id, resp, strategy=strategy
-            )
+            self._approval_cache.put(tool_name, rule.id, session_id, resp, strategy=strategy)
 
         if resp.approved:
             return self._verdict_builder.allow(rule=rule, args=args)

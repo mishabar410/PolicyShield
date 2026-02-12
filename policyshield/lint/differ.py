@@ -136,10 +136,7 @@ class PolicyDiffer:
             "modified": [
                 {
                     "rule_id": m.rule_id,
-                    "changes": [
-                        {"field": c.field, "old": c.old_value, "new": c.new_value}
-                        for c in m.changes
-                    ],
+                    "changes": [{"field": c.field, "old": c.old_value, "new": c.new_value} for c in m.changes],
                 }
                 for m in diff.modified
             ],

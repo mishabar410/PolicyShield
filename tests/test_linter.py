@@ -29,19 +29,23 @@ class TestRuleLinter:
 
     def test_lint_clean_rules_no_warnings(self):
         """A correct rule set produces no warnings."""
-        rs = _make_ruleset([
-            _make_rule(id="rule-a", when={"tool": "exec"}, then=Verdict.BLOCK, message="blocked"),
-            _make_rule(id="rule-b", when={"tool": "read_file"}, then=Verdict.ALLOW),
-        ])
+        rs = _make_ruleset(
+            [
+                _make_rule(id="rule-a", when={"tool": "exec"}, then=Verdict.BLOCK, message="blocked"),
+                _make_rule(id="rule-b", when={"tool": "read_file"}, then=Verdict.ALLOW),
+            ]
+        )
         warnings = RuleLinter().lint(rs)
         assert warnings == []
 
     def test_lint_duplicate_ids(self):
         """Two rules with the same ID produce an ERROR."""
-        rs = _make_ruleset([
-            _make_rule(id="foo", when={"tool": "exec"}, then=Verdict.BLOCK, message="x"),
-            _make_rule(id="foo", when={"tool": "read"}, then=Verdict.ALLOW),
-        ])
+        rs = _make_ruleset(
+            [
+                _make_rule(id="foo", when={"tool": "exec"}, then=Verdict.BLOCK, message="x"),
+                _make_rule(id="foo", when={"tool": "read"}, then=Verdict.ALLOW),
+            ]
+        )
         warnings = RuleLinter().lint(rs)
         errors = [w for w in warnings if w.check == "duplicate_ids"]
         assert len(errors) == 1
@@ -50,14 +54,16 @@ class TestRuleLinter:
 
     def test_lint_invalid_regex(self):
         """An invalid regex in args_match produces an ERROR."""
-        rs = _make_ruleset([
-            _make_rule(
-                id="bad-regex",
-                when={"tool": "exec", "args_match": {"command": {"regex": "[invalid("}}},
-                then=Verdict.BLOCK,
-                message="x",
-            ),
-        ])
+        rs = _make_ruleset(
+            [
+                _make_rule(
+                    id="bad-regex",
+                    when={"tool": "exec", "args_match": {"command": {"regex": "[invalid("}}},
+                    then=Verdict.BLOCK,
+                    message="x",
+                ),
+            ]
+        )
         warnings = RuleLinter().lint(rs)
         errors = [w for w in warnings if w.check == "invalid_regex"]
         assert len(errors) == 1
@@ -66,9 +72,11 @@ class TestRuleLinter:
 
     def test_lint_broad_tool_wildcard(self):
         """tool: '.*' produces a WARNING."""
-        rs = _make_ruleset([
-            _make_rule(id="catch-all", when={"tool": ".*"}, then=Verdict.BLOCK, message="x"),
-        ])
+        rs = _make_ruleset(
+            [
+                _make_rule(id="catch-all", when={"tool": ".*"}, then=Verdict.BLOCK, message="x"),
+            ]
+        )
         warnings = RuleLinter().lint(rs)
         broads = [w for w in warnings if w.check == "broad_tool_pattern"]
         assert len(broads) == 1
@@ -76,18 +84,22 @@ class TestRuleLinter:
 
     def test_lint_broad_tool_dotplus(self):
         """tool: '.+' also produces a WARNING."""
-        rs = _make_ruleset([
-            _make_rule(id="catch-all", when={"tool": ".+"}, then=Verdict.BLOCK, message="x"),
-        ])
+        rs = _make_ruleset(
+            [
+                _make_rule(id="catch-all", when={"tool": ".+"}, then=Verdict.BLOCK, message="x"),
+            ]
+        )
         warnings = RuleLinter().lint(rs)
         broads = [w for w in warnings if w.check == "broad_tool_pattern"]
         assert len(broads) == 1
 
     def test_lint_missing_message_on_block(self):
         """A BLOCK rule without message produces a WARNING."""
-        rs = _make_ruleset([
-            _make_rule(id="no-msg", when={"tool": "exec"}, then=Verdict.BLOCK),
-        ])
+        rs = _make_ruleset(
+            [
+                _make_rule(id="no-msg", when={"tool": "exec"}, then=Verdict.BLOCK),
+            ]
+        )
         warnings = RuleLinter().lint(rs)
         missing = [w for w in warnings if w.check == "missing_message"]
         assert len(missing) == 1
@@ -95,19 +107,23 @@ class TestRuleLinter:
 
     def test_lint_missing_message_on_allow(self):
         """An ALLOW rule without message does NOT produce a warning."""
-        rs = _make_ruleset([
-            _make_rule(id="ok", when={"tool": "exec"}, then=Verdict.ALLOW),
-        ])
+        rs = _make_ruleset(
+            [
+                _make_rule(id="ok", when={"tool": "exec"}, then=Verdict.ALLOW),
+            ]
+        )
         warnings = RuleLinter().lint(rs)
         missing = [w for w in warnings if w.check == "missing_message"]
         assert len(missing) == 0
 
     def test_lint_conflicting_verdicts(self):
         """Two rules on the same tool with different verdicts produce a WARNING."""
-        rs = _make_ruleset([
-            _make_rule(id="rule-block", when={"tool": "exec"}, then=Verdict.BLOCK, message="x"),
-            _make_rule(id="rule-allow", when={"tool": "exec"}, then=Verdict.ALLOW),
-        ])
+        rs = _make_ruleset(
+            [
+                _make_rule(id="rule-block", when={"tool": "exec"}, then=Verdict.BLOCK, message="x"),
+                _make_rule(id="rule-allow", when={"tool": "exec"}, then=Verdict.ALLOW),
+            ]
+        )
         warnings = RuleLinter().lint(rs)
         conflicts = [w for w in warnings if w.check == "conflicting_verdicts"]
         assert len(conflicts) == 1
@@ -115,9 +131,11 @@ class TestRuleLinter:
 
     def test_lint_disabled_rule_info(self):
         """A disabled rule produces an INFO finding."""
-        rs = _make_ruleset([
-            _make_rule(id="old-rule", enabled=False),
-        ])
+        rs = _make_ruleset(
+            [
+                _make_rule(id="old-rule", enabled=False),
+            ]
+        )
         warnings = RuleLinter().lint(rs)
         infos = [w for w in warnings if w.check == "disabled_rules"]
         assert len(infos) == 1
@@ -125,17 +143,19 @@ class TestRuleLinter:
 
     def test_lint_multiple_issues(self):
         """A ruleset with multiple problems reports all of them."""
-        rs = _make_ruleset([
-            _make_rule(id="dup", when={"tool": "exec"}, then=Verdict.BLOCK, message="x"),
-            _make_rule(id="dup", when={"tool": "exec"}, then=Verdict.ALLOW),
-            _make_rule(
-                id="bad-rx",
-                when={"tool": "read", "args_match": {"path": {"regex": "((("}}},
-                then=Verdict.BLOCK,
-                message="x",
-            ),
-            _make_rule(id="disabled", enabled=False),
-        ])
+        rs = _make_ruleset(
+            [
+                _make_rule(id="dup", when={"tool": "exec"}, then=Verdict.BLOCK, message="x"),
+                _make_rule(id="dup", when={"tool": "exec"}, then=Verdict.ALLOW),
+                _make_rule(
+                    id="bad-rx",
+                    when={"tool": "read", "args_match": {"path": {"regex": "((("}}},
+                    then=Verdict.BLOCK,
+                    message="x",
+                ),
+                _make_rule(id="disabled", enabled=False),
+            ]
+        )
         warnings = RuleLinter().lint(rs)
         checks = {w.check for w in warnings}
         assert "duplicate_ids" in checks
@@ -145,14 +165,16 @@ class TestRuleLinter:
 
     def test_lint_valid_regex_no_error(self):
         """A valid regex does not produce an error."""
-        rs = _make_ruleset([
-            _make_rule(
-                id="ok-regex",
-                when={"tool": "exec", "args_match": {"command": {"regex": "rm\\s+-rf"}}},
-                then=Verdict.BLOCK,
-                message="x",
-            ),
-        ])
+        rs = _make_ruleset(
+            [
+                _make_rule(
+                    id="ok-regex",
+                    when={"tool": "exec", "args_match": {"command": {"regex": "rm\\s+-rf"}}},
+                    then=Verdict.BLOCK,
+                    message="x",
+                ),
+            ]
+        )
         warnings = RuleLinter().lint(rs)
         errors = [w for w in warnings if w.check == "invalid_regex"]
         assert len(errors) == 0

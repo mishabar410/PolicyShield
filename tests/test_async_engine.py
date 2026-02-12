@@ -24,39 +24,45 @@ def make_ruleset(rules: list[RuleConfig]) -> RuleSet:
 
 @pytest.fixture
 def block_exec_rules():
-    return make_ruleset([
-        RuleConfig(
-            id="block-exec",
-            description="Block exec calls",
-            when={"tool": "exec"},
-            then=Verdict.BLOCK,
-            message="exec is not allowed",
-        )
-    ])
+    return make_ruleset(
+        [
+            RuleConfig(
+                id="block-exec",
+                description="Block exec calls",
+                when={"tool": "exec"},
+                then=Verdict.BLOCK,
+                message="exec is not allowed",
+            )
+        ]
+    )
 
 
 @pytest.fixture
 def redact_rules():
-    return make_ruleset([
-        RuleConfig(
-            id="redact-pii",
-            description="Redact PII in arguments",
-            when={"tool": "send_email"},
-            then=Verdict.REDACT,
-        )
-    ])
+    return make_ruleset(
+        [
+            RuleConfig(
+                id="redact-pii",
+                description="Redact PII in arguments",
+                when={"tool": "send_email"},
+                then=Verdict.REDACT,
+            )
+        ]
+    )
 
 
 @pytest.fixture
 def approve_rules():
-    return make_ruleset([
-        RuleConfig(
-            id="approve-delete",
-            description="Deletion requires approval",
-            when={"tool": "delete_user"},
-            then=Verdict.APPROVE,
-        )
-    ])
+    return make_ruleset(
+        [
+            RuleConfig(
+                id="approve-delete",
+                description="Deletion requires approval",
+                when={"tool": "delete_user"},
+                then=Verdict.APPROVE,
+            )
+        ]
+    )
 
 
 # ── Test 1: basic ALLOW ──────────────────────────────────────────────
@@ -107,6 +113,7 @@ async def test_async_approve_allow(approve_rules):
     # Approve in a background thread (InMemory uses threading.Event)
     def _approve():
         import time
+
         for _ in range(50):
             time.sleep(0.05)
             reqs = backend.pending()
@@ -136,6 +143,7 @@ async def test_async_approve_deny(approve_rules):
 
     def _deny():
         import time
+
         for _ in range(50):
             time.sleep(0.05)
             reqs = backend.pending()
@@ -174,9 +182,11 @@ async def test_async_approve_timeout(approve_rules):
 @pytest.mark.asyncio
 async def test_async_rate_limit():
     rules = make_ruleset([])
-    rl = RateLimiter([
-        RateLimitConfig(tool="*", max_calls=3, window_seconds=60),
-    ])
+    rl = RateLimiter(
+        [
+            RateLimitConfig(tool="*", max_calls=3, window_seconds=60),
+        ]
+    )
     engine = AsyncShieldEngine(rules, rate_limiter=rl)
 
     for _ in range(3):
@@ -193,13 +203,15 @@ async def test_async_rate_limit():
 
 @pytest.mark.asyncio
 async def test_async_pii_detection():
-    rules = make_ruleset([
-        RuleConfig(
-            id="redact-all",
-            when={"tool": "send_data"},
-            then=Verdict.REDACT,
-        )
-    ])
+    rules = make_ruleset(
+        [
+            RuleConfig(
+                id="redact-all",
+                when={"tool": "send_data"},
+                then=Verdict.REDACT,
+            )
+        ]
+    )
     engine = AsyncShieldEngine(rules)
     result = await engine.check(
         "send_data",

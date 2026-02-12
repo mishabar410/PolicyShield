@@ -38,26 +38,30 @@ class FakeCrewAITool:
 
 @pytest.fixture
 def block_search_rules():
-    return make_ruleset([
-        RuleConfig(
-            id="block-search",
-            description="Block web search",
-            when={"tool": "web_search"},
-            then=Verdict.BLOCK,
-            message="web_search is not allowed",
-        )
-    ])
+    return make_ruleset(
+        [
+            RuleConfig(
+                id="block-search",
+                description="Block web search",
+                when={"tool": "web_search"},
+                then=Verdict.BLOCK,
+                message="web_search is not allowed",
+            )
+        ]
+    )
 
 
 @pytest.fixture
 def redact_rules():
-    return make_ruleset([
-        RuleConfig(
-            id="redact-pii",
-            when={"tool": "web_search"},
-            then=Verdict.REDACT,
-        )
-    ])
+    return make_ruleset(
+        [
+            RuleConfig(
+                id="redact-pii",
+                when={"tool": "web_search"},
+                then=Verdict.REDACT,
+            )
+        ]
+    )
 
 
 @pytest.fixture
@@ -84,9 +88,7 @@ def test_crewai_allow(allow_rules):
 def test_crewai_block_return_message(block_search_rules):
     engine = ShieldEngine(block_search_rules)
     fake_tool = FakeCrewAITool()
-    safe_tool = CrewAIShieldTool(
-        wrapped_tool=fake_tool, engine=engine, on_block="return_message"
-    )
+    safe_tool = CrewAIShieldTool(wrapped_tool=fake_tool, engine=engine, on_block="return_message")
 
     result = safe_tool._run(query="test")
     assert "BLOCKED" in result
@@ -99,9 +101,7 @@ def test_crewai_block_return_message(block_search_rules):
 def test_crewai_block_raise(block_search_rules):
     engine = ShieldEngine(block_search_rules)
     fake_tool = FakeCrewAITool()
-    safe_tool = CrewAIShieldTool(
-        wrapped_tool=fake_tool, engine=engine, on_block="raise"
-    )
+    safe_tool = CrewAIShieldTool(wrapped_tool=fake_tool, engine=engine, on_block="raise")
 
     with pytest.raises(ToolCallBlockedError, match="BLOCKED"):
         safe_tool._run(query="test")
@@ -126,14 +126,16 @@ def test_crewai_redact(redact_rules):
 
 
 def test_crewai_pii_detection():
-    rules = make_ruleset([
-        RuleConfig(
-            id="block-with-pii",
-            when={"tool": "send_data"},
-            then=Verdict.BLOCK,
-            message="Blocked",
-        )
-    ])
+    rules = make_ruleset(
+        [
+            RuleConfig(
+                id="block-with-pii",
+                when={"tool": "send_data"},
+                then=Verdict.BLOCK,
+                message="Blocked",
+            )
+        ]
+    )
     engine = ShieldEngine(rules)
     fake_tool = FakeCrewAITool(name="send_data")
     safe_tool = CrewAIShieldTool(wrapped_tool=fake_tool, engine=engine)

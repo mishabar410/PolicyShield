@@ -1,6 +1,5 @@
 """Tests for matcher engine."""
 
-
 from policyshield.core.models import RuleConfig, RuleSet, Severity, Verdict
 from policyshield.shield.matcher import CompiledRule, MatcherEngine
 

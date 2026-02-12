@@ -46,14 +46,14 @@ def _make_ruleset() -> RuleSet:
         shield_name="e2e-v03",
         version=1,
         rules=[
-            RuleConfig(id="block-exec", when={"tool": "exec"}, then=Verdict.BLOCK,
-                       message="exec is forbidden"),
+            RuleConfig(id="block-exec", when={"tool": "exec"}, then=Verdict.BLOCK, message="exec is forbidden"),
             RuleConfig(id="allow-read", when={"tool": "read_file"}, then=Verdict.ALLOW),
         ],
     )
 
 
 # ── 1. Async basic flow ─────────────────────────────────────────────
+
 
 def test_e2e_async_basic_flow(tmp_path):
     rules_file = _write(tmp_path, "rules.yaml", _RULES_YAML)
@@ -77,6 +77,7 @@ def test_e2e_async_basic_flow(tmp_path):
 
 # ── 2. Async concurrent ─────────────────────────────────────────────
 
+
 def test_e2e_async_concurrent(tmp_path):
     rules_file = _write(tmp_path, "rules.yaml", _RULES_YAML)
     engine = AsyncShieldEngine(str(rules_file))
@@ -91,6 +92,7 @@ def test_e2e_async_concurrent(tmp_path):
 
 
 # ── 3. CrewAI wrap ───────────────────────────────────────────────────
+
 
 def test_e2e_crewai_wrap():
     from policyshield.integrations.crewai.wrapper import (
@@ -118,6 +120,7 @@ def test_e2e_crewai_wrap():
 
 # ── 4. OTel spans ────────────────────────────────────────────────────
 
+
 def test_e2e_otel_spans():
     from policyshield.trace.otel import OTelExporter
 
@@ -137,6 +140,7 @@ def test_e2e_otel_spans():
 
 # ── 5. Webhook sync ─────────────────────────────────────────────────
 
+
 def test_e2e_webhook_sync(tmp_path):
     """Webhook backend instantiation + internal storage (no actual HTTP)."""
     from policyshield.approval.webhook import WebhookApprovalBackend
@@ -151,6 +155,7 @@ def test_e2e_webhook_sync(tmp_path):
 
 
 # ── 6. Rule testing pass ────────────────────────────────────────────
+
 
 def test_e2e_rule_testing(tmp_path):
     from policyshield.testing.runner import TestRunner
@@ -185,6 +190,7 @@ def test_e2e_rule_testing(tmp_path):
 
 # ── 7. Rule testing failure ─────────────────────────────────────────
 
+
 def test_e2e_rule_testing_failure(tmp_path):
     from policyshield.testing.runner import TestRunner
 
@@ -209,18 +215,21 @@ def test_e2e_rule_testing_failure(tmp_path):
 
 # ── 8. Policy diff ──────────────────────────────────────────────────
 
+
 def test_e2e_policy_diff():
     from policyshield.lint.differ import PolicyDiffer
 
     old = RuleSet(
-        shield_name="test", version=1,
+        shield_name="test",
+        version=1,
         rules=[
             RuleConfig(id="r1", when={"tool": "a"}, then=Verdict.BLOCK),
             RuleConfig(id="r2", when={"tool": "b"}, then=Verdict.ALLOW),
         ],
     )
     new = RuleSet(
-        shield_name="test", version=2,
+        shield_name="test",
+        version=2,
         rules=[
             RuleConfig(id="r1", when={"tool": "a"}, then=Verdict.ALLOW),  # modified
             RuleConfig(id="r3", when={"tool": "c"}, then=Verdict.BLOCK),  # added
@@ -236,6 +245,7 @@ def test_e2e_policy_diff():
 
 
 # ── 9. Trace export CSV ─────────────────────────────────────────────
+
 
 def test_e2e_trace_export_csv(tmp_path):
     from policyshield.trace.exporter import TraceExporter
@@ -260,6 +270,7 @@ def test_e2e_trace_export_csv(tmp_path):
 
 # ── 10. Trace export HTML ────────────────────────────────────────────
 
+
 def test_e2e_trace_export_html(tmp_path):
     from policyshield.trace.exporter import TraceExporter
 
@@ -283,6 +294,7 @@ def test_e2e_trace_export_html(tmp_path):
 
 # ── 11. Sanitizer injection ─────────────────────────────────────────
 
+
 def test_e2e_sanitizer_injection():
     cfg = SanitizerConfig(blocked_patterns=[r"ignore\s+previous\s+instructions"])
     sanitizer = InputSanitizer(cfg)
@@ -295,6 +307,7 @@ def test_e2e_sanitizer_injection():
 
 
 # ── 12. Sanitizer normalize ─────────────────────────────────────────
+
 
 def test_e2e_sanitizer_normalize():
     cfg = SanitizerConfig(
@@ -310,6 +323,7 @@ def test_e2e_sanitizer_normalize():
 
 
 # ── 13. Config file ─────────────────────────────────────────────────
+
 
 def test_e2e_config_file(tmp_path, monkeypatch):
     from policyshield.config.loader import load_config, build_engine_from_config
@@ -347,6 +361,7 @@ def test_e2e_config_file(tmp_path, monkeypatch):
 
 
 # ── 14. Full pipeline ───────────────────────────────────────────────
+
 
 def test_e2e_full_pipeline(tmp_path, monkeypatch):
     from policyshield.config.loader import load_config, build_engine_from_config

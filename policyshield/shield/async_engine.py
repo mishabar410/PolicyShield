@@ -136,9 +136,7 @@ class AsyncShieldEngine(BaseShieldEngine):
                 pii_matches=pii_matches,
             )
         elif rule.then == Verdict.REDACT:
-            redacted, scan_matches = await asyncio.to_thread(
-                self._pii.redact_dict, args
-            )
+            redacted, scan_matches = await asyncio.to_thread(self._pii.redact_dict, args)
             all_pii = pii_matches if pii_matches else scan_matches
             return self._verdict_builder.redact(
                 rule=rule,
@@ -177,9 +175,7 @@ class AsyncShieldEngine(BaseShieldEngine):
 
         # Check cache first
         if self._approval_cache is not None:
-            cached = self._approval_cache.get(
-                tool_name, rule.id, session_id, strategy=strategy
-            )
+            cached = self._approval_cache.get(tool_name, rule.id, session_id, strategy=strategy)
             if cached is not None:
                 if cached.approved:
                     return self._verdict_builder.allow(rule=rule, args=args)
@@ -214,20 +210,14 @@ class AsyncShieldEngine(BaseShieldEngine):
 
         # Cache the response
         if self._approval_cache is not None:
-            self._approval_cache.put(
-                tool_name, rule.id, session_id, resp, strategy=strategy
-            )
+            self._approval_cache.put(tool_name, rule.id, session_id, resp, strategy=strategy)
 
         if resp.approved:
             return self._verdict_builder.allow(rule=rule, args=args)
         return ShieldResult(
             verdict=Verdict.BLOCK,
             rule_id=rule.id,
-            message=(
-                f"Approval denied by {resp.responder}"
-                if resp.responder
-                else "Approval denied"
-            ),
+            message=(f"Approval denied by {resp.responder}" if resp.responder else "Approval denied"),
         )
 
     async def post_check(

@@ -10,6 +10,7 @@ from policyshield.cli.main import app
 
 # ---------- helpers ----------
 
+
 def _make_fake_agent_loop_module():
     """Create a fake nanobot.agent.loop module with a mock AgentLoop."""
     mod = types.ModuleType("nanobot.agent.loop")
@@ -30,6 +31,7 @@ def _make_fake_nanobot_cli_module():
 
 
 # ---------- patch_agent_loop_class tests ----------
+
 
 class TestPatchAgentLoopClass:
     def test_patch_agent_loop_class(self, tmp_path, monkeypatch):
@@ -114,6 +116,7 @@ class TestPatchAgentLoopClass:
 
 # ---------- CLI tests ----------
 
+
 class TestCliNanobot:
     def test_cli_nanobot_missing_rules(self, capsys):
         """nanobot without --rules → error."""
@@ -182,6 +185,7 @@ class TestCliNanobot:
 
         # Remove nanobot from sys.modules
         import sys
+
         for mod_name in list(sys.modules.keys()):
             if mod_name.startswith("nanobot"):
                 monkeypatch.delitem(sys.modules, mod_name)

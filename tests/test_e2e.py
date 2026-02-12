@@ -208,4 +208,3 @@ class TestShieldedToolRegistryE2E:
         result = asyncio.run(registry.execute("read_file", {"path": "/tmp"}))
         assert result == "ok"
         assert len(read_called) == 1  # read_file WAS called
-

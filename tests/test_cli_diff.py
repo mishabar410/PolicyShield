@@ -37,7 +37,9 @@ def test_cli_diff_no_changes(tmp_path):
 def test_cli_diff_changes(tmp_path, capsys):
     old = tmp_path / "old.yaml"
     new = tmp_path / "new.yaml"
-    _write_rules(old, """\
+    _write_rules(
+        old,
+        """\
     shield_name: test
     version: 1
     rules:
@@ -47,8 +49,11 @@ def test_cli_diff_changes(tmp_path, capsys):
           tool: exec
         then: BLOCK
         severity: HIGH
-    """)
-    _write_rules(new, """\
+    """,
+    )
+    _write_rules(
+        new,
+        """\
     shield_name: test
     version: 1
     rules:
@@ -58,7 +63,8 @@ def test_cli_diff_changes(tmp_path, capsys):
           tool: exec
         then: ALLOW
         severity: LOW
-    """)
+    """,
+    )
 
     rc = app(["diff", str(old), str(new)])
     assert rc == 0  # no --exit-code
@@ -69,7 +75,9 @@ def test_cli_diff_changes(tmp_path, capsys):
 def test_cli_diff_json(tmp_path, capsys):
     old = tmp_path / "old.yaml"
     new = tmp_path / "new.yaml"
-    _write_rules(old, """\
+    _write_rules(
+        old,
+        """\
     shield_name: test
     version: 1
     rules:
@@ -79,8 +87,11 @@ def test_cli_diff_json(tmp_path, capsys):
           tool: exec
         then: BLOCK
         severity: HIGH
-    """)
-    _write_rules(new, """\
+    """,
+    )
+    _write_rules(
+        new,
+        """\
     shield_name: test
     version: 1
     rules:
@@ -90,7 +101,8 @@ def test_cli_diff_json(tmp_path, capsys):
           tool: exec
         then: ALLOW
         severity: LOW
-    """)
+    """,
+    )
 
     rc = app(["diff", str(old), str(new), "--json"])
     assert rc == 0
@@ -103,7 +115,9 @@ def test_cli_diff_json(tmp_path, capsys):
 def test_cli_diff_exit_code(tmp_path):
     old = tmp_path / "old.yaml"
     new = tmp_path / "new.yaml"
-    _write_rules(old, """\
+    _write_rules(
+        old,
+        """\
     shield_name: test
     version: 1
     rules:
@@ -113,8 +127,11 @@ def test_cli_diff_exit_code(tmp_path):
           tool: exec
         then: BLOCK
         severity: HIGH
-    """)
-    _write_rules(new, """\
+    """,
+    )
+    _write_rules(
+        new,
+        """\
     shield_name: test
     version: 1
     rules:
@@ -124,7 +141,8 @@ def test_cli_diff_exit_code(tmp_path):
           tool: exec
         then: ALLOW
         severity: HIGH
-    """)
+    """,
+    )
 
     rc = app(["diff", str(old), str(new), "--exit-code"])
     assert rc == 1

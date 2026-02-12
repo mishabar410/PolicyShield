@@ -360,7 +360,8 @@ def scaffold(
         print(f"  ⚠ Skipped {rules_file} (already exists)")
     else:
         rules_file.write_text(
-            f"# PolicyShield rules — preset: {preset}\n" + yaml.dump(rules_data, default_flow_style=False, allow_unicode=True, sort_keys=False),
+            f"# PolicyShield rules — preset: {preset}\n"
+            + yaml.dump(rules_data, default_flow_style=False, allow_unicode=True, sort_keys=False),
             encoding="utf-8",
         )
         created.append("policies/rules.yaml")
@@ -371,7 +372,8 @@ def scaffold(
         print(f"  ⚠ Skipped {test_file} (already exists)")
     else:
         test_file.write_text(
-            "# Auto-generated test cases for rules\n" + yaml.dump(test_data, default_flow_style=False, allow_unicode=True, sort_keys=False),
+            "# Auto-generated test cases for rules\n"
+            + yaml.dump(test_data, default_flow_style=False, allow_unicode=True, sort_keys=False),
             encoding="utf-8",
         )
         created.append("tests/test_rules.yaml")
@@ -382,7 +384,8 @@ def scaffold(
         print(f"  ⚠ Skipped {config_file} (already exists)")
     else:
         config_file.write_text(
-            "# PolicyShield configuration\n" + yaml.dump(config_data, default_flow_style=False, allow_unicode=True, sort_keys=False),
+            "# PolicyShield configuration\n"
+            + yaml.dump(config_data, default_flow_style=False, allow_unicode=True, sort_keys=False),
             encoding="utf-8",
         )
         created.append("policyshield.yaml")

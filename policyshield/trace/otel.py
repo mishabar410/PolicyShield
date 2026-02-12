@@ -153,9 +153,7 @@ class OTelExporter:
             self._histogram_latency.record(latency_ms, labels)
 
         if result.verdict == Verdict.BLOCK and self._counter_blocked:
-            self._counter_blocked.add(
-                1, {"tool": tool_name, "rule_id": result.rule_id or ""}
-            )
+            self._counter_blocked.add(1, {"tool": tool_name, "rule_id": result.rule_id or ""})
 
         if result.pii_matches and self._counter_pii:
             for m in result.pii_matches:

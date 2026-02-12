@@ -1,6 +1,6 @@
 # Core API
 
-::: policyshield.models
+::: policyshield.core.models
     options:
       show_source: true
       members:

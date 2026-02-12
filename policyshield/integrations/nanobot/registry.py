@@ -135,10 +135,7 @@ class ShieldedToolRegistry(_NanobotToolRegistry):  # type: ignore[misc]
     def register_func(self, name: str, func: Any) -> None:
         """Register a plain callable (standalone mode, no nanobot)."""
         if _HAS_NANOBOT:
-            raise RuntimeError(
-                "Use register(tool) with a nanobot Tool object, "
-                "not register_func()."
-            )
+            raise RuntimeError("Use register(tool) with a nanobot Tool object, not register_func().")
         self._tools[name] = func
 
     @property
@@ -165,10 +162,7 @@ class ShieldedToolRegistry(_NanobotToolRegistry):  # type: ignore[misc]
             all_defs = super().get_definitions()  # type: ignore[return-value]
         else:
             all_defs = []
-        return [
-            d for d in all_defs
-            if d.get("function", {}).get("name") not in blocked
-        ]
+        return [d for d in all_defs if d.get("function", {}).get("name") not in blocked]
 
     def _get_unconditionally_blocked_tools(self) -> set[str]:
         """Return set of tools that are unconditionally blocked.
@@ -179,11 +173,7 @@ class ShieldedToolRegistry(_NanobotToolRegistry):  # type: ignore[misc]
         """
         blocked: set[str] = set()
         for rule in self._engine._rule_set.rules:
-            if (
-                rule.enabled
-                and rule.then == Verdict.BLOCK
-                and set(rule.when.keys()) == {"tool"}
-            ):
+            if rule.enabled and rule.then == Verdict.BLOCK and set(rule.when.keys()) == {"tool"}:
                 blocked.add(rule.when["tool"])
         return blocked
 
@@ -199,9 +189,7 @@ class ShieldedToolRegistry(_NanobotToolRegistry):  # type: ignore[misc]
             Multi-line string summarising rules, or empty string if
             no active rules exist.
         """
-        active_rules = [
-            r for r in self._engine._rule_set.rules if r.enabled
-        ]
+        active_rules = [r for r in self._engine._rule_set.rules if r.enabled]
         if not active_rules:
             return ""
 

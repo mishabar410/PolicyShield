@@ -85,9 +85,7 @@ class CrewAIShieldTool:
 
         if result.verdict == Verdict.BLOCK:
             if self.on_block == "raise":
-                raise ToolCallBlockedError(
-                    f"🛡️ PolicyShield BLOCKED: {result.message}"
-                )
+                raise ToolCallBlockedError(f"🛡️ PolicyShield BLOCKED: {result.message}")
             return f"🛡️ BLOCKED: {result.message}"
 
         if result.verdict == Verdict.REDACT:

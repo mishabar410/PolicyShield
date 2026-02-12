@@ -120,9 +120,7 @@ class TestAsyncSessionIncrementOnBlock:
             ],
         )
         engine = AsyncShieldEngine(str(rules_path))
-        result = asyncio.run(
-            engine.check(tool_name="shell", args={"command": "rm -rf /"}, session_id="s1")
-        )
+        result = asyncio.run(engine.check(tool_name="shell", args={"command": "rm -rf /"}, session_id="s1"))
         assert result.verdict == Verdict.BLOCK
 
         session = engine._session_mgr.get_or_create("s1")

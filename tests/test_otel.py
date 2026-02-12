@@ -164,9 +164,11 @@ def test_otel_histogram_latency():
 
 def test_otel_engine_integration():
     """OTel exporter works when passed to ShieldEngine."""
-    rules = make_ruleset([
-        RuleConfig(id="r1", when={"tool": "exec"}, then=Verdict.BLOCK),
-    ])
+    rules = make_ruleset(
+        [
+            RuleConfig(id="r1", when={"tool": "exec"}, then=Verdict.BLOCK),
+        ]
+    )
     exporter = OTelExporter(enabled=True)
     engine = ShieldEngine(rules, otel_exporter=exporter)
 
