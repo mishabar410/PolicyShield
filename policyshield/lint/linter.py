@@ -94,15 +94,17 @@ class RuleLinter:
         broad_patterns = {".*", ".+"}
         for rule in ruleset.rules:
             tool = rule.when.get("tool", "")
-            if tool in broad_patterns:
-                warnings.append(
-                    LintWarning(
-                        level="WARNING",
-                        rule_id=rule.id,
-                        check="broad_tool_pattern",
-                        message=f"Tool pattern '{tool}' matches all tools",
+            tools = tool if isinstance(tool, list) else [tool]
+            for t in tools:
+                if isinstance(t, str) and t in broad_patterns:
+                    warnings.append(
+                        LintWarning(
+                            level="WARNING",
+                            rule_id=rule.id,
+                            check="broad_tool_pattern",
+                            message=f"Tool pattern '{t}' matches all tools",
+                        )
                     )
-                )
         return warnings
 
     def check_missing_message(self, ruleset: RuleSet) -> list[LintWarning]:
@@ -131,8 +133,13 @@ class RuleLinter:
             if not rule.enabled:
                 continue
             tool = rule.when.get("tool", "")
-            if tool:
-                tool_groups.setdefault(tool, []).append(rule)
+            # Normalize tool to a hashable key
+            if isinstance(tool, list):
+                tool_key = tuple(sorted(tool))
+            else:
+                tool_key = tool
+            if tool_key:
+                tool_groups.setdefault(tool_key, []).append(rule)
 
         for tool, rules in tool_groups.items():
             if len(rules) < 2:

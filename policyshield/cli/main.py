@@ -106,6 +106,17 @@ def app(args: list[str] | None = None) -> int:
         help="Arguments to pass to nanobot CLI",
     )
 
+    # init command
+    init_parser = subparsers.add_parser("init", help="Scaffold a new PolicyShield project")
+    init_parser.add_argument("directory", nargs="?", default=".", help="Target directory (default: current directory)")
+    init_parser.add_argument(
+        "--preset", default="minimal",
+        choices=["minimal", "security", "compliance"],
+        help="Rule preset (default: minimal)",
+    )
+    init_parser.add_argument("--nanobot", action="store_true", help="Add nanobot-specific rules")
+    init_parser.add_argument("--no-interactive", action="store_true", help="Skip interactive prompts")
+
     # config command
     config_parser = subparsers.add_parser("config", help="Manage policyshield config")
     config_subparsers = config_parser.add_subparsers(dest="config_command")
@@ -137,6 +148,8 @@ def app(args: list[str] | None = None) -> int:
         else:
             trace_parser.print_help()
             return 1
+    elif parsed.command == "init":
+        return _cmd_init(parsed)
     elif parsed.command == "nanobot":
         return _cmd_nanobot(parsed, args)
     elif parsed.command == "config":
@@ -151,6 +164,28 @@ def app(args: list[str] | None = None) -> int:
             return 1
     else:
         parser.print_help()
+        return 1
+
+
+def _cmd_init(parsed: argparse.Namespace) -> int:
+    """Scaffold a new PolicyShield project."""
+    from policyshield.cli.init_scaffold import scaffold
+
+    directory = parsed.directory
+    preset = parsed.preset
+    nanobot_flag = parsed.nanobot
+    interactive = not parsed.no_interactive
+
+    try:
+        scaffold(
+            directory=directory,
+            preset=preset,
+            nanobot=nanobot_flag,
+            interactive=interactive,
+        )
+        return 0
+    except Exception as e:
+        print(f"✗ Error: {e}", file=sys.stderr)
         return 1
 
 
