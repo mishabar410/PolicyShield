@@ -91,6 +91,14 @@ def app(args: list[str] | None = None) -> int:
     search_parser.add_argument("--limit", type=int, default=50, help="Max results (default: 50)")
     search_parser.add_argument("--format", choices=["table", "json"], default="table", help="Output format")
 
+    # trace cost
+    cost_parser = trace_subparsers.add_parser("cost", help="Estimate token/dollar cost of tool calls")
+    cost_parser.add_argument("--dir", default="./traces", help="Trace directory (default: ./traces)")
+    cost_parser.add_argument("--model", default="gpt-4o", help="Model for pricing (default: gpt-4o)")
+    cost_parser.add_argument("--from", dest="time_from", help="Start time (ISO datetime)")
+    cost_parser.add_argument("--to", dest="time_to", help="End time (ISO datetime)")
+    cost_parser.add_argument("--format", choices=["table", "json"], default="table", help="Output format")
+
     # trace export
     export_parser = trace_subparsers.add_parser("export", help="Export trace to CSV or HTML")
     export_parser.add_argument("file", help="Path to JSONL trace file")
@@ -175,6 +183,8 @@ def app(args: list[str] | None = None) -> int:
             return _cmd_trace_search(parsed)
         elif parsed.trace_command == "export":
             return _cmd_trace_export(parsed)
+        elif parsed.trace_command == "cost":
+            return _cmd_trace_cost(parsed)
         else:
             trace_parser.print_help()
             return 1
@@ -569,6 +579,36 @@ def _cmd_trace_search(parsed: argparse.Namespace) -> int:
             icon = "✓" if verdict == "ALLOW" else "✗"
             print(f"{icon} [{verdict}] {tool} | session={session} | {ts}")
         print(f"\n({len(result.records)} of {result.total} shown)")
+
+    return 0
+
+
+def _cmd_trace_cost(parsed: argparse.Namespace) -> int:
+    """Estimate token/dollar cost of tool calls."""
+    from datetime import datetime as _dt
+
+    from policyshield.trace.cost import CostEstimator, format_cost_estimate
+
+    trace_dir = Path(parsed.dir)
+    if not trace_dir.exists():
+        print(f"\u2717 Trace directory not found: {parsed.dir}", file=sys.stderr)
+        return 1
+
+    filters: dict = {}
+    if parsed.time_from or parsed.time_to:
+        from policyshield.trace.aggregator import TimeWindow
+
+        start = _dt.fromisoformat(parsed.time_from) if parsed.time_from else _dt.min
+        end = _dt.fromisoformat(parsed.time_to) if parsed.time_to else _dt.max
+        filters["time_window"] = TimeWindow(start=start, end=end)
+
+    estimator = CostEstimator(model=parsed.model)
+    estimate = estimator.estimate_from_traces(trace_dir, **filters)
+
+    if parsed.format == "json":
+        print(json.dumps(estimate.to_dict(), indent=2, default=str))
+    else:
+        print(format_cost_estimate(estimate))
 
     return 0
 
