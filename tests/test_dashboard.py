@@ -4,6 +4,9 @@ import json
 
 import pytest
 
+pytest.importorskip("fastapi", reason="Dashboard tests require fastapi")
+pytest.importorskip("starlette", reason="Dashboard tests require starlette")
+
 from policyshield.dashboard import create_dashboard_app
 
 
@@ -21,7 +24,13 @@ def trace_dir(tmp_path):
         {"timestamp": "2025-01-01T12:00:00", "tool": "exec", "verdict": "BLOCK", "session_id": "s1"},
         {"timestamp": "2025-01-01T12:01:00", "tool": "exec", "verdict": "ALLOW", "session_id": "s1"},
         {"timestamp": "2025-01-01T12:02:00", "tool": "read_file", "verdict": "ALLOW", "session_id": "s1"},
-        {"timestamp": "2025-01-01T12:03:00", "tool": "web_fetch", "verdict": "BLOCK", "session_id": "s1", "pii_types": ["EMAIL"]},
+        {
+            "timestamp": "2025-01-01T12:03:00",
+            "tool": "web_fetch",
+            "verdict": "BLOCK",
+            "session_id": "s1",
+            "pii_types": ["EMAIL"],
+        },
     ]
     _write_traces(d, records)
     return d

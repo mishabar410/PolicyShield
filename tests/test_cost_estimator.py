@@ -141,10 +141,14 @@ class TestDefaultToolProfile:
 class TestLoadPricingYaml:
     def test_load_pricing(self, tmp_path):
         pricing_yaml = tmp_path / "pricing.yaml"
-        pricing_yaml.write_text(yaml.dump({
-            "custom-model": {"input_per_1k": 0.005, "output_per_1k": 0.02},
-            "cheap-model": {"input_per_1k": 0.0001, "output_per_1k": 0.0005},
-        }))
+        pricing_yaml.write_text(
+            yaml.dump(
+                {
+                    "custom-model": {"input_per_1k": 0.005, "output_per_1k": 0.02},
+                    "cheap-model": {"input_per_1k": 0.0001, "output_per_1k": 0.0005},
+                }
+            )
+        )
         pricing = CostEstimator.load_pricing_from_yaml(pricing_yaml)
         assert "custom-model" in pricing
         assert "cheap-model" in pricing
@@ -215,8 +219,11 @@ class TestFormatCostEstimate:
 class TestSerialization:
     def test_to_dict(self):
         est = CostEstimate(
-            total_calls=10, allowed_calls=8, blocked_calls=2,
-            estimated_cost_allowed=1.0, estimated_cost_blocked=0.25,
+            total_calls=10,
+            allowed_calls=8,
+            blocked_calls=2,
+            estimated_cost_allowed=1.0,
+            estimated_cost_blocked=0.25,
             estimated_cost_total=1.25,
             cost_by_tool={"exec": 1.0},
             model="gpt-4o",

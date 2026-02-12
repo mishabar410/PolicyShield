@@ -2,7 +2,9 @@
 
 import json
 
-from policyshield.dashboard.prometheus import PrometheusExporter, add_prometheus_endpoint
+import pytest
+
+from policyshield.dashboard.prometheus import PrometheusExporter
 
 
 def _write_traces(trace_dir, records):
@@ -17,7 +19,13 @@ def _sample_records():
         {"timestamp": "2025-01-01T12:00:00", "tool": "exec", "verdict": "BLOCK", "session_id": "s1"},
         {"timestamp": "2025-01-01T12:01:00", "tool": "exec", "verdict": "ALLOW", "session_id": "s1"},
         {"timestamp": "2025-01-01T12:02:00", "tool": "read_file", "verdict": "ALLOW", "session_id": "s1"},
-        {"timestamp": "2025-01-01T12:03:00", "tool": "web_fetch", "verdict": "BLOCK", "session_id": "s1", "pii_types": ["EMAIL"]},
+        {
+            "timestamp": "2025-01-01T12:03:00",
+            "tool": "web_fetch",
+            "verdict": "BLOCK",
+            "session_id": "s1",
+            "pii_types": ["EMAIL"],
+        },
     ]
 
 
@@ -97,9 +105,12 @@ class TestPIIMetrics:
 
 class TestPrometheusEndpoint:
     def test_endpoint(self, tmp_path):
+        pytest.importorskip("starlette", reason="Requires starlette")
+        pytest.importorskip("fastapi", reason="Requires fastapi")
         from starlette.testclient import TestClient
 
         from policyshield.dashboard import create_dashboard_app
+        from policyshield.dashboard.prometheus import add_prometheus_endpoint
 
         d = tmp_path / "traces"
         _write_traces(d, _sample_records())

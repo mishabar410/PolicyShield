@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.6.0] - 2025-02-13
+
+### Added
+- **Trace Search**: Full-text and structured search across JSONL traces (`policyshield trace search`)
+- **Trace Aggregation API**: Verdict breakdown, top tools, PII heatmap, timeline analysis
+- **Cost Estimator**: Token/dollar cost estimation per tool call with multi-model pricing (`policyshield trace cost`)
+- **Alert Engine**: 5 condition types (block rate, block count, PII detected, tool blocked, error rate)
+- **Alert Backends**: Console, Webhook, Slack, Telegram with severity filtering and cooldown
+- **Web Dashboard**: FastAPI REST API + WebSocket live verdict stream (`policyshield trace dashboard`)
+- **Dashboard Frontend**: Dark-themed SPA with verdict breakdown, block rate, tool stats, PII, cost view
+- **Prometheus Exporter**: `/metrics` endpoint with per-tool and per-PII labels
+- **Grafana Preset**: Pre-built dashboard JSON + datasource provisioning config
+- New `policyshield trace stats` with directory-based aggregation
+- New `policyshield trace cost` CLI command
+- New `policyshield trace dashboard` CLI command
+- Optional dependencies: `dashboard` (FastAPI + uvicorn), `prometheus` (prometheus-client)
+- 100+ new tests (prompts 29–37), bringing total to 688+
+
 ## [0.5.0] - 2025-02-12
 
 ### Added

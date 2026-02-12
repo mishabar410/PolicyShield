@@ -262,7 +262,11 @@ pii_patterns:
 | **Hot Reload** | File-watcher auto-reloads rules on change |
 | **Input Sanitizer** | Normalize args, block prompt injection patterns |
 | **OpenTelemetry** | OTLP export to Jaeger/Grafana (spans + metrics) |
-| **Trace & Audit** | JSONL log, stats, violations, CSV/HTML export |
+| **Trace & Audit** | JSONL log, search, stats, violations, CSV/HTML export |
+| **Cost Estimator** | Token/dollar cost estimation per tool call and model |
+| **Alert Engine** | 5 condition types with Console, Webhook, Slack, Telegram backends |
+| **Dashboard** | FastAPI REST API + WebSocket live stream + dark-themed SPA |
+| **Prometheus** | `/metrics` endpoint with per-tool and PII labels + Grafana preset |
 | **Rule Testing** | YAML test cases for policies (`policyshield test`) |
 | **Rule Linter** | Static analysis: duplicates, broad patterns, missing messages, conflicts |
 
@@ -298,8 +302,13 @@ policyshield test ./policies/              # Run YAML test cases
 
 policyshield trace show ./traces/trace.jsonl
 policyshield trace violations ./traces/trace.jsonl
-policyshield trace stats ./traces/trace.jsonl --format json
+policyshield trace stats --dir ./traces/ --format json
+policyshield trace search --tool exec --verdict BLOCK
+policyshield trace cost --dir ./traces/ --model gpt-4o
 policyshield trace export ./traces/trace.jsonl -f html
+
+# Launch the live web dashboard
+policyshield trace dashboard --port 8000 --prometheus
 
 # Run nanobot with PolicyShield enforcement
 policyshield nanobot --rules rules.yaml agent -m "Hello!"
@@ -347,7 +356,7 @@ cd PolicyShield
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev,langchain]"
 
-pytest tests/ -v                 # 570 tests
+pytest tests/ -v                 # 690+ tests
 ruff check policyshield/ tests/  # Lint
 ruff format --check policyshield/ tests/  # Format check
 ```
@@ -365,9 +374,10 @@ ruff format --check policyshield/ tests/  # Format check
 | **v0.3** | ✅ Async engine, CrewAI, OTel, webhooks, rule testing, policy diff |
 | **v0.4** | ✅ Nanobot: monkey-patch, CLI wrapper, session propagation, PII scan |
 | **v0.5** | ✅ DX: PyPI publish, docs site, GitHub Action, Docker, CLI init |
-| **v1.0** | 📋 Stable API, dashboard UI, performance benchmarks |
+| **v0.6** | ✅ Observability: trace search, cost estimator, alerts, dashboard, Grafana |
+| **v1.0** | 📋 Stable API, performance benchmarks, multi-tenant |
 
-See [ROADMAP.md](ROADMAP.md) for the full roadmap including v0.6–v1.0 and future ideas.
+See [ROADMAP.md](ROADMAP.md) for the full roadmap including v0.7–v1.0 and future ideas.
 
 ---
 

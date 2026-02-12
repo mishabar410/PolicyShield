@@ -18,13 +18,18 @@ from policyshield.trace.aggregator import (
 
 
 def _make_aggregation(
-    allow=8, block=2, redact=0, approve=0,
-    tools=None, pii=None,
+    allow=8,
+    block=2,
+    redact=0,
+    approve=0,
+    tools=None,
+    pii=None,
 ):
     total = allow + block + redact + approve
     return AggregationResult(
         verdict_breakdown=VerdictBreakdown(allow=allow, block=block, redact=redact, approve=approve, total=total),
-        top_tools=tools or [
+        top_tools=tools
+        or [
             ToolStats(tool="exec", call_count=5, block_count=2, block_rate=0.4),
             ToolStats(tool="read_file", call_count=5, block_count=0, block_rate=0.0),
         ],
@@ -34,9 +39,17 @@ def _make_aggregation(
 
 class TestBlockRateAbove:
     def test_fires_when_rate_exceeded(self):
-        engine = AlertEngine(rules=[
-            AlertRule(id="r1", name="High block rate", condition_type=AlertConditionType.BLOCK_RATE_ABOVE, threshold=0.1, severity=AlertSeverity.CRITICAL),
-        ])
+        engine = AlertEngine(
+            rules=[
+                AlertRule(
+                    id="r1",
+                    name="High block rate",
+                    condition_type=AlertConditionType.BLOCK_RATE_ABOVE,
+                    threshold=0.1,
+                    severity=AlertSeverity.CRITICAL,
+                ),
+            ]
+        )
         agg = _make_aggregation(allow=7, block=3)
         alerts = engine.evaluate(agg)
         assert len(alerts) == 1
@@ -44,92 +57,134 @@ class TestBlockRateAbove:
         assert "30.0%" in alerts[0].message
 
     def test_no_fire_below_threshold(self):
-        engine = AlertEngine(rules=[
-            AlertRule(id="r1", name="High block rate", condition_type=AlertConditionType.BLOCK_RATE_ABOVE, threshold=0.5),
-        ])
+        engine = AlertEngine(
+            rules=[
+                AlertRule(
+                    id="r1", name="High block rate", condition_type=AlertConditionType.BLOCK_RATE_ABOVE, threshold=0.5
+                ),
+            ]
+        )
         agg = _make_aggregation(allow=9, block=1)
         assert engine.evaluate(agg) == []
 
 
 class TestBlockCountAbove:
     def test_fires_when_count_exceeded(self):
-        engine = AlertEngine(rules=[
-            AlertRule(id="r2", name="Too many blocks", condition_type=AlertConditionType.BLOCK_COUNT_ABOVE, threshold=5),
-        ])
+        engine = AlertEngine(
+            rules=[
+                AlertRule(
+                    id="r2", name="Too many blocks", condition_type=AlertConditionType.BLOCK_COUNT_ABOVE, threshold=5
+                ),
+            ]
+        )
         agg = _make_aggregation(allow=4, block=6)
         alerts = engine.evaluate(agg)
         assert len(alerts) == 1
 
     def test_no_fire_below_threshold(self):
-        engine = AlertEngine(rules=[
-            AlertRule(id="r2", name="Too many blocks", condition_type=AlertConditionType.BLOCK_COUNT_ABOVE, threshold=10),
-        ])
+        engine = AlertEngine(
+            rules=[
+                AlertRule(
+                    id="r2", name="Too many blocks", condition_type=AlertConditionType.BLOCK_COUNT_ABOVE, threshold=10
+                ),
+            ]
+        )
         agg = _make_aggregation(allow=8, block=2)
         assert engine.evaluate(agg) == []
 
 
 class TestPIIDetected:
     def test_fires_on_pii(self):
-        engine = AlertEngine(rules=[
-            AlertRule(id="r3", name="PII detected", condition_type=AlertConditionType.PII_DETECTED),
-        ])
+        engine = AlertEngine(
+            rules=[
+                AlertRule(id="r3", name="PII detected", condition_type=AlertConditionType.PII_DETECTED),
+            ]
+        )
         agg = _make_aggregation(pii=[PIIHeatmapEntry(pii_type="EMAIL", tool="send", count=3)])
         alerts = engine.evaluate(agg)
         assert len(alerts) == 1
         assert "EMAIL" in alerts[0].message
 
     def test_fires_on_specific_pii_type(self):
-        engine = AlertEngine(rules=[
-            AlertRule(id="r3", name="SSN detected", condition_type=AlertConditionType.PII_DETECTED, pii_type="SSN"),
-        ])
-        agg = _make_aggregation(pii=[
-            PIIHeatmapEntry(pii_type="EMAIL", tool="send", count=3),
-            PIIHeatmapEntry(pii_type="SSN", tool="write", count=1),
-        ])
+        engine = AlertEngine(
+            rules=[
+                AlertRule(id="r3", name="SSN detected", condition_type=AlertConditionType.PII_DETECTED, pii_type="SSN"),
+            ]
+        )
+        agg = _make_aggregation(
+            pii=[
+                PIIHeatmapEntry(pii_type="EMAIL", tool="send", count=3),
+                PIIHeatmapEntry(pii_type="SSN", tool="write", count=1),
+            ]
+        )
         alerts = engine.evaluate(agg)
         assert len(alerts) == 1
         assert "SSN" in alerts[0].message
 
     def test_no_fire_without_pii(self):
-        engine = AlertEngine(rules=[
-            AlertRule(id="r3", name="PII detected", condition_type=AlertConditionType.PII_DETECTED),
-        ])
+        engine = AlertEngine(
+            rules=[
+                AlertRule(id="r3", name="PII detected", condition_type=AlertConditionType.PII_DETECTED),
+            ]
+        )
         agg = _make_aggregation()
         assert engine.evaluate(agg) == []
 
 
 class TestToolBlocked:
     def test_fires_on_tool_blocked(self):
-        engine = AlertEngine(rules=[
-            AlertRule(id="r4", name="Exec blocked", condition_type=AlertConditionType.TOOL_BLOCKED, tool="exec"),
-        ])
+        engine = AlertEngine(
+            rules=[
+                AlertRule(id="r4", name="Exec blocked", condition_type=AlertConditionType.TOOL_BLOCKED, tool="exec"),
+            ]
+        )
         agg = _make_aggregation()
         alerts = engine.evaluate(agg)
         assert len(alerts) == 1
         assert "exec" in alerts[0].message
 
     def test_no_fire_unblocked_tool(self):
-        engine = AlertEngine(rules=[
-            AlertRule(id="r4", name="Read blocked", condition_type=AlertConditionType.TOOL_BLOCKED, tool="read_file"),
-        ])
+        engine = AlertEngine(
+            rules=[
+                AlertRule(
+                    id="r4", name="Read blocked", condition_type=AlertConditionType.TOOL_BLOCKED, tool="read_file"
+                ),
+            ]
+        )
         agg = _make_aggregation()
         assert engine.evaluate(agg) == []
 
 
 class TestDisabledRule:
     def test_disabled_rule_skipped(self):
-        engine = AlertEngine(rules=[
-            AlertRule(id="r1", name="Disabled", condition_type=AlertConditionType.BLOCK_COUNT_ABOVE, threshold=0, enabled=False),
-        ])
+        engine = AlertEngine(
+            rules=[
+                AlertRule(
+                    id="r1",
+                    name="Disabled",
+                    condition_type=AlertConditionType.BLOCK_COUNT_ABOVE,
+                    threshold=0,
+                    enabled=False,
+                ),
+            ]
+        )
         agg = _make_aggregation(block=5)
         assert engine.evaluate(agg) == []
 
 
 class TestCooldown:
     def test_cooldown_prevents_repeat(self):
-        engine = AlertEngine(rules=[
-            AlertRule(id="r1", name="Rate", condition_type=AlertConditionType.BLOCK_RATE_ABOVE, threshold=0.1, cooldown_seconds=60),
-        ])
+        engine = AlertEngine(
+            rules=[
+                AlertRule(
+                    id="r1",
+                    name="Rate",
+                    condition_type=AlertConditionType.BLOCK_RATE_ABOVE,
+                    threshold=0.1,
+                    cooldown_seconds=60,
+                ),
+            ]
+        )
         agg = _make_aggregation(allow=7, block=3)
         alerts1 = engine.evaluate(agg)
         assert len(alerts1) == 1
@@ -145,9 +200,11 @@ class TestRuleManagement:
         assert len(engine.rules) == 1
 
     def test_remove_rule(self):
-        engine = AlertEngine(rules=[
-            AlertRule(id="r1", name="Test", condition_type=AlertConditionType.BLOCK_COUNT_ABOVE),
-        ])
+        engine = AlertEngine(
+            rules=[
+                AlertRule(id="r1", name="Test", condition_type=AlertConditionType.BLOCK_COUNT_ABOVE),
+            ]
+        )
         assert engine.remove_rule("r1") is True
         assert len(engine.rules) == 0
 
@@ -160,7 +217,13 @@ class TestFromConfig:
     def test_load_from_config(self):
         config = {
             "rules": [
-                {"id": "r1", "name": "High blocks", "condition_type": "block_rate_above", "threshold": 0.2, "severity": "CRITICAL"},
+                {
+                    "id": "r1",
+                    "name": "High blocks",
+                    "condition_type": "block_rate_above",
+                    "threshold": 0.2,
+                    "severity": "CRITICAL",
+                },
                 {"id": "r2", "name": "PII", "condition_type": "pii_detected"},
             ]
         }
@@ -179,10 +242,16 @@ class TestAlertSerialization:
 
 class TestMultipleRules:
     def test_multiple_alerts(self):
-        engine = AlertEngine(rules=[
-            AlertRule(id="r1", name="Block rate", condition_type=AlertConditionType.BLOCK_RATE_ABOVE, threshold=0.1),
-            AlertRule(id="r2", name="Block count", condition_type=AlertConditionType.BLOCK_COUNT_ABOVE, threshold=1),
-        ])
+        engine = AlertEngine(
+            rules=[
+                AlertRule(
+                    id="r1", name="Block rate", condition_type=AlertConditionType.BLOCK_RATE_ABOVE, threshold=0.1
+                ),
+                AlertRule(
+                    id="r2", name="Block count", condition_type=AlertConditionType.BLOCK_COUNT_ABOVE, threshold=1
+                ),
+            ]
+        )
         agg = _make_aggregation(allow=7, block=3)
         alerts = engine.evaluate(agg)
         assert len(alerts) == 2
@@ -200,8 +269,10 @@ class TestEvaluateFromTraces:
             for r in records:
                 f.write(json.dumps(r) + "\n")
 
-        engine = AlertEngine(rules=[
-            AlertRule(id="r1", name="Any block", condition_type=AlertConditionType.BLOCK_COUNT_ABOVE, threshold=0),
-        ])
+        engine = AlertEngine(
+            rules=[
+                AlertRule(id="r1", name="Any block", condition_type=AlertConditionType.BLOCK_COUNT_ABOVE, threshold=0),
+            ]
+        )
         alerts = engine.evaluate_from_traces(d)
         assert len(alerts) == 1

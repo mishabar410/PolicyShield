@@ -326,7 +326,7 @@ def format_aggregation(result: AggregationResult, top_n: int = 10) -> str:
         lines.append("Top Tools (by calls):")
         for i, ts in enumerate(result.top_tools[:top_n], 1):
             lines.append(
-                f"  {i}. {ts.tool:<16} {ts.call_count} calls, {ts.block_count:>3} blocks ({ts.block_rate*100:.1f}%)"
+                f"  {i}. {ts.tool:<16} {ts.call_count} calls, {ts.block_count:>3} blocks ({ts.block_rate * 100:.1f}%)"
             )
         lines.append("")
 

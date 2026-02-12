@@ -60,16 +60,77 @@ def trace_dir(tmp_path):
 def sample_records():
     base = datetime(2025, 1, 1, 12, 0, 0)
     return [
-        _make_record(tool="exec", verdict="BLOCK", session_id="s1", timestamp=(base + timedelta(minutes=0)).isoformat(), latency_ms=10),
-        _make_record(tool="read_file", verdict="ALLOW", session_id="s1", timestamp=(base + timedelta(minutes=10)).isoformat(), latency_ms=5),
-        _make_record(tool="web_fetch", verdict="REDACT", session_id="s2", timestamp=(base + timedelta(minutes=20)).isoformat(), pii_types=["EMAIL", "PHONE"], latency_ms=20),
-        _make_record(tool="send_message", verdict="BLOCK", session_id="s2", timestamp=(base + timedelta(minutes=30)).isoformat(), latency_ms=3),
-        _make_record(tool="exec", verdict="ALLOW", session_id="s3", timestamp=(base + timedelta(minutes=40)).isoformat(), latency_ms=8),
-        _make_record(tool="web_fetch", verdict="ALLOW", session_id="s3", timestamp=(base + timedelta(minutes=50)).isoformat(), latency_ms=15),
-        _make_record(tool="write_file", verdict="REDACT", session_id="s1", timestamp=(base + timedelta(minutes=60)).isoformat(), pii_types=["SSN"]),
-        _make_record(tool="exec", verdict="BLOCK", session_id="s4", timestamp=(base + timedelta(minutes=70)).isoformat(), latency_ms=12),
-        _make_record(tool="send_message", verdict="APPROVE", session_id="s4", timestamp=(base + timedelta(minutes=80)).isoformat(), latency_ms=6),
-        _make_record(tool="read_file", verdict="ALLOW", session_id="s5", timestamp=(base + timedelta(minutes=90)).isoformat(), latency_ms=4),
+        _make_record(
+            tool="exec",
+            verdict="BLOCK",
+            session_id="s1",
+            timestamp=(base + timedelta(minutes=0)).isoformat(),
+            latency_ms=10,
+        ),
+        _make_record(
+            tool="read_file",
+            verdict="ALLOW",
+            session_id="s1",
+            timestamp=(base + timedelta(minutes=10)).isoformat(),
+            latency_ms=5,
+        ),
+        _make_record(
+            tool="web_fetch",
+            verdict="REDACT",
+            session_id="s2",
+            timestamp=(base + timedelta(minutes=20)).isoformat(),
+            pii_types=["EMAIL", "PHONE"],
+            latency_ms=20,
+        ),
+        _make_record(
+            tool="send_message",
+            verdict="BLOCK",
+            session_id="s2",
+            timestamp=(base + timedelta(minutes=30)).isoformat(),
+            latency_ms=3,
+        ),
+        _make_record(
+            tool="exec",
+            verdict="ALLOW",
+            session_id="s3",
+            timestamp=(base + timedelta(minutes=40)).isoformat(),
+            latency_ms=8,
+        ),
+        _make_record(
+            tool="web_fetch",
+            verdict="ALLOW",
+            session_id="s3",
+            timestamp=(base + timedelta(minutes=50)).isoformat(),
+            latency_ms=15,
+        ),
+        _make_record(
+            tool="write_file",
+            verdict="REDACT",
+            session_id="s1",
+            timestamp=(base + timedelta(minutes=60)).isoformat(),
+            pii_types=["SSN"],
+        ),
+        _make_record(
+            tool="exec",
+            verdict="BLOCK",
+            session_id="s4",
+            timestamp=(base + timedelta(minutes=70)).isoformat(),
+            latency_ms=12,
+        ),
+        _make_record(
+            tool="send_message",
+            verdict="APPROVE",
+            session_id="s4",
+            timestamp=(base + timedelta(minutes=80)).isoformat(),
+            latency_ms=6,
+        ),
+        _make_record(
+            tool="read_file",
+            verdict="ALLOW",
+            session_id="s5",
+            timestamp=(base + timedelta(minutes=90)).isoformat(),
+            latency_ms=4,
+        ),
     ]
 
 

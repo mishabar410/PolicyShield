@@ -17,9 +17,7 @@ def create_dashboard_app(trace_dir: str | Path = "./traces"):
         from fastapi.middleware.cors import CORSMiddleware
         from fastapi.responses import FileResponse, HTMLResponse
     except ImportError:
-        raise ImportError(
-            "Dashboard requires 'fastapi'. Install with: pip install policyshield[dashboard]"
-        )
+        raise ImportError("Dashboard requires 'fastapi'. Install with: pip install policyshield[dashboard]")
 
     trace_dir = Path(trace_dir)
     app = FastAPI(title="PolicyShield Dashboard", version="0.6.0")
