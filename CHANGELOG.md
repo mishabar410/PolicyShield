@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.5.0] - 2025-02-12
+
+### Added
+- **CLI `policyshield init`**: Scaffold new projects with presets (`minimal`, `security`, `compliance`), nanobot support, auto-generated test cases
+- **CLI nanobot wrapper**: Extracted `cli_wrapper.py` with `patch_agent_loop_class()` and `run_nanobot_cli()`
+- **PyPI packaging**: Updated metadata, Beta status, 7 optional dependency groups (`langchain`, `crewai`, `otel`, `nanobot`, `docs`, `dev`, `all`)
+- **GitHub Actions CI**: Enhanced with format check, coverage XML artifact, build job with twine check
+- **Release workflow**: Automated PyPI publishing on version tags
+- **Reusable GitHub Action**: `.github/actions/lint-rules/` for validating and linting rules in CI
+- **MkDocs documentation site**: Material theme, 14 pages covering getting started, guides, integrations, API reference
+- **GitHub Pages deploy**: Automatic docs deployment workflow
+- **FastAPI example**: Complete agent service with `/evaluate` and `/rules` endpoints
+- **Docker quickstart**: Dockerfile and docker-compose.yml with validate/lint/test services
+- **Contributing guide**: Updated with format checks, project structure, commit conventions
+- **GitHub templates**: PR template, bug report and feature request issue templates
+- **Code of Conduct**: Contributor Covenant v2.1
+- 109 new tests (prompts 19–28), bringing total to 570
+
 ## [0.4.0] - 2025-02-12
 
 ### Added

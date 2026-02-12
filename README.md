@@ -84,6 +84,12 @@ policyshield validate rules.yaml
 policyshield lint rules.yaml
 ```
 
+Or scaffold a full project:
+
+```bash
+policyshield init --preset security --no-interactive
+```
+
 ---
 
 ## Using with Nanobot
@@ -295,6 +301,24 @@ policyshield trace export ./traces/trace.jsonl -f html
 # Run nanobot with PolicyShield enforcement
 policyshield nanobot --rules rules.yaml agent -m "Hello!"
 policyshield nanobot --rules rules.yaml gateway
+
+# Initialize a new project
+policyshield init --preset security --no-interactive
+```
+
+---
+
+## Docker
+
+```bash
+# Validate rules
+docker compose run policyshield validate policies/
+
+# Lint rules
+docker compose run lint
+
+# Run tests
+docker compose run test
 ```
 
 ---
@@ -320,9 +344,12 @@ cd PolicyShield
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev,langchain]"
 
-pytest tests/ -v                 # 461 tests
+pytest tests/ -v                 # 570 tests
 ruff check policyshield/ tests/  # Lint
+ruff format --check policyshield/ tests/  # Format check
 ```
+
+📖 **Documentation**: [mishabar410.github.io/PolicyShield](https://mishabar410.github.io/PolicyShield/)
 
 ---
 
@@ -334,7 +361,7 @@ ruff check policyshield/ tests/  # Lint
 | **v0.2** | ✅ Linter, hot reload, rate limiter, approval flow, LangChain |
 | **v0.3** | ✅ Async engine, CrewAI, OTel, webhooks, rule testing, policy diff |
 | **v0.4** | ✅ Nanobot: monkey-patch, CLI wrapper, session propagation, PII scan |
-| **v0.5** | 🚧 DX: PyPI publish, docs site, GitHub Action, VS Code extension |
+| **v0.5** | ✅ DX: PyPI publish, docs site, GitHub Action, Docker, CLI init |
 | **v1.0** | 📋 Stable API, dashboard UI, performance benchmarks |
 
 See [ROADMAP.md](ROADMAP.md) for the full roadmap including v0.6–v1.0 and future ideas.
