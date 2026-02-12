@@ -128,19 +128,23 @@ rules:
     message: "File deletion is disabled."
 ```
 
-### Step 3. Add PolicyShield to your AgentLoop
+### Step 3. Run nanobot through PolicyShield
 
-After creating your `AgentLoop`, call `shield_agent_loop()` to add enforcement:
+The simplest way — just prefix your usual command:
+
+```bash
+policyshield nanobot --rules policies/rules.yaml agent -m "Hello!"
+policyshield nanobot --rules policies/rules.yaml gateway
+```
+
+Or if you create `AgentLoop` in your own Python code:
 
 ```python
 from nanobot.agent.loop import AgentLoop
 from policyshield.integrations.nanobot import shield_agent_loop
 
-# Create your agent loop as usual
 loop = AgentLoop(bus=bus, provider=provider, workspace=workspace)
-
-# ↓ Add this one line to enable PolicyShield ↓
-shield_agent_loop(loop, rules_path="policies/rules.yaml")
+shield_agent_loop(loop, rules_path="policies/rules.yaml")  # ← one line
 ```
 
 That's it. Every tool call your agent makes will now pass through PolicyShield. Blocked tools return an error message to the LLM, which replans automatically.
@@ -287,6 +291,10 @@ policyshield trace show ./traces/trace.jsonl
 policyshield trace violations ./traces/trace.jsonl
 policyshield trace stats ./traces/trace.jsonl --format json
 policyshield trace export ./traces/trace.jsonl -f html
+
+# Run nanobot with PolicyShield enforcement
+policyshield nanobot --rules rules.yaml agent -m "Hello!"
+policyshield nanobot --rules rules.yaml gateway
 ```
 
 ---
@@ -322,11 +330,14 @@ ruff check policyshield/ tests/  # Lint
 
 | Version | Status |
 |---------|--------|
-| **v0.1** | ✅ Core: YAML DSL, verdicts, PII, repair loop, trace, CLI |
-| **v0.2** | ✅ Linter, hot reload, rate limiter, approval flow, LangChain adapter |
-| **v0.3** | ✅ Async engine, CrewAI/Nanobot, OTel, webhooks, rule testing, policy diff |
-| **v0.4** | ✅ Nanobot deep integration: session propagation, PII scan, context enrichment, subagent shield |
-| **v1.0** | 🚧 Stable API, PyPI publish, dashboard UI |
+| **v0.1** | ✅ Core: YAML DSL, verdicts, PII, trace, CLI |
+| **v0.2** | ✅ Linter, hot reload, rate limiter, approval flow, LangChain |
+| **v0.3** | ✅ Async engine, CrewAI, OTel, webhooks, rule testing, policy diff |
+| **v0.4** | ✅ Nanobot: monkey-patch, CLI wrapper, session propagation, PII scan |
+| **v0.5** | 🚧 DX: PyPI publish, docs site, GitHub Action, VS Code extension |
+| **v1.0** | 📋 Stable API, dashboard UI, performance benchmarks |
+
+See [ROADMAP.md](ROADMAP.md) for the full roadmap including v0.6–v1.0 and future ideas.
 
 ---
 

@@ -1,47 +1,63 @@
 # Nanobot Integration Guide
 
-PolicyShield integrates with [nanobot](https://github.com/nanobot-sh/nanobot) to enforce security policies on AI agent tool calls.
+PolicyShield integrates with [nanobot](https://github.com/nanobot-sh/nanobot) to enforce security policies on AI agent tool calls. **No nanobot source code changes required.**
 
 ## Quick Start
 
-### AgentLoop (recommended)
+### Option A: CLI wrapper (recommended)
+
+The easiest way — just prefix your usual nanobot command:
+
+```bash
+# Instead of:
+nanobot agent -m "Hello!"
+
+# Run:
+policyshield nanobot --rules policies/rules.yaml agent -m "Hello!"
+
+# Gateway mode:
+policyshield nanobot --rules policies/rules.yaml gateway
+
+# Audit mode (log only, don't block):
+policyshield nanobot --rules policies/rules.yaml --mode AUDIT gateway
+```
+
+### Option B: Python API
+
+If you create `AgentLoop` in your own code:
 
 ```python
 from nanobot.agent.loop import AgentLoop
+from policyshield.integrations.nanobot import shield_agent_loop
 
-loop = AgentLoop(
-    bus=bus,
-    provider=provider,
-    workspace=workspace,
-    shield_config={
-        "rules_path": "policies/rules.yaml",
-        "mode": "ENFORCE",    # ENFORCE | AUDIT | DISABLED
-        "fail_open": True,
-    },
-)
+# Create your agent as usual
+loop = AgentLoop(bus=bus, provider=provider, workspace=workspace)
+
+# Add PolicyShield (one line)
+shield_agent_loop(loop, rules_path="policies/rules.yaml")
 ```
 
-This automatically:
-1. Wraps the `ToolRegistry` with `ShieldedToolRegistry`
-2. Propagates session IDs for rate limiting
-3. Injects policy constraints into the LLM system prompt
-4. Filters blocked tools from `get_definitions()`
-5. Scans tool results for PII (post-call)
-6. Propagates shield to spawned subagents
-
-### Standalone
+### Option C: Standalone registry (no AgentLoop)
 
 ```python
 from policyshield.integrations.nanobot.installer import install_shield
 
-registry = install_shield(
-    rules_path="policies/rules.yaml",
-    mode="ENFORCE",
-    fail_open=True,
-)
+registry = install_shield(rules_path="policies/rules.yaml")
 registry.register_func("echo", lambda message="": message)
-result = await registry.execute("echo", {"message": "hello"})
+
+result = await registry.execute("echo", {"message": "hello"})     # ✓ Allowed
+result = await registry.execute("delete_file", {"path": "/etc"})  # ✗ Blocked
 ```
+
+## What Happens Under the Hood
+
+`shield_agent_loop()` monkey-patches the AgentLoop instance:
+
+1. **Wraps the ToolRegistry** — every `execute()` call is checked against your rules
+2. **Filters blocked tools from LLM context** — the model never sees tools it can't use
+3. **Injects constraints into the system prompt** — the model knows what's forbidden
+4. **Scans tool results for PII** — post-call audit and tainting
+5. **Tracks sessions** — rate limits work per-conversation
 
 ## Features
 
@@ -65,10 +81,6 @@ After tool execution, results are scanned for PII. Detected PII types are record
 
 `get_definitions()` excludes unconditionally blocked tools from the schemas sent to the LLM, preventing wasted tokens on tools that will always be rejected.
 
-### Subagent Propagation
-
-When `shield_config` is provided to `AgentLoop`, it's automatically passed to `SubagentManager`. Each spawned subagent gets its own `ShieldedToolRegistry` with the same policy rules.
-
 ### Approval Flow
 
 For `APPROVE` verdicts, wire up an approval backend:
@@ -84,6 +96,26 @@ registry = install_shield(
 ```
 
 Available backends: `CLIBackend`, `InMemoryBackend`, `TelegramBackend`, `WebhookBackend`.
+
+## Configuration
+
+```python
+shield_agent_loop(
+    loop,
+    rules_path="policies/rules.yaml",  # Required
+    mode="ENFORCE",       # ENFORCE (default) | AUDIT (log only) | DISABLED
+    fail_open=True,       # True (default): shield errors don't block tools
+)
+```
+
+Or via CLI:
+
+```bash
+policyshield nanobot \
+    --rules policies/rules.yaml \
+    --mode ENFORCE \
+    gateway --port 18790
+```
 
 ## Example Rules
 
@@ -118,5 +150,4 @@ rules:
 ## Examples
 
 - [`examples/nanobot_shield_example.py`](../examples/nanobot_shield_example.py) — standalone integration demo
-- [`examples/nanobot_shield_agentloop.py`](../examples/nanobot_shield_agentloop.py) — AgentLoop configuration reference
 - [`examples/nanobot_rules.yaml`](../examples/nanobot_rules.yaml) — example rules file
