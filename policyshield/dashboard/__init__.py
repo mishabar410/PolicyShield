@@ -1,7 +1,5 @@
 """Dashboard backend — FastAPI REST API + WebSocket for live verdicts."""
 
-from __future__ import annotations
-
 import asyncio
 import json
 import logging
@@ -14,14 +12,12 @@ def create_dashboard_app(trace_dir: str | Path = "./traces"):
     """Create and return a FastAPI app for the dashboard."""
     try:
         from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-        from fastapi.middleware.cors import CORSMiddleware
         from fastapi.responses import FileResponse, HTMLResponse
     except ImportError:
         raise ImportError("Dashboard requires 'fastapi'. Install with: pip install policyshield[dashboard]")
 
     trace_dir = Path(trace_dir)
     app = FastAPI(title="PolicyShield Dashboard", version="0.6.0")
-    app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
     @app.get("/api/metrics")
     def get_metrics():
