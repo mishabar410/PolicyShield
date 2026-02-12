@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "policyshield"
-version = "0.4.0"
+version = "0.5.0"
 description = "Declarative firewall for AI agent tool calls"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -12,9 +12,9 @@ license = "MIT"
 authors = [
     { name = "PolicyShield Team" },
 ]
-keywords = ["ai", "agent", "firewall", "policy", "security", "tool-calls"]
+keywords = ["ai", "agent", "firewall", "policy", "security", "tool-calls", "guardrails", "llm"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
@@ -22,6 +22,8 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Topic :: Security",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Typing :: Typed",
 ]
 dependencies = [
     "pyyaml",
@@ -36,11 +38,19 @@ otel = [
     "opentelemetry-sdk>=1.20",
     "opentelemetry-exporter-otlp-proto-grpc>=1.20",
 ]
+nanobot = ["nanobot>=0.1"]
+docs = [
+    "mkdocs-material>=9.0",
+    "mkdocstrings[python]>=0.24",
+]
 dev = [
     "pytest",
     "pytest-asyncio",
     "pytest-cov",
     "ruff",
+]
+all = [
+    "policyshield[langchain,crewai,otel,nanobot,docs,dev]",
 ]
 
 [project.scripts]
@@ -48,7 +58,7 @@ policyshield = "policyshield.cli.main:app"
 
 [project.urls]
 Homepage = "https://github.com/mishabar410/PolicyShield"
-Documentation = "https://github.com/mishabar410/PolicyShield/tree/main/docs"
+Documentation = "https://mishabar410.github.io/PolicyShield/"
 Repository = "https://github.com/mishabar410/PolicyShield"
 Issues = "https://github.com/mishabar410/PolicyShield/issues"
 Changelog = "https://github.com/mishabar410/PolicyShield/blob/main/CHANGELOG.md"
@@ -62,6 +72,10 @@ exclude = [
     "dist/",
 ]
 
+[tool.hatch.build.targets.wheel]
+packages = ["policyshield"]
+
 [tool.ruff]
 line-length = 120
 target-version = "py310"
+
