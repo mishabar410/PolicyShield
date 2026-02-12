@@ -1,0 +1,31 @@
+tests:
+  - name: "Block rm -rf"
+    tool: exec
+    args:
+      command: "rm -rf /"
+    expect:
+      verdict: block
+      rule_id: block-shell-exec
+
+  - name: "Allow safe exec"
+    tool: exec
+    args:
+      command: "ls -la"
+    expect:
+      verdict: allow
+
+  - name: "Block file deletion"
+    tool: delete_file
+    args:
+      path: "/etc/passwd"
+    expect:
+      verdict: block
+      rule_id: block-file-delete
+
+  - name: "Redact PII in web fetch"
+    tool: web_fetch
+    args:
+      url: "https://example.com?email=test@test.com"
+    expect:
+      verdict: redact
+      rule_id: redact-pii-web

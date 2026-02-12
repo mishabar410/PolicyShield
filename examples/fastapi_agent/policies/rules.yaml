@@ -1,0 +1,30 @@
+shield_name: fastapi-agent
+version: 1
+
+rules:
+  - id: block-shell-exec
+    description: "Block shell command execution"
+    when:
+      tool: exec
+      args_match:
+        command:
+          regex: "rm\\s+-rf|mkfs|dd\\s+if="
+    then: block
+    severity: critical
+    message: "Destructive shell commands are blocked."
+
+  - id: redact-pii-web
+    description: "Redact PII in web requests"
+    when:
+      tool: web_fetch
+    then: redact
+    severity: medium
+    message: "PII redacted from web requests."
+
+  - id: block-file-delete
+    description: "Block file deletion"
+    when:
+      tool: delete_file
+    then: block
+    severity: high
+    message: "File deletion is not allowed."
