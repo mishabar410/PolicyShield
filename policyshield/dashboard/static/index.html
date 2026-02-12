@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PolicyShield Dashboard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
+        .header { background: linear-gradient(135deg, #1e293b, #334155); padding: 1.5rem 2rem; border-bottom: 1px solid #475569; display: flex; align-items: center; gap: 1rem; }
+        .header h1 { font-size: 1.5rem; font-weight: 700; color: #f8fafc; }
+        .header .badge { background: #3b82f6; color: white; padding: 0.25rem 0.75rem; border-radius: 1rem; font-size: 0.75rem; font-weight: 600; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; padding: 2rem; }
+        .card { background: #1e293b; border-radius: 0.75rem; padding: 1.5rem; border: 1px solid #334155; transition: box-shadow 0.2s; }
+        .card:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
+        .card h2 { font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; margin-bottom: 1rem; }
+        .stat { font-size: 2.5rem; font-weight: 700; color: #f8fafc; }
+        .stat-label { font-size: 0.875rem; color: #64748b; margin-top: 0.25rem; }
+        .stat-row { display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid #334155; }
+        .stat-row:last-child { border-bottom: none; }
+        .bar { height: 8px; border-radius: 4px; background: #334155; margin-top: 0.5rem; overflow: hidden; }
+        .bar-fill { height: 100%; border-radius: 4px; transition: width 0.3s; }
+        .bar-fill.green { background: #22c55e; }
+        .bar-fill.red { background: #ef4444; }
+        .bar-fill.yellow { background: #eab308; }
+        .bar-fill.blue { background: #3b82f6; }
+        .verdict-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
+        .verdict-item { text-align: center; padding: 1rem; background: #0f172a; border-radius: 0.5rem; }
+        .verdict-count { font-size: 1.75rem; font-weight: 700; }
+        .allow { color: #22c55e; }
+        .block { color: #ef4444; }
+        .redact { color: #eab308; }
+        .approve { color: #3b82f6; }
+        .live-feed { max-height: 300px; overflow-y: auto; font-family: monospace; font-size: 0.8rem; }
+        .live-item { padding: 0.5rem; border-bottom: 1px solid #1e293b; }
+        .wide { grid-column: span 2; }
+        .refresh-btn { background: #3b82f6; color: white; border: none; padding: 0.5rem 1rem; border-radius: 0.5rem; cursor: pointer; font-size: 0.875rem; }
+        .refresh-btn:hover { background: #2563eb; }
+        .status { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 0.5rem; }
+        .status.online { background: #22c55e; }
+        .status.offline { background: #ef4444; }
+        @media (max-width: 640px) { .wide { grid-column: span 1; } }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🛡️ PolicyShield</h1>
+        <span class="badge">v0.6</span>
+        <span style="flex:1"></span>
+        <span id="connection-status"><span class="status offline"></span>Disconnected</span>
+        <button class="refresh-btn" onclick="refresh()">↻ Refresh</button>
+    </div>
+
+    <div class="grid">
+        <div class="card">
+            <h2>Verdict Breakdown</h2>
+            <div class="verdict-grid">
+                <div class="verdict-item"><div class="verdict-count allow" id="v-allow">—</div><div class="stat-label">Allow</div></div>
+                <div class="verdict-item"><div class="verdict-count block" id="v-block">—</div><div class="stat-label">Block</div></div>
+                <div class="verdict-item"><div class="verdict-count redact" id="v-redact">—</div><div class="stat-label">Redact</div></div>
+                <div class="verdict-item"><div class="verdict-count approve" id="v-approve">—</div><div class="stat-label">Approve</div></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Block Rate</h2>
+            <div class="stat" id="block-rate">—</div>
+            <div class="stat-label">of all tool calls blocked</div>
+            <div class="bar"><div class="bar-fill red" id="block-rate-bar" style="width:0%"></div></div>
+        </div>
+
+        <div class="card">
+            <h2>Total Calls</h2>
+            <div class="stat" id="total-calls">—</div>
+            <div class="stat-label">policy evaluations</div>
+        </div>
+
+        <div class="card wide">
+            <h2>Top Tools</h2>
+            <div id="tools-list"></div>
+        </div>
+
+        <div class="card">
+            <h2>PII Detections</h2>
+            <div id="pii-list"><div class="stat-label">No PII detected</div></div>
+        </div>
+
+        <div class="card">
+            <h2>Estimated Cost</h2>
+            <div class="stat" id="cost-total">—</div>
+            <div class="stat-label" id="cost-model">Model: —</div>
+            <div style="margin-top:1rem">
+                <div class="stat-row"><span class="stat-label">Allowed cost</span><span id="cost-allowed">—</span></div>
+                <div class="stat-row"><span class="stat-label">Blocked savings</span><span class="allow" id="cost-blocked">—</span></div>
+            </div>
+        </div>
+
+        <div class="card wide">
+            <h2>Live Feed <span class="status online" id="ws-dot" style="display:none"></span></h2>
+            <div class="live-feed" id="live-feed"><div class="stat-label">Waiting for events...</div></div>
+        </div>
+    </div>
+
+    <script>
+        const API = window.location.origin;
+
+        async function refresh() {
+            try {
+                const [metrics, cost] = await Promise.all([
+                    fetch(`${API}/api/metrics`).then(r => r.json()),
+                    fetch(`${API}/api/metrics/cost`).then(r => r.json()),
+                ]);
+
+                if (metrics.error) return;
+
+                const vb = metrics.verdict_breakdown;
+                document.getElementById('v-allow').textContent = vb.allow;
+                document.getElementById('v-block').textContent = vb.block;
+                document.getElementById('v-redact').textContent = vb.redact;
+                document.getElementById('v-approve').textContent = vb.approve;
+                document.getElementById('total-calls').textContent = vb.total.toLocaleString();
+
+                const rate = vb.total > 0 ? (vb.block / vb.total * 100).toFixed(1) : '0.0';
+                document.getElementById('block-rate').textContent = rate + '%';
+                document.getElementById('block-rate-bar').style.width = rate + '%';
+
+                const toolsEl = document.getElementById('tools-list');
+                toolsEl.innerHTML = '';
+                (metrics.top_tools || []).forEach(t => {
+                    const pct = t.call_count > 0 ? (t.block_count / t.call_count * 100).toFixed(0) : 0;
+                    toolsEl.innerHTML += `
+                        <div class="stat-row">
+                            <span>${t.tool}</span>
+                            <span>${t.call_count} calls (${pct}% blocked)</span>
+                        </div>
+                        <div class="bar"><div class="bar-fill ${pct > 30 ? 'red' : pct > 10 ? 'yellow' : 'green'}" style="width:${pct}%"></div></div>
+                    `;
+                });
+
+                const piiEl = document.getElementById('pii-list');
+                const pii = metrics.pii_heatmap || [];
+                if (pii.length > 0) {
+                    piiEl.innerHTML = pii.map(p =>
+                        `<div class="stat-row"><span>${p.pii_type}</span><span>${p.count} in ${p.tool}</span></div>`
+                    ).join('');
+                }
+
+                if (!cost.error) {
+                    document.getElementById('cost-total').textContent = '$' + cost.estimated_cost_total.toFixed(2);
+                    document.getElementById('cost-model').textContent = 'Model: ' + cost.model;
+                    document.getElementById('cost-allowed').textContent = '$' + cost.estimated_cost_allowed.toFixed(2);
+                    document.getElementById('cost-blocked').textContent = '-$' + cost.estimated_cost_blocked.toFixed(2);
+                }
+            } catch (e) {
+                console.error('Refresh failed:', e);
+            }
+        }
+
+        function connectWS() {
+            const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const ws = new WebSocket(`${proto}//${location.host}/ws/verdicts`);
+            ws.onopen = () => {
+                document.getElementById('connection-status').innerHTML = '<span class="status online"></span>Connected';
+                document.getElementById('ws-dot').style.display = 'inline-block';
+            };
+            ws.onmessage = (e) => {
+                const data = JSON.parse(e.data);
+                const feed = document.getElementById('live-feed');
+                const icon = data.verdict === 'BLOCK' ? '🚫' : data.verdict === 'ALLOW' ? '✅' : '🔄';
+                const item = document.createElement('div');
+                item.className = 'live-item';
+                item.textContent = `${icon} ${data.timestamp || '—'} | ${data.tool || '?'} → ${data.verdict || '?'}`;
+                feed.insertBefore(item, feed.firstChild);
+                if (feed.children.length > 100) feed.removeChild(feed.lastChild);
+            };
+            ws.onclose = () => {
+                document.getElementById('connection-status').innerHTML = '<span class="status offline"></span>Disconnected';
+                document.getElementById('ws-dot').style.display = 'none';
+                setTimeout(connectWS, 3000);
+            };
+        }
+
+        refresh();
+        setInterval(refresh, 10000);
+        connectWS();
+    </script>
+</body>
+</html>

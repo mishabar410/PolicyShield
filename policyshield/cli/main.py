@@ -106,6 +106,13 @@ def app(args: list[str] | None = None) -> int:
     export_parser.add_argument("--output", help="Output file path")
     export_parser.add_argument("--title", default="PolicyShield Trace Report", help="HTML report title")
 
+    # trace dashboard
+    dash_parser = trace_subparsers.add_parser("dashboard", help="Launch live web dashboard")
+    dash_parser.add_argument("--dir", default="./traces", help="Trace directory (default: ./traces)")
+    dash_parser.add_argument("--host", default="127.0.0.1", help="Host to bind (default: 127.0.0.1)")
+    dash_parser.add_argument("--port", type=int, default=8000, help="Port to bind (default: 8000)")
+    dash_parser.add_argument("--prometheus", action="store_true", help="Enable /metrics endpoint")
+
     # nanobot wrapper command
     nanobot_parser = subparsers.add_parser(
         "nanobot",
@@ -185,6 +192,8 @@ def app(args: list[str] | None = None) -> int:
             return _cmd_trace_export(parsed)
         elif parsed.trace_command == "cost":
             return _cmd_trace_cost(parsed)
+        elif parsed.trace_command == "dashboard":
+            return _cmd_trace_dashboard(parsed)
         else:
             trace_parser.print_help()
             return 1
@@ -637,6 +646,39 @@ def _cmd_trace_export(parsed: argparse.Namespace) -> int:
         count = TraceExporter.to_html(trace_path, output, title=title)
 
     print(f"✓ Exported {count} records to {output}")
+    return 0
+
+
+def _cmd_trace_dashboard(parsed: argparse.Namespace) -> int:
+    """Launch the live web dashboard."""
+    from policyshield.dashboard import create_dashboard_app
+
+    trace_dir_path = Path(parsed.dir)
+    host = parsed.host
+    port = parsed.port
+
+    app = create_dashboard_app(trace_dir_path)
+
+    if getattr(parsed, "prometheus", False):
+        from policyshield.dashboard.prometheus import add_prometheus_endpoint
+
+        add_prometheus_endpoint(app, trace_dir_path)
+
+    print(f"🛡️  PolicyShield Dashboard → http://{host}:{port}")
+    print(f"   Trace dir: {trace_dir_path}")
+    if getattr(parsed, "prometheus", False):
+        print(f"   Prometheus: http://{host}:{port}/metrics")
+
+    try:
+        import uvicorn
+
+        uvicorn.run(app, host=host, port=port, log_level="info")
+    except ImportError:
+        print("⚠  uvicorn not found. Install with: pip install policyshield[dashboard]", file=sys.stderr)
+        print("   Starting with built-in server...", file=sys.stderr)
+        # Fallback: just print a message, can't serve without uvicorn
+        return 1
+
     return 0
 
 
