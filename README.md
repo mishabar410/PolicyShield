@@ -1,8 +1,11 @@
 # 🛡️ PolicyShield
 
+[![PyPI Version](https://img.shields.io/pypi/v/policyshield?color=blue)](https://pypi.org/project/policyshield/)
+[![PyPI Downloads](https://img.shields.io/pypi/dm/policyshield?color=green)](https://pypi.org/project/policyshield/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![CI](https://github.com/mishabar410/PolicyShield/actions/workflows/ci.yml/badge.svg)](https://github.com/mishabar410/PolicyShield/actions/workflows/ci.yml)
+[![Docs](https://img.shields.io/badge/docs-mkdocs-blue.svg)](https://mishabar410.github.io/PolicyShield/)
 [![Coverage: 92%](https://img.shields.io/badge/coverage-92%25-brightgreen.svg)](#development)
 
 **Declarative firewall for AI agent tool calls.**
