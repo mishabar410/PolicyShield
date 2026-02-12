@@ -1,0 +1,20 @@
+services:
+  policyshield:
+    build: .
+    volumes:
+      - ./policies:/app/policies:ro
+      - ./traces:/app/traces
+    command: ["validate", "policies/"]
+
+  lint:
+    build: .
+    volumes:
+      - ./policies:/app/policies:ro
+    command: ["lint", "policies/rules.yaml"]
+
+  test:
+    build: .
+    volumes:
+      - ./policies:/app/policies:ro
+      - ./tests:/app/tests:ro
+    command: ["test", "tests/"]
