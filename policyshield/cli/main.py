@@ -68,7 +68,13 @@ def app(args: list[str] | None = None) -> int:
 
     # trace stats
     stats_parser = trace_subparsers.add_parser("stats", help="Show aggregated trace statistics")
-    stats_parser.add_argument("file", help="Path to JSONL trace file")
+    stats_parser.add_argument("file", nargs="?", default=None, help="Path to JSONL trace file (legacy mode)")
+    stats_parser.add_argument("--dir", default=None, help="Trace directory for aggregation")
+    stats_parser.add_argument("--from", dest="time_from", help="Start time (ISO datetime)")
+    stats_parser.add_argument("--to", dest="time_to", help="End time (ISO datetime)")
+    stats_parser.add_argument("--tool", help="Filter by tool name")
+    stats_parser.add_argument("--session", help="Filter by session ID")
+    stats_parser.add_argument("--top", type=int, default=10, help="Top N tools (default: 10)")
     stats_parser.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
 
     # trace search
@@ -462,11 +468,51 @@ def _cmd_trace_violations(parsed: argparse.Namespace) -> int:
 
 def _cmd_trace_stats(parsed: argparse.Namespace) -> int:
     """Show aggregated trace statistics."""
+    from datetime import datetime as _dt
+
+    # New dir-based aggregation mode
+    if parsed.dir:
+        from policyshield.trace.aggregator import (
+            TimeWindow,
+            TraceAggregator,
+            format_aggregation,
+        )
+
+        trace_dir = Path(parsed.dir)
+        if not trace_dir.exists():
+            print(f"\u2717 Trace directory not found: {parsed.dir}", file=sys.stderr)
+            return 1
+
+        tw = None
+        if parsed.time_from or parsed.time_to:
+            start = _dt.fromisoformat(parsed.time_from) if parsed.time_from else _dt.min
+            end = _dt.fromisoformat(parsed.time_to) if parsed.time_to else _dt.max
+            tw = TimeWindow(start=start, end=end)
+
+        aggregator = TraceAggregator(trace_dir)
+        result = aggregator.aggregate(
+            time_window=tw,
+            session_id=parsed.session,
+            tool=parsed.tool,
+        )
+
+        if parsed.format == "json":
+            print(json.dumps(result.to_dict(), indent=2, default=str))
+        else:
+            print(format_aggregation(result, top_n=parsed.top))
+
+        return 0
+
+    # Legacy file-based mode
+    if not parsed.file:
+        print("\u2717 Provide either --dir or a trace file path.", file=sys.stderr)
+        return 1
+
     from policyshield.trace.analyzer import TraceAnalyzer, format_stats
 
     trace_path = Path(parsed.file)
     if not trace_path.exists():
-        print(f"✗ Trace file not found: {parsed.file}", file=sys.stderr)
+        print(f"\u2717 Trace file not found: {parsed.file}", file=sys.stderr)
         return 1
 
     stats = TraceAnalyzer.from_file(trace_path)
