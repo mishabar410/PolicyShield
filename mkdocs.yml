@@ -1,0 +1,73 @@
+site_name: PolicyShield
+site_description: Declarative firewall for AI agent tool calls
+site_url: https://mishabar410.github.io/PolicyShield/
+repo_url: https://github.com/mishabar410/PolicyShield
+repo_name: mishabar410/PolicyShield
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: amber
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: amber
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - content.code.copy
+    - search.highlight
+  icon:
+    repo: fontawesome/brands/github
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Installation: getting-started/installation.md
+    - Quick Start: getting-started/quickstart.md
+    - Configuration: getting-started/configuration.md
+  - Guides:
+    - Writing Rules: guides/writing-rules.md
+    - Testing Rules: guides/testing-rules.md
+    - CLI Reference: guides/cli.md
+    - Presets: guides/presets.md
+  - Integrations:
+    - LangChain: integrations/langchain.md
+    - CrewAI: integrations/crewai.md
+    - Nanobot: integrations/nanobot.md
+    - FastAPI: integrations/fastapi.md
+  - CI/CD:
+    - GitHub Actions: github-action.md
+  - API Reference:
+    - Core: api/core.md
+    - Shield Engine: api/engine.md
+    - Linter: api/linter.md
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            show_source: true
+            show_root_heading: true
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.tabbed:
+      alternate_style: true
+  - attr_list
+  - toc:
+      permalink: true
