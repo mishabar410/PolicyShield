@@ -91,3 +91,7 @@ packages = ["policyshield"]
 line-length = 120
 target-version = "py310"
 
+[tool.pytest.ini_options]
+markers = ["benchmark: performance benchmarks (not run by default)"]
+addopts = "-m 'not benchmark'"
+
