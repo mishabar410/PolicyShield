@@ -175,4 +175,27 @@ describe("PolicyShieldClient", () => {
         const ok = await client.healthCheck();
         expect(ok).toBe(false);
     });
+
+    it("checkApproval: approved", async () => {
+        mockFetch({ approval_id: "apr-1", status: "approved", responder: "admin" });
+        const client = new PolicyShieldClient();
+        const res = await client.checkApproval("apr-1");
+        expect(res.status).toBe("approved");
+        expect(res.responder).toBe("admin");
+    });
+
+    it("checkApproval: pending", async () => {
+        mockFetch({ approval_id: "apr-2", status: "pending" });
+        const client = new PolicyShieldClient();
+        const res = await client.checkApproval("apr-2");
+        expect(res.status).toBe("pending");
+    });
+
+    it("checkApproval: server down falls back to pending", async () => {
+        mockFetchError();
+        const client = new PolicyShieldClient();
+        const res = await client.checkApproval("apr-3");
+        expect(res.status).toBe("pending");
+        expect(res.approval_id).toBe("apr-3");
+    });
 });
