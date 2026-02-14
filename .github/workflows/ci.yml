@@ -71,7 +71,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install dependencies
-        run: pip install -e ".[dev,server]"
+        run: pip install -e ".[dev,server]" httpx
       - name: Run benchmarks
         run: pytest tests/test_benchmark.py tests/test_server_benchmark.py -m benchmark -v --tb=short
 
