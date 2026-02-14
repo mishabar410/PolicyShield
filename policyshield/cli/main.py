@@ -133,6 +133,19 @@ def app(args: list[str] | None = None) -> int:
     show_parser2.add_argument("path", nargs="?", default=None, help="Config file path")
     config_subparsers.add_parser("init", help="Create default policyshield.yaml")
 
+    # server command
+    server_parser = subparsers.add_parser("server", help="Start PolicyShield HTTP server")
+    server_parser.add_argument("--rules", required=True, help="Path to YAML rules file or directory")
+    server_parser.add_argument("--port", type=int, default=8100, help="Server port (default: 8100)")
+    server_parser.add_argument("--host", default="0.0.0.0", help="Server host (default: 0.0.0.0)")
+    server_parser.add_argument(
+        "--mode",
+        choices=["enforce", "audit", "disabled"],
+        default="enforce",
+    )
+    server_parser.add_argument("--reload", action="store_true", help="Enable hot reload of rules")
+    server_parser.add_argument("--workers", type=int, default=1, help="Number of uvicorn workers")
+
     parsed = parser.parse_args(args)
 
     if parsed.command == "validate":
@@ -173,6 +186,8 @@ def app(args: list[str] | None = None) -> int:
         else:
             config_parser.print_help()
             return 1
+    elif parsed.command == "server":
+        return _cmd_server(parsed)
     else:
         parser.print_help()
         return 1
@@ -196,6 +211,49 @@ def _cmd_init(parsed: argparse.Namespace) -> int:
     except Exception as e:
         print(f"✗ Error: {e}", file=sys.stderr)
         return 1
+
+
+def _cmd_server(parsed: argparse.Namespace) -> int:
+    """Start the PolicyShield HTTP server."""
+    try:
+        import uvicorn
+    except ImportError:
+        print(
+            "ERROR: uvicorn not installed. Run: pip install policyshield[server]",
+            file=sys.stderr,
+        )
+        return 1
+
+    from policyshield.core.models import ShieldMode
+    from policyshield.server.app import create_app
+    from policyshield.shield.engine import ShieldEngine
+
+    mode_map = {
+        "enforce": ShieldMode.ENFORCE,
+        "audit": ShieldMode.AUDIT,
+        "disabled": ShieldMode.DISABLED,
+    }
+    mode = mode_map[parsed.mode]
+
+    rules_path = Path(parsed.rules)
+    if not rules_path.exists():
+        print(f"ERROR: rules not found: {rules_path}", file=sys.stderr)
+        return 1
+
+    engine = ShieldEngine(rules=rules_path, mode=mode)
+    print("PolicyShield server starting...")
+    print(f"  Rules: {rules_path} ({engine.rule_count} rules)")
+    print(f"  Mode: {mode.value}")
+    print(f"  Listen: http://{parsed.host}:{parsed.port}")
+    print(f"  Health: http://{parsed.host}:{parsed.port}/api/v1/health")
+
+    if parsed.reload:
+        engine.start_watching()
+        print("  Hot reload: enabled")
+
+    app = create_app(engine)
+    uvicorn.run(app, host=parsed.host, port=parsed.port, workers=parsed.workers)
+    return 0
 
 
 def _cmd_validate(path: str) -> int:
