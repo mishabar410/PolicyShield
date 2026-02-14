@@ -152,6 +152,7 @@ class TestServerCLI:
 
     def test_server_invalid_rules_path(self, capsys):
         """Pointing --rules at a nonexistent path should exit 1."""
+        pytest.importorskip("uvicorn", reason="uvicorn not installed")
         exit_code = app(["server", "--rules", "/nonexistent/rules.yaml"])
         assert exit_code == 1
         captured = capsys.readouterr()
@@ -159,7 +160,7 @@ class TestServerCLI:
 
     def test_server_starts_uvicorn(self, valid_yaml, monkeypatch, capsys):
         """Happy path: engine loads rules, uvicorn.run is called."""
-        import uvicorn
+        uvicorn = pytest.importorskip("uvicorn", reason="uvicorn not installed")
 
         called = {}
 
