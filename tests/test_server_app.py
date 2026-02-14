@@ -290,4 +290,3 @@ rules:
         health2 = local_client.get("/api/v1/health").json()
         assert health2["rules_count"] == 2
         assert health2["rules_hash"] == data["rules_hash"]
-

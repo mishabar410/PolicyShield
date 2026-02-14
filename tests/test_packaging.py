@@ -155,4 +155,3 @@ class TestV07VersionSync:
 
         data = json.loads(pkg.read_text())
         assert data["version"] == "0.8.1"
-

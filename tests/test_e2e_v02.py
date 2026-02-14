@@ -215,7 +215,13 @@ class TestE2EApproval:
         backend.respond(result1.approval_id, approved=True)
         from policyshield.approval.base import ApprovalResponse
 
-        cache.put("exec", "approve-exec", "default", ApprovalResponse(request_id=result1.approval_id, approved=True), strategy=ApprovalStrategy.PER_RULE)
+        cache.put(
+            "exec",
+            "approve-exec",
+            "default",
+            ApprovalResponse(request_id=result1.approval_id, approved=True),
+            strategy=ApprovalStrategy.PER_RULE,
+        )
 
         # Second call auto-approved from cache
         result2 = engine.check("exec", {"cmd": "ls"})

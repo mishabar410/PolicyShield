@@ -78,4 +78,3 @@ class ApprovalStatusResponse(BaseModel):
     approval_id: str
     status: str  # "pending" | "approved" | "denied"
     responder: str | None = None
-

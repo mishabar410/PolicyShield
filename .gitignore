@@ -56,3 +56,4 @@ demo_traces/
 # Plugin build artifacts
 plugins/openclaw/dist/
 plugins/openclaw/node_modules/
+.venv312/
