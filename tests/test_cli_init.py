@@ -131,7 +131,11 @@ class TestInitOpenclawPreset:
         scaffold(str(tmp_path), preset="openclaw", interactive=False)
         rules_file = tmp_path / "policies" / "rules.yaml"
         data = yaml.safe_load(rules_file.read_text())
-        exec_blocks = [r for r in data["rules"] if r.get("tool") == "exec" and r["then"] == "block"]
+        exec_blocks = [
+            r
+            for r in data["rules"]
+            if r.get("when", {}).get("tool") == "exec" and r["then"] == "block"
+        ]
         assert len(exec_blocks) >= 1
 
     def test_openclaw_rules_have_pii_redact(self, tmp_path):

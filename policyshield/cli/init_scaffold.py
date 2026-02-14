@@ -183,9 +183,11 @@ _OPENCLAW_RULES: list[dict[str, Any]] = [
     {
         "id": "block-destructive-exec",
         "description": "Block destructive shell commands",
-        "tool": "exec",
         "when": {
-            "args": {"command": {"regex": r"\b(rm\s+-rf|rm\s+-r\s+/|mkfs|dd\s+if=|chmod\s+777|chmod\s+-R\s+777)\b"}}
+            "tool": "exec",
+            "args_match": {
+                "command": {"regex": r"\b(rm\s+-rf|rm\s+-r\s+/|mkfs|dd\s+if=|chmod\s+777|chmod\s+-R\s+777)\b"}
+            },
         },
         "then": "block",
         "severity": "critical",
@@ -194,8 +196,10 @@ _OPENCLAW_RULES: list[dict[str, Any]] = [
     {
         "id": "block-curl-pipe-sh",
         "description": "Block remote code execution via curl|sh",
-        "tool": "exec",
-        "when": {"args": {"command": {"regex": r"curl.*\|.*sh|wget.*\|.*sh|curl.*\|.*bash"}}},
+        "when": {
+            "tool": "exec",
+            "args_match": {"command": {"regex": r"curl.*\|.*sh|wget.*\|.*sh|curl.*\|.*bash"}},
+        },
         "then": "block",
         "severity": "critical",
         "message": "Remote code execution via curl|sh is blocked",
@@ -203,13 +207,13 @@ _OPENCLAW_RULES: list[dict[str, Any]] = [
     {
         "id": "block-secrets-exfil",
         "description": "Block potential secrets exfiltration",
-        "tool": "exec",
         "when": {
-            "args": {
+            "tool": "exec",
+            "args_match": {
                 "command": {
                     "regex": r"\b(curl|wget|nc|ncat|scp|rsync)\b.*\b(AWS_SECRET|OPENAI_API_KEY|API_KEY|SECRET_KEY|password|token|private.key)\b"
                 }
-            }
+            },
         },
         "then": "block",
         "severity": "critical",
@@ -218,8 +222,10 @@ _OPENCLAW_RULES: list[dict[str, Any]] = [
     {
         "id": "block-env-dump",
         "description": "Block environment variable dumps",
-        "tool": "exec",
-        "when": {"args": {"command": {"regex": r"\benv\b|\bprintenv\b|\bset\b.*export"}}},
+        "when": {
+            "tool": "exec",
+            "args_match": {"command": {"regex": r"\benv\b|\bprintenv\b|\bset\b.*export"}},
+        },
         "then": "block",
         "severity": "high",
         "message": "Environment variable dump is restricted",
@@ -227,8 +233,7 @@ _OPENCLAW_RULES: list[dict[str, Any]] = [
     {
         "id": "redact-pii-in-messages",
         "description": "Redact PII in outgoing messages",
-        "tool": "message",
-        "when": {"args": {"_any": {"has_pii": True}}},
+        "when": {"tool": "message"},
         "then": "redact",
         "severity": "high",
         "message": "PII detected and redacted in outgoing message",
@@ -236,8 +241,7 @@ _OPENCLAW_RULES: list[dict[str, Any]] = [
     {
         "id": "redact-pii-in-writes",
         "description": "Redact PII in file writes",
-        "tool": "write",
-        "when": {"args": {"content": {"has_pii": True}}},
+        "when": {"tool": "write"},
         "then": "redact",
         "severity": "medium",
         "message": "PII detected and redacted in file write",
@@ -245,8 +249,7 @@ _OPENCLAW_RULES: list[dict[str, Any]] = [
     {
         "id": "redact-pii-in-edits",
         "description": "Redact PII in file edits",
-        "tool": "edit",
-        "when": {"args": {"_any": {"has_pii": True}}},
+        "when": {"tool": "edit"},
         "then": "redact",
         "severity": "medium",
         "message": "PII detected and redacted in file edit",
@@ -254,8 +257,10 @@ _OPENCLAW_RULES: list[dict[str, Any]] = [
     {
         "id": "approve-dotenv-write",
         "description": "Require approval for writing sensitive files",
-        "tool": "write",
-        "when": {"args": {"file_path": {"regex": r"\.(env|pem|key|crt|p12|pfx)$"}}},
+        "when": {
+            "tool": "write",
+            "args_match": {"file_path": {"regex": r"\.(env|pem|key|crt|p12|pfx)$"}},
+        },
         "then": "approve",
         "severity": "high",
         "message": "Writing to sensitive file requires approval",
@@ -263,8 +268,10 @@ _OPENCLAW_RULES: list[dict[str, Any]] = [
     {
         "id": "approve-ssh-access",
         "description": "Require approval for SSH key modification",
-        "tool": "write",
-        "when": {"args": {"file_path": {"contains": ".ssh/"}}},
+        "when": {
+            "tool": "write",
+            "args_match": {"file_path": {"contains": ".ssh/"}},
+        },
         "then": "approve",
         "severity": "critical",
         "message": "SSH key modification requires approval",
@@ -272,16 +279,14 @@ _OPENCLAW_RULES: list[dict[str, Any]] = [
     {
         "id": "rate-limit-exec",
         "description": "Rate limit exec calls",
-        "tool": "exec",
-        "rate_limit": {"max_calls": 60, "window_seconds": 60},
+        "when": {"tool": "exec", "session": {"tool_count.exec": {"gt": 60}}},
         "then": "block",
         "message": "exec rate limit exceeded (60/min)",
     },
     {
         "id": "rate-limit-web",
         "description": "Rate limit web_fetch calls",
-        "tool": "web_fetch",
-        "rate_limit": {"max_calls": 30, "window_seconds": 60},
+        "when": {"tool": "web_fetch", "session": {"tool_count.web_fetch": {"gt": 30}}},
         "then": "block",
         "message": "web_fetch rate limit exceeded (30/min)",
     },
