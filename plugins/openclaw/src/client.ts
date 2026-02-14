@@ -5,6 +5,7 @@ import type {
     PostCheckRequest,
     PostCheckResponse,
     ConstraintsResponse,
+    ApprovalStatusResponse,
 } from "./types.js";
 
 export class PolicyShieldClient {
@@ -99,5 +100,22 @@ export class PolicyShieldClient {
         } catch {
             return false;
         }
+    }
+
+    async checkApproval(approvalId: string): Promise<ApprovalStatusResponse> {
+        try {
+            const res = await fetch(`${this.url}/api/v1/check-approval`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ approval_id: approvalId }),
+                signal: AbortSignal.timeout(this.timeout),
+            });
+            if (res.ok) {
+                return (await res.json()) as ApprovalStatusResponse;
+            }
+        } catch {
+            /* polling failure — treat as pending */
+        }
+        return { approval_id: approvalId, status: "pending" };
     }
 }

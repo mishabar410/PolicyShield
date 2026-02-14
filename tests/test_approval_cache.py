@@ -118,51 +118,36 @@ class TestApprovalCacheEngineIntegration:
 
     def test_engine_batch_approve_integration(self):
         engine, backend = self._make_engine(ApprovalStrategy.PER_RULE)
-        # First call: triggers real approval
-        import threading
-
-        def approve_first():
-            import time
-
-            time.sleep(0.05)
-            pending = backend.pending()
-            if pending:
-                backend.respond(pending[0].request_id, approved=True)
-
-        t = threading.Thread(target=approve_first)
-        t.start()
+        # First call: returns APPROVE with approval_id for async polling
         result1 = engine.check("exec", {"cmd": "ls"})
-        t.join()
-        assert result1.verdict == Verdict.ALLOW
+        assert result1.verdict == Verdict.APPROVE
+        assert result1.approval_id is not None
+
+        # Simulate approval response
+        backend.respond(result1.approval_id, approved=True)
+        status = engine.get_approval_status(result1.approval_id)
+        assert status["status"] == "approved"
+
+        # Manually populate the cache (simulating what the client layer does after polling)
+        from policyshield.approval.base import ApprovalResponse
+
+        cache_resp = ApprovalResponse(request_id=result1.approval_id, approved=True)
+        engine._approval_cache.put("exec", "approve-exec", "default", cache_resp, strategy=ApprovalStrategy.PER_RULE)
 
         # Second call: auto-approved from cache
         result2 = engine.check("exec", {"cmd": "ls"})
         assert result2.verdict == Verdict.ALLOW
-        # No new pending requests since it was cached
-        assert len(backend.pending()) == 0
 
     def test_engine_once_strategy_no_cache(self):
         engine, backend = self._make_engine(ApprovalStrategy.ONCE)
-        # Each call requires actual approval
-        import threading
-
-        def approve():
-            import time
-
-            time.sleep(0.05)
-            pending = backend.pending()
-            if pending:
-                backend.respond(pending[0].request_id, approved=True)
-
-        t = threading.Thread(target=approve)
-        t.start()
+        # Each call requires actual approval (ONCE strategy never caches)
         result1 = engine.check("exec", {"cmd": "ls"})
-        t.join()
-        assert result1.verdict == Verdict.ALLOW
+        assert result1.verdict == Verdict.APPROVE
+        assert result1.approval_id is not None
 
-        # Second call: should also need approval (ONCE strategy)
-        t2 = threading.Thread(target=approve)
-        t2.start()
+        # Second call: should also return APPROVE (ONCE strategy)
         result2 = engine.check("exec", {"cmd": "ls"})
-        t2.join()
-        assert result2.verdict == Verdict.ALLOW
+        assert result2.verdict == Verdict.APPROVE
+        assert result2.approval_id is not None
+        # Different approval_id each time
+        assert result2.approval_id != result1.approval_id

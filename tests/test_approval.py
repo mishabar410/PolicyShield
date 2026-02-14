@@ -150,59 +150,55 @@ class TestCLIBackend:
 
 
 class TestEngineApproval:
-    def test_approve_verdict_approved(self):
+    def test_approve_verdict_returns_approval_id(self):
+        """Engine should return APPROVE with an approval_id for async polling."""
         backend = InMemoryBackend()
         engine = ShieldEngine(
             rules=_approve_ruleset(),
             approval_backend=backend,
-            approval_timeout=2.0,
         )
 
-        def approve_first_pending():
-            import time
-
-            time.sleep(0.05)
-            for req in backend.pending():
-                backend.respond(req.request_id, approved=True, responder="admin")
-
-        t = threading.Thread(target=approve_first_pending)
-        t.start()
         result = engine.check("exec")
-        t.join()
-        assert result.verdict == Verdict.ALLOW
+        assert result.verdict == Verdict.APPROVE
+        assert result.approval_id is not None
+        assert result.message == "exec requires approval"
 
-    def test_approve_verdict_denied(self):
+    def test_get_approval_status_approved(self):
+        """get_approval_status returns 'approved' after backend responds."""
         backend = InMemoryBackend()
         engine = ShieldEngine(
             rules=_approve_ruleset(),
             approval_backend=backend,
-            approval_timeout=2.0,
         )
 
-        def deny():
-            import time
-
-            time.sleep(0.05)
-            for req in backend.pending():
-                backend.respond(req.request_id, approved=False, responder="admin")
-
-        t = threading.Thread(target=deny)
-        t.start()
         result = engine.check("exec")
-        t.join()
-        assert result.verdict == Verdict.BLOCK
-        assert "denied" in result.message.lower()
+        assert result.approval_id is not None
 
-    def test_approve_timeout_blocks(self):
+        # Before responding → pending
+        status = engine.get_approval_status(result.approval_id)
+        assert status["status"] == "pending"
+
+        # Respond with approval
+        backend.respond(result.approval_id, approved=True, responder="admin")
+        status = engine.get_approval_status(result.approval_id)
+        assert status["status"] == "approved"
+        assert status["responder"] == "admin"
+
+    def test_get_approval_status_denied(self):
+        """get_approval_status returns 'denied' after backend denies."""
         backend = InMemoryBackend()
         engine = ShieldEngine(
             rules=_approve_ruleset(),
             approval_backend=backend,
-            approval_timeout=0.1,
         )
+
         result = engine.check("exec")
-        assert result.verdict == Verdict.BLOCK
-        assert "timed out" in result.message.lower()
+        assert result.approval_id is not None
+
+        backend.respond(result.approval_id, approved=False, responder="admin")
+        status = engine.get_approval_status(result.approval_id)
+        assert status["status"] == "denied"
+        assert status["responder"] == "admin"
 
     def test_no_backend_blocks(self):
         engine = ShieldEngine(rules=_approve_ruleset())

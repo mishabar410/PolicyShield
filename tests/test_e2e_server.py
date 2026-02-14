@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 from policyshield.core.parser import load_rules  # noqa: E402
 from policyshield.server.app import create_app  # noqa: E402
-from policyshield.shield.engine import ShieldEngine  # noqa: E402
+from policyshield.shield.async_engine import AsyncShieldEngine  # noqa: E402
 
 OPENCLAW_RULES = "examples/openclaw_rules.yaml"
 
@@ -19,7 +19,7 @@ OPENCLAW_RULES = "examples/openclaw_rules.yaml"
 def e2e_client() -> TestClient:
     """TestClient wired to an engine loaded from openclaw_rules.yaml."""
     ruleset = load_rules(OPENCLAW_RULES)
-    engine = ShieldEngine(ruleset)
+    engine = AsyncShieldEngine(ruleset)
     app = create_app(engine)
     return TestClient(app)
 

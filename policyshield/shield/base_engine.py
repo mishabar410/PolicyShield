@@ -242,25 +242,30 @@ class BaseShieldEngine:
             session_id=session_id,
         )
         self._approval_backend.submit(req)
-        resp = self._approval_backend.wait_for_response(req.request_id, timeout=self._approval_timeout)
-        if resp is None:
-            return ShieldResult(
-                verdict=Verdict.BLOCK,
-                rule_id=rule.id,
-                message="Approval timed out",
-            )
 
-        # Cache the response
-        if self._approval_cache is not None:
-            self._approval_cache.put(tool_name, rule.id, session_id, resp, strategy=strategy)
-
-        if resp.approved:
-            return self._verdict_builder.allow(rule=rule, args=args)
+        # Return APPROVE verdict with the approval_id for async polling
         return ShieldResult(
-            verdict=Verdict.BLOCK,
+            verdict=Verdict.APPROVE,
             rule_id=rule.id,
-            message=f"Approval denied by {resp.responder}" if resp.responder else "Approval denied",
+            message=rule.message or "Approval required",
+            approval_id=req.request_id,
         )
+
+    def get_approval_status(self, approval_id: str) -> dict:
+        """Check the status of a pending approval request.
+
+        Returns:
+            dict with 'status' ('pending', 'approved', 'denied') and optional 'responder'.
+        """
+        if self._approval_backend is None:
+            return {"status": "denied", "responder": None}
+
+        resp = self._approval_backend.wait_for_response(approval_id, timeout=0.0)
+        if resp is None:
+            return {"status": "pending", "responder": None}
+        if resp.approved:
+            return {"status": "approved", "responder": resp.responder}
+        return {"status": "denied", "responder": resp.responder}
 
     # ------------------------------------------------------------------ #
     #  Shared helpers                                                     #

@@ -2,33 +2,59 @@
 
 from __future__ import annotations
 
+import hashlib
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 
 from policyshield.server.models import (
+    ApprovalStatusRequest,
+    ApprovalStatusResponse,
     CheckRequest,
     CheckResponse,
     ConstraintsResponse,
     HealthResponse,
     PostCheckRequest,
     PostCheckResponse,
+    ReloadResponse,
 )
-from policyshield.shield.engine import ShieldEngine
+from policyshield.shield.async_engine import AsyncShieldEngine
 
 
-def create_app(engine: ShieldEngine) -> FastAPI:
-    """Create a FastAPI application wired to the given ShieldEngine.
+def _rules_hash(engine: AsyncShieldEngine) -> str:
+    """Compute a stable hash of the current ruleset for change detection."""
+    ruleset = engine.rules
+    raw = f"{ruleset.shield_name}:{ruleset.version}:{len(ruleset.rules)}"
+    for r in ruleset.rules:
+        raw += f"|{r.id}:{r.then.value}"
+    return hashlib.sha256(raw.encode()).hexdigest()[:16]
+
+
+def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastAPI:
+    """Create a FastAPI application wired to the given AsyncShieldEngine.
 
     Args:
-        engine: A configured ShieldEngine instance.
+        engine: A configured AsyncShieldEngine instance.
+        enable_watcher: If True, start/stop rule file watcher with the app lifecycle.
 
     Returns:
-        A FastAPI app with /check, /post-check, /health, /constraints endpoints.
+        A FastAPI app with /check, /post-check, /health, /constraints, /reload endpoints.
     """
-    app = FastAPI(title="PolicyShield", version="1.0.0")
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        """Manage engine watcher lifecycle."""
+        if enable_watcher:
+            engine.start_watching()
+        yield
+        if enable_watcher:
+            engine.stop_watching()
+
+    app = FastAPI(title="PolicyShield", version="1.0.0", lifespan=lifespan)
 
     @app.post("/api/v1/check", response_model=CheckResponse)
     async def check(req: CheckRequest) -> CheckResponse:
-        result = engine.check(
+        result = await engine.check(
             tool_name=req.tool_name,
             args=req.args,
             session_id=req.session_id,
@@ -40,11 +66,12 @@ def create_app(engine: ShieldEngine) -> FastAPI:
             rule_id=result.rule_id,
             modified_args=result.modified_args,
             pii_types=[m.pii_type.value for m in result.pii_matches],
+            approval_id=result.approval_id,
         )
 
     @app.post("/api/v1/post-check", response_model=PostCheckResponse)
     async def post_check(req: PostCheckRequest) -> PostCheckResponse:
-        result = engine.post_check(
+        result = await engine.post_check(
             tool_name=req.tool_name,
             result=req.result,
             session_id=req.session_id,
@@ -66,6 +93,26 @@ def create_app(engine: ShieldEngine) -> FastAPI:
             version=ruleset.version,
             rules_count=engine.rule_count,
             mode=engine.mode.value,
+            rules_hash=_rules_hash(engine),
+        )
+
+    @app.post("/api/v1/reload", response_model=ReloadResponse)
+    async def reload() -> ReloadResponse:
+        """Reload rules from disk."""
+        engine.reload_rules()
+        return ReloadResponse(
+            rules_count=engine.rule_count,
+            rules_hash=_rules_hash(engine),
+        )
+
+    @app.post("/api/v1/check-approval", response_model=ApprovalStatusResponse)
+    async def check_approval(req: ApprovalStatusRequest) -> ApprovalStatusResponse:
+        """Check the status of a pending approval request."""
+        result = engine.get_approval_status(req.approval_id)
+        return ApprovalStatusResponse(
+            approval_id=req.approval_id,
+            status=result["status"],
+            responder=result.get("responder"),
         )
 
     return app

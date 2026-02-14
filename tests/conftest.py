@@ -33,14 +33,14 @@ rules:
 
 @pytest.fixture
 def server_client(server_rules):
-    """TestClient wired to a ShieldEngine with standard rules."""
+    """TestClient wired to an AsyncShieldEngine with standard rules."""
     fastapi = pytest.importorskip("fastapi", reason="fastapi not installed")  # noqa: F841
 
     from fastapi.testclient import TestClient
 
     from policyshield.server.app import create_app
-    from policyshield.shield.engine import ShieldEngine
+    from policyshield.shield.async_engine import AsyncShieldEngine
 
-    engine = ShieldEngine(rules=server_rules)
+    engine = AsyncShieldEngine(rules=server_rules)
     app = create_app(engine)
     return TestClient(app)

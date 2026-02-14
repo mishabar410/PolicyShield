@@ -226,7 +226,7 @@ def _cmd_server(parsed: argparse.Namespace) -> int:
 
     from policyshield.core.models import ShieldMode
     from policyshield.server.app import create_app
-    from policyshield.shield.engine import ShieldEngine
+    from policyshield.shield.async_engine import AsyncShieldEngine
 
     mode_map = {
         "enforce": ShieldMode.ENFORCE,
@@ -240,7 +240,7 @@ def _cmd_server(parsed: argparse.Namespace) -> int:
         print(f"ERROR: rules not found: {rules_path}", file=sys.stderr)
         return 1
 
-    engine = ShieldEngine(rules=rules_path, mode=mode)
+    engine = AsyncShieldEngine(rules=rules_path, mode=mode)
     print("PolicyShield server starting...")
     print(f"  Rules: {rules_path} ({engine.rule_count} rules)")
     print(f"  Mode: {mode.value}")
@@ -248,10 +248,9 @@ def _cmd_server(parsed: argparse.Namespace) -> int:
     print(f"  Health: http://{parsed.host}:{parsed.port}/api/v1/health")
 
     if parsed.reload:
-        engine.start_watching()
         print("  Hot reload: enabled")
 
-    app = create_app(engine)
+    app = create_app(engine, enable_watcher=parsed.reload)
     uvicorn.run(app, host=parsed.host, port=parsed.port, workers=parsed.workers)
     return 0
 

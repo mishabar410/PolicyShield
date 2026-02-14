@@ -8,11 +8,11 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 from policyshield.core.models import RuleConfig, RuleSet, Verdict  # noqa: E402
 from policyshield.server.app import create_app  # noqa: E402
-from policyshield.shield.engine import ShieldEngine  # noqa: E402
+from policyshield.shield.async_engine import AsyncShieldEngine  # noqa: E402
 
 
-def _make_engine() -> ShieldEngine:
-    """Create a test ShieldEngine with a block-exec and redact-email rule."""
+def _make_engine() -> AsyncShieldEngine:
+    """Create a test AsyncShieldEngine with a block-exec and redact-email rule."""
     rules = RuleSet(
         shield_name="test-server",
         version=1,
@@ -32,7 +32,7 @@ def _make_engine() -> ShieldEngine:
             ),
         ],
     )
-    return ShieldEngine(rules)
+    return AsyncShieldEngine(rules)
 
 
 @pytest.fixture
@@ -220,3 +220,74 @@ class TestServerApp:
         data = resp.json()
         assert len(data["summary"]) > 0
         assert "Rules:" in data["summary"]
+
+    def test_health_has_rules_hash(self, client: TestClient):
+        """Health response should include a non-empty rules_hash."""
+        resp = client.get("/api/v1/health")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "rules_hash" in data
+        assert len(data["rules_hash"]) > 0
+
+    def test_reload_endpoint(self):
+        """POST /api/v1/reload loads rules from disk and returns new hash."""
+        import tempfile
+        from pathlib import Path
+
+        from policyshield.core.models import ShieldMode
+
+        rules_yaml = Path(tempfile.mkdtemp()) / "rules.yaml"
+        rules_yaml.write_text("""\
+shield_name: reload-test
+version: 1
+default_verdict: allow
+rules:
+  - id: block-exec
+    description: Block exec calls
+    when:
+      tool: exec
+    then: BLOCK
+    message: exec is not allowed
+""")
+        engine = AsyncShieldEngine(rules=rules_yaml, mode=ShieldMode.ENFORCE)
+        app_local = create_app(engine)
+        local_client = TestClient(app_local)
+
+        # Get initial hash
+        health1 = local_client.get("/api/v1/health").json()
+        initial_hash = health1["rules_hash"]
+        assert health1["rules_count"] == 1
+
+        # Modify rules on disk
+        rules_yaml.write_text("""\
+shield_name: reload-test
+version: 2
+default_verdict: allow
+rules:
+  - id: block-exec
+    description: Block exec calls
+    when:
+      tool: exec
+    then: BLOCK
+    message: exec is not allowed
+  - id: block-delete
+    description: Block delete calls
+    when:
+      tool: delete
+    then: BLOCK
+    message: delete is not allowed
+""")
+
+        # Reload
+        resp = local_client.post("/api/v1/reload")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["status"] == "ok"
+        assert data["rules_count"] == 2
+        assert data["rules_hash"] != initial_hash
+
+        # Health should reflect new state
+        health2 = local_client.get("/api/v1/health").json()
+        assert health2["rules_count"] == 2
+        assert health2["rules_hash"] == data["rules_hash"]
+

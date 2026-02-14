@@ -18,6 +18,7 @@ export type CheckResponse = {
     rule_id?: string;
     modified_args?: Record<string, unknown>;
     pii_types?: string[];
+    approval_id?: string;
 };
 
 export type PostCheckRequest = {
@@ -34,4 +35,10 @@ export type PostCheckResponse = {
 
 export type ConstraintsResponse = {
     summary: string;
+};
+
+export type ApprovalStatusResponse = {
+    approval_id: string;
+    status: "pending" | "approved" | "denied";
+    responder?: string;
 };

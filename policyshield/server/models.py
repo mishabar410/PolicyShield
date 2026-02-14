@@ -22,6 +22,7 @@ class CheckResponse(BaseModel):
     rule_id: str | None = None
     modified_args: dict | None = None
     pii_types: list[str] = []
+    approval_id: str | None = None
 
 
 class PostCheckRequest(BaseModel):
@@ -54,3 +55,27 @@ class HealthResponse(BaseModel):
     version: int = 0
     rules_count: int = 0
     mode: str = ""
+    rules_hash: str = ""
+
+
+class ReloadResponse(BaseModel):
+    """Response body for the /api/v1/reload endpoint."""
+
+    status: str = "ok"
+    rules_count: int = 0
+    rules_hash: str = ""
+
+
+class ApprovalStatusRequest(BaseModel):
+    """Request body for the /api/v1/check-approval endpoint."""
+
+    approval_id: str
+
+
+class ApprovalStatusResponse(BaseModel):
+    """Response body for the /api/v1/check-approval endpoint."""
+
+    approval_id: str
+    status: str  # "pending" | "approved" | "denied"
+    responder: str | None = None
+

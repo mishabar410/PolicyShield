@@ -131,6 +131,7 @@ class ShieldResult(BaseModel):
     pii_matches: list[PIIMatch] = []
     original_args: dict | None = None
     modified_args: dict | None = None
+    approval_id: str | None = None
 
 
 class SessionState(BaseModel):

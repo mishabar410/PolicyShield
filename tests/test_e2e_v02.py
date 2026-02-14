@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import threading
 import time
 
 
@@ -147,19 +146,16 @@ class TestE2EApproval:
             rules=[RuleConfig(id="approve-it", when={"tool": "delete"}, then=Verdict.APPROVE)],
         )
         backend = InMemoryBackend()
-        engine = ShieldEngine(rules, approval_backend=backend, approval_timeout=2.0)
+        engine = ShieldEngine(rules, approval_backend=backend)
 
-        def approve():
-            time.sleep(0.05)
-            pending = backend.pending()
-            if pending:
-                backend.respond(pending[0].request_id, approved=True)
-
-        t = threading.Thread(target=approve)
-        t.start()
         result = engine.check("delete", {"id": "123"})
-        t.join()
-        assert result.verdict == Verdict.ALLOW
+        assert result.verdict == Verdict.APPROVE
+        assert result.approval_id is not None
+
+        # Simulate async approval
+        backend.respond(result.approval_id, approved=True)
+        status = engine.get_approval_status(result.approval_id)
+        assert status["status"] == "approved"
 
     def test_e2e_approval_denied(self):
         rules = RuleSet(
@@ -168,31 +164,30 @@ class TestE2EApproval:
             rules=[RuleConfig(id="approve-it", when={"tool": "delete"}, then=Verdict.APPROVE)],
         )
         backend = InMemoryBackend()
-        engine = ShieldEngine(rules, approval_backend=backend, approval_timeout=2.0)
+        engine = ShieldEngine(rules, approval_backend=backend)
 
-        def deny():
-            time.sleep(0.05)
-            pending = backend.pending()
-            if pending:
-                backend.respond(pending[0].request_id, approved=False)
-
-        t = threading.Thread(target=deny)
-        t.start()
         result = engine.check("delete", {"id": "123"})
-        t.join()
-        assert result.verdict == Verdict.BLOCK
+        assert result.verdict == Verdict.APPROVE
+        assert result.approval_id is not None
 
-    def test_e2e_approval_timeout(self):
+        # Simulate async denial
+        backend.respond(result.approval_id, approved=False)
+        status = engine.get_approval_status(result.approval_id)
+        assert status["status"] == "denied"
+
+    def test_e2e_approval_pending(self):
         rules = RuleSet(
             shield_name="test",
             version=1,
             rules=[RuleConfig(id="approve-it", when={"tool": "delete"}, then=Verdict.APPROVE)],
         )
         backend = InMemoryBackend()
-        engine = ShieldEngine(rules, approval_backend=backend, approval_timeout=0.1)
+        engine = ShieldEngine(rules, approval_backend=backend)
         result = engine.check("delete", {"id": "123"})
-        assert result.verdict == Verdict.BLOCK
-        assert "timed out" in result.message.lower()
+        assert result.verdict == Verdict.APPROVE
+        # No response yet → pending
+        status = engine.get_approval_status(result.approval_id)
+        assert status["status"] == "pending"
 
     def test_e2e_batch_approve_auto(self):
         rules = RuleSet(
@@ -209,19 +204,18 @@ class TestE2EApproval:
         )
         backend = InMemoryBackend()
         cache = ApprovalCache(strategy=ApprovalStrategy.PER_RULE)
-        engine = ShieldEngine(rules, approval_backend=backend, approval_cache=cache, approval_timeout=2.0)
+        engine = ShieldEngine(rules, approval_backend=backend, approval_cache=cache)
 
-        def approve():
-            time.sleep(0.05)
-            pending = backend.pending()
-            if pending:
-                backend.respond(pending[0].request_id, approved=True)
-
-        t = threading.Thread(target=approve)
-        t.start()
+        # First call: returns APPROVE
         result1 = engine.check("exec", {"cmd": "ls"})
-        t.join()
-        assert result1.verdict == Verdict.ALLOW
+        assert result1.verdict == Verdict.APPROVE
+        assert result1.approval_id is not None
+
+        # Simulate approval and cache it
+        backend.respond(result1.approval_id, approved=True)
+        from policyshield.approval.base import ApprovalResponse
+
+        cache.put("exec", "approve-exec", "default", ApprovalResponse(request_id=result1.approval_id, approved=True), strategy=ApprovalStrategy.PER_RULE)
 
         # Second call auto-approved from cache
         result2 = engine.check("exec", {"cmd": "ls"})

@@ -13,10 +13,10 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 from policyshield.core.models import RuleConfig, RuleSet, Verdict  # noqa: E402
 from policyshield.server.app import create_app  # noqa: E402
-from policyshield.shield.engine import ShieldEngine  # noqa: E402
+from policyshield.shield.async_engine import AsyncShieldEngine  # noqa: E402
 
 
-def _make_bench_engine() -> ShieldEngine:
+def _make_bench_engine() -> AsyncShieldEngine:
     rules = RuleSet(
         shield_name="bench",
         version=1,
@@ -30,7 +30,7 @@ def _make_bench_engine() -> ShieldEngine:
             ),
         ],
     )
-    return ShieldEngine(rules)
+    return AsyncShieldEngine(rules)
 
 
 @pytest.fixture
