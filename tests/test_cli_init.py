@@ -107,3 +107,44 @@ class TestInitCLI:
         assert exit_code == 0
         captured = capsys.readouterr()
         assert "Created" in captured.out
+
+
+class TestInitOpenclawPreset:
+    def test_init_preset_openclaw(self, tmp_path):
+        """policyshield init --preset openclaw creates rules.yaml."""
+        created = scaffold(str(tmp_path), preset="openclaw", interactive=False)
+        assert "policies/rules.yaml" in created
+        rules_file = tmp_path / "policies" / "rules.yaml"
+        assert rules_file.exists()
+        data = yaml.safe_load(rules_file.read_text())
+        assert len(data["rules"]) == 11
+
+    def test_openclaw_rules_valid(self, tmp_path):
+        """Generated openclaw rules pass policyshield validate."""
+        scaffold(str(tmp_path), preset="openclaw", interactive=False)
+        rules_path = str(tmp_path / "policies" / "rules.yaml")
+        exit_code = app(["validate", rules_path])
+        assert exit_code == 0
+
+    def test_openclaw_rules_have_exec_block(self, tmp_path):
+        """Openclaw preset has a block rule for exec tool."""
+        scaffold(str(tmp_path), preset="openclaw", interactive=False)
+        rules_file = tmp_path / "policies" / "rules.yaml"
+        data = yaml.safe_load(rules_file.read_text())
+        exec_blocks = [r for r in data["rules"] if r.get("tool") == "exec" and r["then"] == "block"]
+        assert len(exec_blocks) >= 1
+
+    def test_openclaw_rules_have_pii_redact(self, tmp_path):
+        """Openclaw preset has a redact rule for PII."""
+        scaffold(str(tmp_path), preset="openclaw", interactive=False)
+        rules_file = tmp_path / "policies" / "rules.yaml"
+        data = yaml.safe_load(rules_file.read_text())
+        redact_rules = [r for r in data["rules"] if r["then"] == "redact"]
+        assert len(redact_rules) >= 1
+
+    def test_openclaw_rules_default_verdict(self, tmp_path):
+        """Openclaw preset has default_verdict: allow."""
+        scaffold(str(tmp_path), preset="openclaw", interactive=False)
+        rules_file = tmp_path / "policies" / "rules.yaml"
+        data = yaml.safe_load(rules_file.read_text())
+        assert data["default_verdict"] == "allow"

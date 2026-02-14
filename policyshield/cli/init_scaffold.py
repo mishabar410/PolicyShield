@@ -179,6 +179,114 @@ _COMPLIANCE_RULES: list[dict[str, Any]] = [
     },
 ]
 
+_OPENCLAW_RULES: list[dict[str, Any]] = [
+    {
+        "id": "block-destructive-exec",
+        "description": "Block destructive shell commands",
+        "tool": "exec",
+        "when": {
+            "args": {"command": {"regex": r"\b(rm\s+-rf|rm\s+-r\s+/|mkfs|dd\s+if=|chmod\s+777|chmod\s+-R\s+777)\b"}}
+        },
+        "then": "block",
+        "severity": "critical",
+        "message": "Destructive command blocked by PolicyShield",
+    },
+    {
+        "id": "block-curl-pipe-sh",
+        "description": "Block remote code execution via curl|sh",
+        "tool": "exec",
+        "when": {"args": {"command": {"regex": r"curl.*\|.*sh|wget.*\|.*sh|curl.*\|.*bash"}}},
+        "then": "block",
+        "severity": "critical",
+        "message": "Remote code execution via curl|sh is blocked",
+    },
+    {
+        "id": "block-secrets-exfil",
+        "description": "Block potential secrets exfiltration",
+        "tool": "exec",
+        "when": {
+            "args": {
+                "command": {
+                    "regex": r"\b(curl|wget|nc|ncat|scp|rsync)\b.*\b(AWS_SECRET|OPENAI_API_KEY|API_KEY|SECRET_KEY|password|token|private.key)\b"
+                }
+            }
+        },
+        "then": "block",
+        "severity": "critical",
+        "message": "Potential secrets exfiltration blocked",
+    },
+    {
+        "id": "block-env-dump",
+        "description": "Block environment variable dumps",
+        "tool": "exec",
+        "when": {"args": {"command": {"regex": r"\benv\b|\bprintenv\b|\bset\b.*export"}}},
+        "then": "block",
+        "severity": "high",
+        "message": "Environment variable dump is restricted",
+    },
+    {
+        "id": "redact-pii-in-messages",
+        "description": "Redact PII in outgoing messages",
+        "tool": "message",
+        "when": {"args": {"_any": {"has_pii": True}}},
+        "then": "redact",
+        "severity": "high",
+        "message": "PII detected and redacted in outgoing message",
+    },
+    {
+        "id": "redact-pii-in-writes",
+        "description": "Redact PII in file writes",
+        "tool": "write",
+        "when": {"args": {"content": {"has_pii": True}}},
+        "then": "redact",
+        "severity": "medium",
+        "message": "PII detected and redacted in file write",
+    },
+    {
+        "id": "redact-pii-in-edits",
+        "description": "Redact PII in file edits",
+        "tool": "edit",
+        "when": {"args": {"_any": {"has_pii": True}}},
+        "then": "redact",
+        "severity": "medium",
+        "message": "PII detected and redacted in file edit",
+    },
+    {
+        "id": "approve-dotenv-write",
+        "description": "Require approval for writing sensitive files",
+        "tool": "write",
+        "when": {"args": {"file_path": {"regex": r"\.(env|pem|key|crt|p12|pfx)$"}}},
+        "then": "approve",
+        "severity": "high",
+        "message": "Writing to sensitive file requires approval",
+    },
+    {
+        "id": "approve-ssh-access",
+        "description": "Require approval for SSH key modification",
+        "tool": "write",
+        "when": {"args": {"file_path": {"contains": ".ssh/"}}},
+        "then": "approve",
+        "severity": "critical",
+        "message": "SSH key modification requires approval",
+    },
+    {
+        "id": "rate-limit-exec",
+        "description": "Rate limit exec calls",
+        "tool": "exec",
+        "rate_limit": {"max_calls": 60, "window_seconds": 60},
+        "then": "block",
+        "message": "exec rate limit exceeded (60/min)",
+    },
+    {
+        "id": "rate-limit-web",
+        "description": "Rate limit web_fetch calls",
+        "tool": "web_fetch",
+        "rate_limit": {"max_calls": 30, "window_seconds": 60},
+        "then": "block",
+        "message": "web_fetch rate limit exceeded (30/min)",
+    },
+]
+
 
 def _get_preset_rules(preset: str) -> list[dict[str, Any]]:
     """Return rules for the given preset name."""
@@ -186,6 +294,7 @@ def _get_preset_rules(preset: str) -> list[dict[str, Any]]:
         "minimal": _MINIMAL_RULES,
         "security": _SECURITY_RULES,
         "compliance": _COMPLIANCE_RULES,
+        "openclaw": _OPENCLAW_RULES,
     }
     if preset not in presets:
         raise ValueError(f"Unknown preset: {preset}. Choose from: {', '.join(presets)}")
@@ -287,11 +396,13 @@ def scaffold(
     rules = _get_preset_rules(preset)
 
     # Build rules data
-    rules_data = {
+    rules_data: dict[str, Any] = {
         "shield_name": f"{preset}-policy",
         "version": 1,
         "rules": rules,
     }
+    if preset == "openclaw":
+        rules_data["default_verdict"] = "allow"
 
     # Build test data
     test_cases = _generate_test_cases(rules)
@@ -387,11 +498,12 @@ def _ask_preset(default: str) -> str:
         print("  1) minimal  — 3 rules (block, redact, allow)")
         print("  2) security — 8 rules (shell, file, network, PII)")
         print("  3) compliance — 10 rules (GDPR, approval flows, audit)")
+        print("  4) openclaw — 11 rules (exec, PII, secrets, rate limits)")
         choice = input(f"Preset [{default}]: ").strip()
-        mapping = {"1": "minimal", "2": "security", "3": "compliance"}
+        mapping = {"1": "minimal", "2": "security", "3": "compliance", "4": "openclaw"}
         if choice in mapping:
             return mapping[choice]
-        if choice in ("minimal", "security", "compliance"):
+        if choice in ("minimal", "security", "compliance", "openclaw"):
             return choice
         return default
     except (EOFError, KeyboardInterrupt):

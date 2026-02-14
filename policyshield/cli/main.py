@@ -119,7 +119,7 @@ def app(args: list[str] | None = None) -> int:
     init_parser.add_argument(
         "--preset",
         default="minimal",
-        choices=["minimal", "security", "compliance"],
+        choices=["minimal", "security", "compliance", "openclaw"],
         help="Rule preset (default: minimal)",
     )
     init_parser.add_argument("--no-interactive", action="store_true", help="Skip interactive prompts")
