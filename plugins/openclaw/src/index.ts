@@ -28,7 +28,7 @@ export type { OpenClawPluginApi, OpenClawPluginDefinition } from "./openclaw-plu
 const plugin: OpenClawPluginDefinition = {
     id: "policyshield",
     name: "PolicyShield",
-    version: "0.7.0",
+    version: "0.8.0",
     description: "PolicyShield — runtime policy enforcement for AI agent tool calls",
 
     async register(api: OpenClawPluginApi) {
@@ -47,6 +47,11 @@ const plugin: OpenClawPluginDefinition = {
         }
 
         const client = new PolicyShieldClient(rawConfig, log);
+
+        // Read configurable values (with defaults)
+        const approveTimeoutMs = rawConfig.approve_timeout_ms ?? 60_000;
+        const approvePollMs = rawConfig.approve_poll_interval_ms ?? 2_000;
+        const maxResultBytes = rawConfig.max_result_bytes ?? 10_000;
 
         // Async startup check (non-blocking)
         client
@@ -69,46 +74,52 @@ const plugin: OpenClawPluginDefinition = {
                 event: PluginHookBeforeToolCallEvent,
                 ctx: PluginHookToolContext,
             ): Promise<PluginHookBeforeToolCallResult | void> => {
-                const verdict = await client.check({
-                    tool_name: event.toolName ?? "",
-                    args: event.params ?? {},
-                    session_id: ctx.sessionKey ?? "default",
-                    sender: ctx.agentId,
-                });
+                try {
+                    const verdict = await client.check({
+                        tool_name: event.toolName ?? "",
+                        args: event.params ?? {},
+                        session_id: ctx.sessionKey ?? "default",
+                        sender: ctx.agentId,
+                    });
 
-                if (verdict.verdict === "BLOCK") {
-                    return {
-                        block: true,
-                        blockReason: `🛡️ PolicyShield: ${verdict.message}`,
-                    };
-                }
-                if (verdict.verdict === "REDACT" && verdict.modified_args) {
-                    return { params: verdict.modified_args };
-                }
-                if (verdict.verdict === "APPROVE" && verdict.approval_id) {
-                    // Poll for approval decision (max 60s, every 2s)
-                    const maxWaitMs = 60_000;
-                    const intervalMs = 2_000;
-                    const deadline = Date.now() + maxWaitMs;
-                    while (Date.now() < deadline) {
-                        await new Promise((r) => setTimeout(r, intervalMs));
-                        const status = await client.checkApproval(verdict.approval_id);
-                        if (status.status === "approved") {
-                            return undefined; // proceed
-                        }
-                        if (status.status === "denied") {
-                            return {
-                                block: true,
-                                blockReason: `🛡️ PolicyShield: approval denied${status.responder ? ` by ${status.responder}` : ""}`,
-                            };
-                        }
+                    if (verdict.verdict === "BLOCK") {
+                        return {
+                            block: true,
+                            blockReason: `🛡️ PolicyShield: ${verdict.message}`,
+                        };
                     }
-                    return {
-                        block: true,
-                        blockReason: "⏳ PolicyShield: approval timed out",
-                    };
+                    if (verdict.verdict === "REDACT" && verdict.modified_args) {
+                        return { params: verdict.modified_args };
+                    }
+                    if (verdict.verdict === "APPROVE" && verdict.approval_id) {
+                        const deadline = Date.now() + approveTimeoutMs;
+                        while (Date.now() < deadline) {
+                            await new Promise((r) => setTimeout(r, approvePollMs));
+                            try {
+                                const status = await client.checkApproval(verdict.approval_id);
+                                if (status.status === "approved") {
+                                    return undefined; // proceed
+                                }
+                                if (status.status === "denied") {
+                                    return {
+                                        block: true,
+                                        blockReason: `🛡️ PolicyShield: approval denied${status.responder ? ` by ${status.responder}` : ""}`,
+                                    };
+                                }
+                            } catch (pollErr) {
+                                log.warn(`Approval poll error: ${String(pollErr)}`);
+                            }
+                        }
+                        return {
+                            block: true,
+                            blockReason: `⏳ PolicyShield: approval timed out after ${approveTimeoutMs / 1000}s`,
+                        };
+                    }
+                    return undefined; // ALLOW
+                } catch (err) {
+                    log.warn(`before_tool_call hook error: ${String(err)}`);
+                    return undefined; // fail-open
                 }
-                return undefined; // ALLOW
             },
             { priority: 100 },
         );
@@ -120,16 +131,25 @@ const plugin: OpenClawPluginDefinition = {
                 event: PluginHookAfterToolCallEvent,
                 ctx: PluginHookToolContext,
             ): Promise<void> => {
-                const resultStr =
-                    typeof event.result === "string"
-                        ? event.result
-                        : JSON.stringify(event.result ?? "").slice(0, 10000);
-                await client.postCheck({
-                    tool_name: event.toolName ?? "",
-                    args: event.params ?? {},
-                    result: resultStr,
-                    session_id: ctx.sessionKey ?? "default",
-                });
+                try {
+                    const resultStr =
+                        typeof event.result === "string"
+                            ? event.result.slice(0, maxResultBytes)
+                            : JSON.stringify(event.result ?? "").slice(0, maxResultBytes);
+                    const postResult = await client.postCheck({
+                        tool_name: event.toolName ?? "",
+                        args: event.params ?? {},
+                        result: resultStr,
+                        session_id: ctx.sessionKey ?? "default",
+                    });
+                    if (postResult && postResult.pii_types.length > 0) {
+                        log.warn(
+                            `PII detected in ${event.toolName} output: ${postResult.pii_types.join(", ")}`,
+                        );
+                    }
+                } catch (err) {
+                    log.warn(`after_tool_call hook error: ${String(err)}`);
+                }
             },
             { priority: 100 },
         );
@@ -141,11 +161,16 @@ const plugin: OpenClawPluginDefinition = {
                 _event: PluginHookBeforeAgentStartEvent,
                 _ctx: PluginHookAgentContext,
             ): Promise<PluginHookBeforeAgentStartResult | void> => {
-                const constraints = await client.getConstraints();
-                if (!constraints) return undefined;
-                return {
-                    prependContext: `\n## 🛡️ PolicyShield Active Rules\n${constraints}\n`,
-                };
+                try {
+                    const constraints = await client.getConstraints();
+                    if (!constraints) return undefined;
+                    return {
+                        prependContext: `\n## 🛡️ PolicyShield Active Rules\n${constraints}\n`,
+                    };
+                } catch (err) {
+                    log.warn(`before_agent_start hook error: ${String(err)}`);
+                    return undefined;
+                }
             },
             { priority: 50 },
         );

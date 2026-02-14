@@ -12,20 +12,20 @@ import type {
 export class PolicyShieldClient {
     private readonly url: string;
     private readonly timeout: number;
-    private readonly mode: string;
+    private readonly enabled: boolean;
     private readonly failOpen: boolean;
     private readonly logger?: PluginLogger;
 
     constructor(config: PluginConfig = {}, logger?: PluginLogger) {
         this.url = (config.url ?? "http://localhost:8100").replace(/\/$/, "");
         this.timeout = config.timeout_ms ?? 5000;
-        this.mode = config.mode ?? "enforce";
+        this.enabled = (config.mode ?? "enforce") !== "disabled";
         this.failOpen = config.fail_open ?? true;
         this.logger = logger;
     }
 
     async check(req: CheckRequest): Promise<CheckResponse> {
-        if (this.mode === "disabled") {
+        if (!this.enabled) {
             return { verdict: "ALLOW", message: "" };
         }
         try {
@@ -38,14 +38,8 @@ export class PolicyShieldClient {
             if (!res.ok) {
                 throw new Error(`HTTP ${res.status}: ${res.statusText}`);
             }
-            const verdict = (await res.json()) as CheckResponse;
-            if (this.mode === "audit") {
-                this.logger?.info(
-                    `[policyshield:audit] ${req.tool_name}: ${verdict.verdict} — ${verdict.message}`,
-                );
-                return { verdict: "ALLOW", message: "" };
-            }
-            return verdict;
+            // Audit mode is configured server-side, not in the client.
+            return (await res.json()) as CheckResponse;
         } catch (err) {
             if (this.failOpen) {
                 this.logger?.warn(
@@ -73,8 +67,13 @@ export class PolicyShieldClient {
             if (res.ok) {
                 return (await res.json()) as PostCheckResponse;
             }
-        } catch {
-            /* fire and forget */
+            this.logger?.warn(
+                `[policyshield] post-check HTTP ${res.status} for ${req.tool_name}`,
+            );
+        } catch (err) {
+            this.logger?.warn(
+                `[policyshield] post-check failed for ${req.tool_name}: ${String(err)}`,
+            );
         }
         return undefined;
     }
@@ -88,8 +87,10 @@ export class PolicyShieldClient {
                 const data = (await res.json()) as ConstraintsResponse;
                 return data.summary;
             }
-        } catch {
-            /* optional */
+        } catch (err) {
+            this.logger?.debug?.(
+                `[policyshield] constraints fetch failed: ${String(err)}`,
+            );
         }
         return undefined;
     }

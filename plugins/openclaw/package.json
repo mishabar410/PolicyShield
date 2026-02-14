@@ -1,18 +1,28 @@
 {
-    "name": "@openclaw/policyshield",
-    "version": "0.7.0",
+    "name": "@policyshield/openclaw-plugin",
+    "version": "0.8.0",
     "description": "PolicyShield plugin for OpenClaw — runtime tool call policy enforcement",
     "type": "module",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        },
+        "./plugin.json": "./openclaw.plugin.json"
+    },
     "files": [
         "dist/",
-        "openclaw.plugin.json"
+        "openclaw.plugin.json",
+        "README.md"
     ],
     "scripts": {
         "build": "tsc",
+        "prepack": "npm run build",
         "test": "vitest run",
-        "test:watch": "vitest"
+        "test:watch": "vitest",
+        "typecheck": "tsc --noEmit"
     },
     "keywords": [
         "openclaw",
@@ -20,16 +30,31 @@
         "policyshield",
         "security",
         "firewall",
-        "ai-agent"
+        "ai-agent",
+        "policy-enforcement"
     ],
     "license": "MIT",
+    "author": "PolicyShield Contributors",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/policyshield/policyshield",
+        "directory": "plugins/openclaw"
+    },
+    "homepage": "https://github.com/policyshield/policyshield/tree/main/plugins/openclaw#readme",
+    "bugs": {
+        "url": "https://github.com/policyshield/policyshield/issues"
+    },
+    "engines": {
+        "node": ">=18.0.0"
+    },
     "devDependencies": {
+        "@types/node": "^25.2.3",
         "typescript": "^5.0.0",
         "vitest": "^1.0.0"
     },
     "openclaw": {
         "extensions": [
-            "./src/index.ts"
+            "./dist/index.js"
         ]
     }
 }

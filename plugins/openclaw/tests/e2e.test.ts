@@ -1,45 +1,132 @@
-/**
- * E2E: Plugin → PolicyShield Server
- *
- * Requires POLICYSHIELD_URL env var pointing to a running PolicyShield server.
- * Skip all tests if the env var is not set.
- */
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { PolicyShieldClient } from "../src/client.js";
-import { describe, it, expect } from "vitest";
+import { createServer, type Server } from "node:http";
 
-const url = process.env.POLICYSHIELD_URL;
+let server: Server;
+let serverUrl: string;
 
-const describeE2E = url ? describe : describe.skip;
+beforeAll(async () => {
+    server = createServer((req, res) => {
+        let body = "";
+        req.on("data", (chunk) => (body += chunk));
+        req.on("end", () => {
+            const url = req.url ?? "";
 
-describeE2E("E2E: Plugin → Server", () => {
-    const client = new PolicyShieldClient({ url: url! });
+            if (url === "/api/v1/health") {
+                res.writeHead(200, { "Content-Type": "application/json" });
+                res.end(JSON.stringify({ status: "ok" }));
+                return;
+            }
 
-    it("blocks destructive exec", async () => {
+            if (url === "/api/v1/check" && req.method === "POST") {
+                const parsed = JSON.parse(body);
+                if (
+                    parsed.tool_name === "exec" &&
+                    typeof parsed.args?.command === "string" &&
+                    parsed.args.command.includes("rm -rf")
+                ) {
+                    res.writeHead(200, { "Content-Type": "application/json" });
+                    res.end(
+                        JSON.stringify({
+                            verdict: "BLOCK",
+                            message: "Destructive command blocked",
+                        }),
+                    );
+                    return;
+                }
+                res.writeHead(200, { "Content-Type": "application/json" });
+                res.end(JSON.stringify({ verdict: "ALLOW", message: "" }));
+                return;
+            }
+
+            if (url === "/api/v1/post-check" && req.method === "POST") {
+                res.writeHead(200, { "Content-Type": "application/json" });
+                res.end(JSON.stringify({ pii_types: [] }));
+                return;
+            }
+
+            if (url === "/api/v1/constraints") {
+                res.writeHead(200, { "Content-Type": "application/json" });
+                res.end(JSON.stringify({ summary: "- No destructive commands" }));
+                return;
+            }
+
+            res.writeHead(404);
+            res.end();
+        });
+    });
+
+    await new Promise<void>((resolve) => {
+        server.listen(0, () => {
+            const addr = server.address();
+            if (addr && typeof addr !== "string") {
+                serverUrl = `http://localhost:${addr.port}`;
+            }
+            resolve();
+        });
+    });
+});
+
+afterAll(() => {
+    server?.close();
+});
+
+describe("e2e: plugin ↔ mock PolicyShield server", () => {
+    it("health check succeeds", async () => {
+        const client = new PolicyShieldClient({ url: serverUrl });
+        expect(await client.healthCheck()).toBe(true);
+    });
+
+    it("blocks destructive commands", async () => {
+        const client = new PolicyShieldClient({ url: serverUrl });
         const result = await client.check({
             tool_name: "exec",
             args: { command: "rm -rf /" },
-            session_id: "ts-e2e",
+            session_id: "test",
         });
         expect(result.verdict).toBe("BLOCK");
+        expect(result.message).toContain("Destructive");
     });
 
-    it("allows safe exec", async () => {
+    it("allows safe commands", async () => {
+        const client = new PolicyShieldClient({ url: serverUrl });
         const result = await client.check({
             tool_name: "exec",
-            args: { command: "echo hello" },
-            session_id: "ts-e2e",
+            args: { command: "ls" },
+            session_id: "test",
         });
         expect(result.verdict).toBe("ALLOW");
     });
 
-    it("health check returns ok", async () => {
-        const ok = await client.healthCheck();
-        expect(ok).toBe(true);
+    it("post-check returns PII types", async () => {
+        const client = new PolicyShieldClient({ url: serverUrl });
+        const result = await client.postCheck({
+            tool_name: "exec",
+            args: {},
+            result: "safe output",
+            session_id: "test",
+        });
+        expect(result).toBeDefined();
+        expect(result?.pii_types).toEqual([]);
     });
 
     it("constraints returns summary", async () => {
+        const client = new PolicyShieldClient({ url: serverUrl });
         const result = await client.getConstraints();
-        expect(result).toBeDefined();
-        expect(typeof result).toBe("string");
+        expect(result).toBe("- No destructive commands");
+    });
+
+    it("unreachable server with fail_open=true returns ALLOW", async () => {
+        const client = new PolicyShieldClient({
+            url: "http://localhost:1",
+            fail_open: true,
+            timeout_ms: 500,
+        });
+        const result = await client.check({
+            tool_name: "test",
+            args: {},
+            session_id: "test",
+        });
+        expect(result.verdict).toBe("ALLOW");
     });
 });

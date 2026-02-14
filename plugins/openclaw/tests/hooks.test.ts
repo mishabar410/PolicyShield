@@ -80,7 +80,7 @@ describe("Plugin Registration (api.on pattern)", () => {
     it("exports correct metadata", () => {
         expect(plugin.id).toBe("policyshield");
         expect(plugin.name).toBe("PolicyShield");
-        expect(plugin.version).toBe("0.7.0");
+        expect(plugin.version).toBe("0.8.0");
         expect(plugin.description).toContain("PolicyShield");
     });
 });
@@ -199,6 +199,31 @@ describe("before_tool_call hook", () => {
             block: true,
             blockReason: expect.stringContaining("denied"),
         });
+    });
+
+    it("hook error fails open — returns undefined", async () => {
+        // The client.check() has its own try-catch, so to trigger the *hook-level*
+        // catch we need an error outside the client call. We do this via a Proxy
+        // that throws on property access for the event object.
+        mockFetch({}, 200); // health check
+        const { api, hooks, logs } = createMockApi({});
+        await plugin.register!(api);
+        const handler = hooks.get("before_tool_call")!.handler;
+
+        const badEvent = new Proxy(
+            {},
+            {
+                get() {
+                    throw new Error("synthetic hook error");
+                },
+            },
+        );
+        const result = await handler(
+            badEvent,
+            { sessionKey: "sess-1", agentId: "agent-1", toolName: "test" },
+        );
+        expect(result).toBeUndefined(); // fail-open
+        expect(logs.some((l) => l.includes("before_tool_call hook error"))).toBe(true);
     });
 });
 

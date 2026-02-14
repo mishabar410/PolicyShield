@@ -100,7 +100,7 @@ policyshield init --preset security --no-interactive
 
 ## OpenClaw Integration
 
-PolicyShield integrates natively with [OpenClaw](https://github.com/AgenturAI/OpenClaw) as a plugin:
+PolicyShield integrates natively with [OpenClaw](https://github.com/openclaw/openclaw) as a plugin:
 
 ### 1. Start the PolicyShield server
 
@@ -109,10 +109,10 @@ pip install "policyshield[server]"
 policyshield server --rules ./rules.yaml --port 8100
 ```
 
-### 2. Install the OpenClaw plugin
+### 2. Install the plugin
 
 ```bash
-openclaw plugin install openclaw-plugin-policyshield
+npm install @policyshield/openclaw-plugin
 ```
 
 ### 3. Configure in `openclaw.yaml`
@@ -121,18 +121,11 @@ openclaw plugin install openclaw-plugin-policyshield
 plugins:
   policyshield:
     url: http://localhost:8100
-    mode: enforce        # enforce | audit | disabled
-    fail_open: true      # allow calls when server is unreachable
-    timeout_ms: 5000
+    mode: enforce
+    fail_open: true
 ```
 
-### 4. Generate rules for OpenClaw
-
-```bash
-policyshield init --preset openclaw
-```
-
-This generates 11 security rules covering destructive commands, PII redaction, sensitive path protection, and rate limiting.
+See [`plugins/openclaw/README.md`](plugins/openclaw/README.md) for full configuration reference.
 
 ---
 

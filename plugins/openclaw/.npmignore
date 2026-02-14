@@ -1,0 +1,11 @@
+# Source files
+src/
+tests/
+tsconfig.json
+vitest.config.ts
+
+# Dev configs
+.eslintrc*
+.prettierrc*
+*.config.js
+*.config.ts

@@ -5,23 +5,41 @@
         "properties": {
             "url": {
                 "type": "string",
-                "default": "http://localhost:8100"
+                "default": "http://localhost:8100",
+                "description": "PolicyShield server URL"
             },
             "mode": {
                 "enum": [
                     "enforce",
-                    "audit",
                     "disabled"
                 ],
-                "default": "enforce"
+                "default": "enforce",
+                "description": "enforce or disabled (audit is server-side)"
             },
             "fail_open": {
                 "type": "boolean",
-                "default": true
+                "default": true,
+                "description": "Allow tool calls if server is unreachable"
             },
             "timeout_ms": {
                 "type": "number",
-                "default": 5000
+                "default": 5000,
+                "description": "HTTP request timeout (ms)"
+            },
+            "approve_timeout_ms": {
+                "type": "number",
+                "default": 60000,
+                "description": "Max time to wait for human approval (ms)"
+            },
+            "approve_poll_interval_ms": {
+                "type": "number",
+                "default": 2000,
+                "description": "Polling interval for approval status (ms)"
+            },
+            "max_result_bytes": {
+                "type": "number",
+                "default": 10000,
+                "description": "Max bytes of tool result to send for PII scan"
             }
         }
     }

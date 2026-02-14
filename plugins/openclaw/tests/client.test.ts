@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { PolicyShieldClient } from "../src/client.js";
 
 function mockFetch(response: unknown, status = 200) {
@@ -83,7 +83,7 @@ describe("PolicyShieldClient", () => {
         expect(res.message).toContain("unreachable");
     });
 
-    it("check: mode=disabled", async () => {
+    it("check: mode=disabled skips fetch", async () => {
         const spy = vi.spyOn(globalThis, "fetch");
         const client = new PolicyShieldClient({ mode: "disabled" });
         const res = await client.check({
@@ -95,16 +95,16 @@ describe("PolicyShieldClient", () => {
         expect(spy).not.toHaveBeenCalled();
     });
 
-    it("check: mode=audit", async () => {
+    it("check: no client-side audit override — BLOCK from server stays BLOCK", async () => {
         mockFetch({ verdict: "BLOCK", message: "would block" });
-        const client = new PolicyShieldClient({ mode: "audit" });
+        const client = new PolicyShieldClient({ mode: "enforce" });
         const res = await client.check({
             tool_name: "test",
             args: {},
             session_id: "s1",
         });
-        expect(res.verdict).toBe("ALLOW"); // audit does not enforce
-        expect(globalThis.fetch).toHaveBeenCalledOnce();
+        expect(res.verdict).toBe("BLOCK");
+        // Audit mode is now server-side only — client must not override verdicts
     });
 
     it("check: timeout (fail_open)", async () => {
@@ -123,7 +123,7 @@ describe("PolicyShieldClient", () => {
         expect(res.verdict).toBe("ALLOW");
     });
 
-    it("postCheck: fire and forget", async () => {
+    it("postCheck: returns PII types", async () => {
         mockFetch({ pii_types: ["email"] });
         const client = new PolicyShieldClient();
         const res = await client.postCheck({
@@ -136,9 +136,10 @@ describe("PolicyShieldClient", () => {
         expect(res!.pii_types).toContain("email");
     });
 
-    it("postCheck: does not throw on 500", async () => {
+    it("postCheck: logs warning on HTTP 500", async () => {
         mockFetch({}, 500);
-        const client = new PolicyShieldClient();
+        const mockLogger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+        const client = new PolicyShieldClient({}, mockLogger);
         const res = await client.postCheck({
             tool_name: "test",
             args: {},
@@ -146,6 +147,25 @@ describe("PolicyShieldClient", () => {
             session_id: "s1",
         });
         expect(res).toBeUndefined();
+        expect(mockLogger.warn).toHaveBeenCalledWith(
+            expect.stringContaining("post-check HTTP 500"),
+        );
+    });
+
+    it("postCheck: logs warning on connection error", async () => {
+        mockFetchError();
+        const mockLogger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+        const client = new PolicyShieldClient({}, mockLogger);
+        const res = await client.postCheck({
+            tool_name: "exec",
+            args: {},
+            result: "done",
+            session_id: "s1",
+        });
+        expect(res).toBeUndefined();
+        expect(mockLogger.warn).toHaveBeenCalledWith(
+            expect.stringContaining("post-check failed for exec"),
+        );
     });
 
     it("getConstraints: returns summary", async () => {
@@ -155,11 +175,15 @@ describe("PolicyShieldClient", () => {
         expect(res).toBe("Do not delete files");
     });
 
-    it("getConstraints: server down", async () => {
+    it("getConstraints: logs debug on error", async () => {
         mockFetchError();
-        const client = new PolicyShieldClient();
+        const mockLogger = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() };
+        const client = new PolicyShieldClient({}, mockLogger);
         const res = await client.getConstraints();
         expect(res).toBeUndefined();
+        expect(mockLogger.debug).toHaveBeenCalledWith(
+            expect.stringContaining("constraints fetch failed"),
+        );
     });
 
     it("healthCheck: ok", async () => {

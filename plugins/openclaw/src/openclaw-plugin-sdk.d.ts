@@ -1,11 +1,12 @@
 /**
  * Type stubs for the OpenClaw Plugin SDK.
  *
- * Extracted from the real OpenClaw source (openclaw/src/plugins/types.ts)
- * to avoid a heavyweight workspace dependency. Only the types actually
- * used by the PolicyShield plugin are included here.
+ * Manually synchronized with openclaw/src/plugins/types.ts
+ * Source of truth: https://github.com/openclaw/openclaw → src/plugins/types.ts
+ * Last sync: 2026-02-14
  *
- * Source of truth: https://github.com/nicepkg/openclaw → src/plugins/types.ts
+ * Only types used by the PolicyShield plugin are included here.
+ * To re-sync: compare this file with the real types.ts and update differences.
  */
 
 // ---------------------------------------------------------------------------
@@ -139,11 +140,22 @@ export type OpenClawPluginApi = {
 // ---------------------------------------------------------------------------
 // Plugin Definition
 // ---------------------------------------------------------------------------
+export type PluginKind = "tool" | "channel" | "provider" | "gateway" | "agent" | "command" | string;
+
+export type OpenClawPluginConfigSchema = Record<string, {
+    type: string;
+    default?: unknown;
+    description?: string;
+    required?: boolean;
+}>;
+
 export type OpenClawPluginDefinition = {
     id?: string;
     name?: string;
     description?: string;
     version?: string;
+    kind?: PluginKind;
+    configSchema?: OpenClawPluginConfigSchema;
     register?: (api: OpenClawPluginApi) => void | Promise<void>;
     activate?: (api: OpenClawPluginApi) => void | Promise<void>;
 };

@@ -1,8 +1,15 @@
 export type PluginConfig = {
     url?: string;
-    mode?: "enforce" | "audit" | "disabled";
+    /** "enforce" (default) or "disabled". Audit mode is configured on the server. */
+    mode?: "enforce" | "disabled";
     fail_open?: boolean;
     timeout_ms?: number;
+    /** Max time to wait for human approval (ms). Default: 60000 */
+    approve_timeout_ms?: number;
+    /** Polling interval for approval status (ms). Default: 2000 */
+    approve_poll_interval_ms?: number;
+    /** Max bytes of tool result to send for post-check PII scan. Default: 10000 */
+    max_result_bytes?: number;
 };
 
 export type CheckRequest = {

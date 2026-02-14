@@ -1,0 +1,26 @@
+# OpenClaw + PolicyShield — Full Configuration Example
+#
+# Add this section to your openclaw.yaml (or equivalent config file).
+# See plugins/openclaw/README.md for details.
+
+plugins:
+  policyshield:
+    # PolicyShield server URL (required)
+    url: "http://localhost:8100"
+
+    # "enforce" (default) or "disabled"
+    # Audit mode is configured on the PolicyShield server, not here.
+    mode: "enforce"
+
+    # Allow tool calls when PolicyShield server is unreachable?
+    fail_open: true
+
+    # HTTP request timeout for check/post-check calls (ms)
+    timeout_ms: 5000
+
+    # Human-in-the-loop APPROVE flow
+    approve_timeout_ms: 60000       # Max wait for approval (ms)
+    approve_poll_interval_ms: 2000  # How often to poll for approval status (ms)
+
+    # PII scanning
+    max_result_bytes: 10000         # Max bytes of tool output sent for post-check

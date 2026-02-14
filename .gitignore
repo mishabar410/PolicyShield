@@ -50,8 +50,8 @@ demo_traces/
 .gemini/
 .antigravityignore
 
-# Vendored OpenClaw source
-openclaw/node_modules/
+# OpenClaw source (reference clone, not part of this project)
+/openclaw/
 
 # Plugin build artifacts
 plugins/openclaw/dist/
