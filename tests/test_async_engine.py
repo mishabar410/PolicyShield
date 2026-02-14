@@ -8,6 +8,7 @@ import pytest
 
 from policyshield.approval.memory import InMemoryBackend
 from policyshield.core.models import (
+    PostCheckResult,
     RuleConfig,
     RuleSet,
     ShieldMode,
@@ -224,11 +225,14 @@ async def test_async_pii_detection():
 # ── Test 9: post_check returns ALLOW ─────────────────────────────────
 
 
+
 @pytest.mark.asyncio
 async def test_async_post_check(block_exec_rules):
     engine = AsyncShieldEngine(block_exec_rules)
     result = await engine.post_check("exec", {"output": "done"})
-    assert result.verdict == Verdict.ALLOW
+    assert isinstance(result, PostCheckResult)
+    assert result.pii_matches == []
+    assert result.session_tainted is False
 
 
 # ── Test 10: AUDIT mode ──────────────────────────────────────────────

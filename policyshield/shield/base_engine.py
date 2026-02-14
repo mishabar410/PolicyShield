@@ -10,6 +10,7 @@ from typing import Any
 from policyshield.approval.base import ApprovalBackend, ApprovalRequest
 from policyshield.approval.cache import ApprovalCache, ApprovalStrategy
 from policyshield.core.models import (
+    PostCheckResult,
     RuleSet,
     ShieldMode,
     ShieldResult,
@@ -135,14 +136,31 @@ class BaseShieldEngine:
         session_state = self._build_session_state(session_id)
 
         # Find best matching rule
-        match = self._matcher.find_best_match(
-            tool_name=tool_name,
-            args=args,
-            session_state=session_state,
-            sender=sender,
-        )
+        try:
+            match = self._matcher.find_best_match(
+                tool_name=tool_name,
+                args=args,
+                session_state=session_state,
+                sender=sender,
+            )
+        except Exception as e:
+            logger.error("Matcher error: %s", e)
+            if self._fail_open:
+                return self._verdict_builder.allow(args=args)
+            return ShieldResult(
+                verdict=Verdict.BLOCK,
+                rule_id="__error__",
+                message=f"Internal error: {e}",
+            )
 
         if match is None:
+            default = self._rule_set.default_verdict
+            if default == Verdict.BLOCK:
+                return ShieldResult(
+                    verdict=Verdict.BLOCK,
+                    rule_id="__default__",
+                    message="No matching rule. Default policy: BLOCK.",
+                )
             return self._verdict_builder.allow(args=args)
 
         rule = match.rule
@@ -303,24 +321,33 @@ class BaseShieldEngine:
         tool_name: str,
         result: Any,
         session_id: str = "default",
-    ) -> ShieldResult:
+    ) -> PostCheckResult:
         """Post-call check on tool output (PII scan on results)."""
         if self._mode == ShieldMode.DISABLED:
-            return self._verdict_builder.allow()
+            return PostCheckResult()
 
         pii_matches: list = []
+        redacted_output: str | None = None
 
         if isinstance(result, str):
             pii_matches = self._pii.scan(result)
+            if pii_matches:
+                redacted_output = self._pii.redact_text(result)
         elif isinstance(result, dict):
             pii_matches = self._pii.scan_dict(result)
+            if pii_matches:
+                redacted_dict, _ = self._pii.redact_dict(result)
+                redacted_output = str(redacted_dict)
 
+        tainted = False
         for pm in pii_matches:
             self._session_mgr.add_taint(session_id, pm.pii_type)
+            tainted = True
 
-        return ShieldResult(
-            verdict=Verdict.ALLOW,
+        return PostCheckResult(
             pii_matches=pii_matches,
+            redacted_output=redacted_output,
+            session_tainted=tainted,
         )
 
     # ------------------------------------------------------------------ #
@@ -399,3 +426,12 @@ class BaseShieldEngine:
         """Return current rule set (thread-safe)."""
         with self._lock:
             return self._rule_set
+
+    def get_policy_summary(self) -> str:
+        """Return human-readable summary of active rules for LLM context."""
+        lines = [f"PolicyShield: {self._rule_set.shield_name} v{self._rule_set.version}"]
+        lines.append(f"Default: {self._rule_set.default_verdict.value}")
+        lines.append(f"Rules: {len(self._rule_set.rules)}")
+        for rule in self._rule_set.rules:
+            lines.append(f"  - [{rule.then.value}] {rule.id}: {rule.message or rule.description or rule.id}")
+        return "\n".join(lines)

@@ -6,7 +6,7 @@ import time
 from typing import Any
 
 from policyshield.core.exceptions import PolicyShieldError
-from policyshield.core.models import ShieldMode, ShieldResult
+from policyshield.core.models import PostCheckResult, ShieldMode, ShieldResult
 from policyshield.shield.base_engine import BaseShieldEngine, logger
 
 
@@ -69,7 +69,7 @@ class ShieldEngine(BaseShieldEngine):
         tool_name: str,
         result: Any,
         session_id: str = "default",
-    ) -> ShieldResult:
+    ) -> PostCheckResult:
         """Post-call check on tool output (for PII in results).
 
         Args:
@@ -78,6 +78,6 @@ class ShieldEngine(BaseShieldEngine):
             session_id: Session identifier.
 
         Returns:
-            ShieldResult (currently always ALLOW).
+            PostCheckResult with PII matches and optional redacted output.
         """
         return self._post_check_sync(tool_name, result, session_id)

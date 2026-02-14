@@ -230,6 +230,25 @@ class PIIDetector:
             return mask_char * len(text)
         return text[:keep_edges] + mask_char * (len(text) - keep_edges * 2) + text[-keep_edges:]
 
+    def redact_text(self, text: str) -> str:
+        """Scan a string and return a copy with PII values masked.
+
+        Args:
+            text: Text to scan and redact.
+
+        Returns:
+            Text with PII values replaced by masked versions.
+        """
+        matches = self.scan(text)
+        if not matches:
+            return text
+        # Apply masks in reverse order to preserve positions
+        result = text
+        for match in sorted(matches, key=lambda m: m.span[0], reverse=True):
+            start, end = match.span
+            result = result[:start] + match.masked_value + result[end:]
+        return result
+
     def redact_dict(self, data: dict) -> tuple[dict, list[PIIMatch]]:
         """Scan a dict and return a copy with PII values redacted.
 

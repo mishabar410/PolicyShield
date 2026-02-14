@@ -137,6 +137,7 @@ def _load_rules_from_dir(dir_path: Path) -> RuleSet:
     all_rules: list[RuleConfig] = []
     shield_name = ""
     version = 1
+    default_verdict = Verdict.ALLOW
 
     for f in yaml_files:
         data = parse_rule_file(f)
@@ -144,6 +145,14 @@ def _load_rules_from_dir(dir_path: Path) -> RuleSet:
             shield_name = data["shield_name"]
         if "version" in data:
             version = data["version"]
+        if "default_verdict" in data:
+            dv = data["default_verdict"].upper()
+            try:
+                default_verdict = Verdict(dv)
+            except ValueError:
+                raise PolicyShieldParseError(
+                    f"Invalid default_verdict '{dv}'", str(f)
+                )
         raw_rules = data.get("rules", [])
         for raw in raw_rules:
             all_rules.append(_parse_rule(raw, str(f)))
@@ -151,7 +160,12 @@ def _load_rules_from_dir(dir_path: Path) -> RuleSet:
     if not shield_name:
         shield_name = dir_path.name
 
-    ruleset = RuleSet(shield_name=shield_name, version=version, rules=all_rules)
+    ruleset = RuleSet(
+        shield_name=shield_name,
+        version=version,
+        rules=all_rules,
+        default_verdict=default_verdict,
+    )
     validate_rule_set(ruleset)
     return ruleset
 
@@ -169,7 +183,22 @@ def _build_ruleset(data: dict, file_path: str) -> RuleSet:
     shield_name = data.get("shield_name", Path(file_path).stem)
     version = data.get("version", 1)
 
-    ruleset = RuleSet(shield_name=shield_name, version=version, rules=rules)
+    default_verdict = Verdict.ALLOW
+    if "default_verdict" in data:
+        dv = data["default_verdict"].upper()
+        try:
+            default_verdict = Verdict(dv)
+        except ValueError:
+            raise PolicyShieldParseError(
+                f"Invalid default_verdict '{dv}'", file_path
+            )
+
+    ruleset = RuleSet(
+        shield_name=shield_name,
+        version=version,
+        rules=rules,
+        default_verdict=default_verdict,
+    )
     validate_rule_set(ruleset)
     return ruleset
 

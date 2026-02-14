@@ -92,6 +92,7 @@ class RuleSet(BaseModel):
     shield_name: str
     version: int
     rules: list[RuleConfig]
+    default_verdict: Verdict = Verdict.ALLOW
 
     def enabled_rules(self) -> list[RuleConfig]:
         """Return only rules with enabled=True."""
@@ -107,6 +108,16 @@ class PIIMatch(BaseModel):
     field: str
     span: tuple[int, int]
     masked_value: str
+
+
+class PostCheckResult(BaseModel):
+    """Result of post-call output scanning."""
+
+    model_config = ConfigDict(frozen=True)
+
+    pii_matches: list[PIIMatch] = []
+    redacted_output: str | None = None
+    session_tainted: bool = False
 
 
 class ShieldResult(BaseModel):

@@ -5,6 +5,8 @@ import json
 import pytest
 
 from policyshield.core.models import (
+    PIIType,
+    PostCheckResult,
     RuleConfig,
     RuleSet,
     ShieldMode,
@@ -14,8 +16,8 @@ from policyshield.shield.engine import ShieldEngine
 from policyshield.trace.recorder import TraceRecorder
 
 
-def make_ruleset(rules: list[RuleConfig]) -> RuleSet:
-    return RuleSet(shield_name="test", version=1, rules=rules)
+def make_ruleset(rules: list[RuleConfig], **kwargs) -> RuleSet:
+    return RuleSet(shield_name="test", version=1, rules=rules, **kwargs)
 
 
 @pytest.fixture
@@ -223,15 +225,162 @@ rules:
     def test_post_check(self, block_exec_rules):
         engine = ShieldEngine(block_exec_rules)
         result = engine.post_check("exec", {"output": "done"})
-        assert result.verdict == Verdict.ALLOW
+        assert isinstance(result, PostCheckResult)
+        assert result.pii_matches == []
+        assert result.session_tainted is False
 
     def test_post_check_string_pii(self, block_exec_rules):
         """post_check on string with email → pii_matches contains EMAIL."""
         engine = ShieldEngine(block_exec_rules)
         result = engine.post_check("exec", "Contact: test@example.com today")
-        assert result.verdict == Verdict.ALLOW
+        assert isinstance(result, PostCheckResult)
         assert len(result.pii_matches) > 0
-        from policyshield.core.models import PIIType
-
         pii_types = {m.pii_type for m in result.pii_matches}
         assert PIIType.EMAIL in pii_types
+        assert result.redacted_output is not None
+        assert "test@example.com" not in result.redacted_output
+
+
+class TestDefaultVerdict:
+    """Tests for default_verdict (zero-trust default)."""
+
+    def test_default_verdict_block_unmatched_tool(self):
+        """Unmatched tool should BLOCK when default_verdict is BLOCK."""
+        rules = make_ruleset(
+            [RuleConfig(id="r1", when={"tool": "exec"}, then=Verdict.BLOCK)],
+            default_verdict=Verdict.BLOCK,
+        )
+        engine = ShieldEngine(rules)
+        result = engine.check("unknown_tool", {"arg": "val"})
+        assert result.verdict == Verdict.BLOCK
+        assert result.rule_id == "__default__"
+        assert "Default policy" in result.message
+
+    def test_default_verdict_allow_unmatched_tool(self):
+        """Unmatched tool should ALLOW when default_verdict is ALLOW (legacy)."""
+        rules = make_ruleset(
+            [RuleConfig(id="r1", when={"tool": "exec"}, then=Verdict.BLOCK)],
+            default_verdict=Verdict.ALLOW,
+        )
+        engine = ShieldEngine(rules)
+        result = engine.check("unknown_tool", {"arg": "val"})
+        assert result.verdict == Verdict.ALLOW
+
+    def test_default_verdict_from_yaml(self, tmp_path):
+        """Parser reads default_verdict from YAML."""
+        yaml_file = tmp_path / "rules.yaml"
+        yaml_file.write_text("""\
+shield_name: test
+version: 1
+default_verdict: BLOCK
+rules:
+  - id: r1
+    when:
+      tool: exec
+    then: ALLOW
+""")
+        engine = ShieldEngine(str(yaml_file))
+        # exec matches rule → ALLOW
+        assert engine.check("exec").verdict == Verdict.ALLOW
+        # unknown tool → default_verdict → BLOCK
+        result = engine.check("unknown_tool")
+        assert result.verdict == Verdict.BLOCK
+        assert result.rule_id == "__default__"
+
+
+class TestPostCheckResult:
+    """Tests for PostCheckResult structured return."""
+
+    def test_post_check_returns_post_check_result(self):
+        """post_check returns PostCheckResult, not ShieldResult."""
+        rules = make_ruleset([RuleConfig(id="r1", when={"tool": "x"}, then=Verdict.BLOCK)])
+        engine = ShieldEngine(rules)
+        result = engine.post_check("x", "no pii here")
+        assert isinstance(result, PostCheckResult)
+        assert result.pii_matches == []
+        assert result.redacted_output is None
+        assert result.session_tainted is False
+
+    def test_post_check_redacted_output(self):
+        """post_check redacts PII and populates redacted_output."""
+        rules = make_ruleset([RuleConfig(id="r1", when={"tool": "x"}, then=Verdict.BLOCK)])
+        engine = ShieldEngine(rules)
+        result = engine.post_check("x", "Send to user@corp.com please")
+        assert isinstance(result, PostCheckResult)
+        assert len(result.pii_matches) > 0
+        assert result.redacted_output is not None
+        assert "user@corp.com" not in result.redacted_output
+        assert result.session_tainted is True
+
+    def test_post_check_dict_input(self):
+        """post_check handles dict input with PII."""
+        rules = make_ruleset([RuleConfig(id="r1", when={"tool": "x"}, then=Verdict.BLOCK)])
+        engine = ShieldEngine(rules)
+        result = engine.post_check("x", {"email": "user@corp.com", "data": "clean"})
+        assert isinstance(result, PostCheckResult)
+        assert len(result.pii_matches) > 0
+        assert result.session_tainted is True
+
+
+class TestMatcherErrorHandling:
+    """Tests for matcher error handling (fail-open / fail-closed)."""
+
+    def test_matcher_error_fail_closed(self):
+        """Matcher error with fail_open=False → BLOCK."""
+        rules = make_ruleset([RuleConfig(id="r1", when={"tool": "test"}, then=Verdict.ALLOW)])
+        engine = ShieldEngine(rules, fail_open=False)
+
+        # Monkey-patch matcher to throw
+        engine._matcher.find_best_match = lambda **kw: (_ for _ in ()).throw(
+            RuntimeError("matcher crash")
+        )
+
+        result = engine.check("test", {"data": "val"})
+        assert result.verdict == Verdict.BLOCK
+        assert result.rule_id == "__error__"
+        assert "matcher crash" in result.message
+
+    def test_matcher_error_fail_open(self):
+        """Matcher error with fail_open=True → ALLOW."""
+        rules = make_ruleset([RuleConfig(id="r1", when={"tool": "test"}, then=Verdict.ALLOW)])
+        engine = ShieldEngine(rules, fail_open=True)
+
+        # Monkey-patch matcher to throw
+        engine._matcher.find_best_match = lambda **kw: (_ for _ in ()).throw(
+            RuntimeError("matcher crash")
+        )
+
+        result = engine.check("test", {"data": "val"})
+        assert result.verdict == Verdict.ALLOW
+
+
+class TestPolicySummary:
+    """Tests for get_policy_summary."""
+
+    def test_get_policy_summary(self):
+        """get_policy_summary returns formatted string."""
+        rules = make_ruleset(
+            [
+                RuleConfig(
+                    id="block-exec",
+                    description="Block exec calls",
+                    when={"tool": "exec"},
+                    then=Verdict.BLOCK,
+                    message="exec is not allowed",
+                ),
+                RuleConfig(
+                    id="allow-read",
+                    description="Allow file reads",
+                    when={"tool": "read_file"},
+                    then=Verdict.ALLOW,
+                ),
+            ],
+            default_verdict=Verdict.BLOCK,
+        )
+        engine = ShieldEngine(rules)
+        summary = engine.get_policy_summary()
+        assert "test" in summary
+        assert "BLOCK" in summary
+        assert "block-exec" in summary
+        assert "allow-read" in summary
+        assert "Rules: 2" in summary

@@ -9,7 +9,7 @@ from typing import Any
 from policyshield.approval.base import ApprovalRequest
 from policyshield.approval.cache import ApprovalStrategy
 from policyshield.core.exceptions import PolicyShieldError
-from policyshield.core.models import ShieldMode, ShieldResult, Verdict
+from policyshield.core.models import PostCheckResult, ShieldMode, ShieldResult, Verdict
 from policyshield.shield.base_engine import BaseShieldEngine, logger
 
 
@@ -103,15 +103,32 @@ class AsyncShieldEngine(BaseShieldEngine):
         session_state = self._build_session_state(session_id)
 
         # Offload CPU-bound matching to thread
-        match = await asyncio.to_thread(
-            self._matcher.find_best_match,
-            tool_name=tool_name,
-            args=args,
-            session_state=session_state,
-            sender=sender,
-        )
+        try:
+            match = await asyncio.to_thread(
+                self._matcher.find_best_match,
+                tool_name=tool_name,
+                args=args,
+                session_state=session_state,
+                sender=sender,
+            )
+        except Exception as e:
+            logger.error("Matcher error: %s", e)
+            if self._fail_open:
+                return self._verdict_builder.allow(args=args)
+            return ShieldResult(
+                verdict=Verdict.BLOCK,
+                rule_id="__error__",
+                message=f"Internal error: {e}",
+            )
 
         if match is None:
+            default = self._rule_set.default_verdict
+            if default == Verdict.BLOCK:
+                return ShieldResult(
+                    verdict=Verdict.BLOCK,
+                    rule_id="__default__",
+                    message="No matching rule. Default policy: BLOCK.",
+                )
             return self._verdict_builder.allow(args=args)
 
         rule = match.rule
@@ -225,7 +242,7 @@ class AsyncShieldEngine(BaseShieldEngine):
         tool_name: str,
         result: Any,
         session_id: str = "default",
-    ) -> ShieldResult:
+    ) -> PostCheckResult:
         """Async post-call check on tool output (for PII in results).
 
         Args:
@@ -234,14 +251,8 @@ class AsyncShieldEngine(BaseShieldEngine):
             session_id: Session identifier.
 
         Returns:
-            ShieldResult (currently always ALLOW).
+            PostCheckResult with PII matches and optional redacted output.
         """
-        if self._mode == ShieldMode.DISABLED:
-            return self._verdict_builder.allow()
-
-        if isinstance(result, dict):
-            pii_matches = await asyncio.to_thread(self._pii.scan_dict, result)
-            for pm in pii_matches:
-                self._session_mgr.add_taint(session_id, pm.pii_type)
-
-        return self._verdict_builder.allow()
+        return await asyncio.to_thread(
+            self._post_check_sync, tool_name, result, session_id
+        )

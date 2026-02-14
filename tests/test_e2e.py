@@ -150,7 +150,9 @@ class TestPostCallPIIScan:
             {"content": "File content: SSN 123-45-6789"},
             session_id=session_id,
         )
-        assert post_result.verdict == Verdict.ALLOW  # Post-check currently always allows
+        from policyshield.core.models import PostCheckResult
+
+        assert isinstance(post_result, PostCheckResult)
 
 
 class TestAuditMode:
