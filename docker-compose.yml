@@ -26,13 +26,13 @@ services:
     ports:
       - "8100:8100"
     volumes:
-      - ./rules.yaml:/app/rules.yaml:ro
+      - ./policies/:/app/rules/:ro
     environment:
       POLICYSHIELD_MODE: enforce
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8100/api/v1/health')"]
-      interval: 30s
+      test: ["CMD", "curl", "-f", "http://localhost:8100/api/v1/health"]
+      interval: 10s
       timeout: 3s
-      start_period: 5s
+      retries: 3
 
