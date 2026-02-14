@@ -8,20 +8,27 @@ pip install "policyshield[langchain]"
 
 ## Usage
 
-```python
-from langchain.agents import AgentExecutor
-from policyshield.integrations.langchain import PolicyShieldCallbackHandler
+Wrap individual tools with `PolicyShieldTool`:
 
-handler = PolicyShieldCallbackHandler.from_yaml("policies/rules.yaml")
-agent = AgentExecutor(agent=..., tools=..., callbacks=[handler])
+```python
+from policyshield.shield.engine import ShieldEngine
+from policyshield.integrations.langchain import PolicyShieldTool, shield_all_tools
+
+engine = ShieldEngine(rules="policies/rules.yaml")
+
+# Wrap a single tool
+safe_tool = PolicyShieldTool(wrapped_tool=my_tool, engine=engine)
+
+# Or wrap all tools at once
+safe_tools = shield_all_tools([tool1, tool2, tool3], engine)
 ```
 
-## Configuration
+Use with an agent:
 
 ```python
-handler = PolicyShieldCallbackHandler.from_yaml(
-    "policies/rules.yaml",
-    mode="ENFORCE",
-    fail_open=True,
-)
+from langchain.agents import AgentExecutor
+
+agent = AgentExecutor(agent=my_agent, tools=safe_tools)
+result = agent.invoke({"input": "Delete all files"})
+# PolicyShield will block destructive tool calls based on your rules
 ```

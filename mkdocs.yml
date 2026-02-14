@@ -40,6 +40,7 @@ nav:
     - CLI Reference: guides/cli.md
     - Presets: guides/presets.md
   - Integrations:
+    - OpenClaw: integrations/openclaw.md
     - LangChain: integrations/langchain.md
     - CrewAI: integrations/crewai.md
     - FastAPI: integrations/fastapi.md

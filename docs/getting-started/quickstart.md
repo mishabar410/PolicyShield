@@ -47,15 +47,37 @@ policyshield test tests/
 ## 5. Use in your agent
 
 ```python
-from policyshield import ShieldEngine
+from policyshield.shield.engine import ShieldEngine
 
-engine = ShieldEngine.from_yaml("policies/rules.yaml")
-verdict = engine.evaluate(tool="exec", args={"command": "rm -rf /"})
-print(verdict)  # Verdict.BLOCK
+engine = ShieldEngine(rules="policies/rules.yaml")
+
+# Check a tool call
+result = engine.check("exec", {"command": "rm -rf /"})
+print(result.verdict)  # Verdict.BLOCK
+print(result.message)  # "Destructive shell commands are not allowed."
+
+# Safe calls pass through
+result = engine.check("web_search", {"query": "best restaurants"})
+print(result.verdict)  # Verdict.ALLOW
+```
+
+## 6. Or start the HTTP server
+
+```bash
+pip install "policyshield[server]"
+policyshield server --rules policies/rules.yaml --port 8100
+```
+
+```bash
+curl -X POST http://localhost:8100/api/v1/check \
+  -H "Content-Type: application/json" \
+  -d '{"tool": "exec", "args": {"command": "rm -rf /"}}'
+# → {"verdict": "BLOCK", "message": "Destructive shell commands are not allowed."}
 ```
 
 ## Next steps
 
 - [Writing Rules](../guides/writing-rules.md)
 - [CLI Reference](../guides/cli.md)
-- [Integrations](../integrations/langchain.md)
+- [OpenClaw Integration](../integrations/openclaw.md)
+- [Presets](../guides/presets.md)

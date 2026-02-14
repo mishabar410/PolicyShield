@@ -6,7 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![CI](https://github.com/mishabar410/PolicyShield/actions/workflows/ci.yml/badge.svg)](https://github.com/mishabar410/PolicyShield/actions/workflows/ci.yml)
 [![Docs](https://img.shields.io/badge/docs-mkdocs-blue.svg)](https://mishabar410.github.io/PolicyShield/)
-[![Coverage: 92%](https://img.shields.io/badge/coverage-92%25-brightgreen.svg)](#development)
+[![Coverage: 85%](https://img.shields.io/badge/coverage-85%25-brightgreen.svg)](#development)
 
 **Declarative firewall for AI agent tool calls.**
 
@@ -29,6 +29,9 @@ LLM calls web_fetch(url="...?email=john@corp.com")
 
 ```bash
 pip install policyshield
+
+# With HTTP server (for OpenClaw and other integrations)
+pip install "policyshield[server]"
 ```
 
 Or from source:
@@ -36,7 +39,7 @@ Or from source:
 ```bash
 git clone https://github.com/mishabar410/PolicyShield.git
 cd PolicyShield
-pip install -e ".[dev]"
+pip install -e ".[dev,server]"
 ```
 
 ---
@@ -65,9 +68,9 @@ rules:
 **Step 2.** Use in Python:
 
 ```python
-from policyshield.shield import ShieldEngine
+from policyshield.shield.engine import ShieldEngine
 
-engine = ShieldEngine("rules.yaml")
+engine = ShieldEngine(rules="rules.yaml")
 
 # This will be blocked:
 result = engine.check("delete_file", {"path": "/data"})
@@ -93,6 +96,69 @@ Or scaffold a full project:
 policyshield init --preset security --no-interactive
 ```
 
+---
+
+## OpenClaw Integration
+
+PolicyShield integrates natively with [OpenClaw](https://github.com/AgenturAI/OpenClaw) as a plugin:
+
+### 1. Start the PolicyShield server
+
+```bash
+pip install "policyshield[server]"
+policyshield server --rules ./rules.yaml --port 8100
+```
+
+### 2. Install the OpenClaw plugin
+
+```bash
+openclaw plugin install openclaw-plugin-policyshield
+```
+
+### 3. Configure in `openclaw.yaml`
+
+```yaml
+plugins:
+  policyshield:
+    url: http://localhost:8100
+    mode: enforce        # enforce | audit | disabled
+    fail_open: true      # allow calls when server is unreachable
+    timeout_ms: 5000
+```
+
+### 4. Generate rules for OpenClaw
+
+```bash
+policyshield init --preset openclaw
+```
+
+This generates 11 security rules covering destructive commands, PII redaction, sensitive path protection, and rate limiting.
+
+---
+
+## HTTP Server
+
+PolicyShield ships with a built-in HTTP API for framework-agnostic integration:
+
+```bash
+policyshield server --rules ./rules.yaml --port 8100 --mode enforce
+```
+
+### Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/v1/check` | POST | Pre-call policy check (ALLOW/BLOCK/REDACT/APPROVE) |
+| `/api/v1/post-check` | POST | Post-call PII scanning on tool output |
+| `/api/v1/health` | GET | Health check with rules count and mode |
+| `/api/v1/constraints` | GET | Human-readable policy summary for LLM context |
+
+### Docker
+
+```bash
+docker build -f Dockerfile.server -t policyshield-server .
+docker run -p 8100:8100 -v ./rules.yaml:/app/rules.yaml policyshield-server
+```
 
 ---
 
@@ -122,6 +188,15 @@ rules:
     then: approve
     approval_strategy: per_rule
 
+  # Session-based conditions
+  - id: rate-limit-exec
+    when:
+      tool: exec
+      session:
+        tool_count.exec: { gt: 60 }
+    then: block
+    message: "exec rate limit exceeded"
+
 # Rate limiting
 rate_limits:
   - tool: web_fetch
@@ -145,6 +220,8 @@ pii_patterns:
 |----------|-------------|
 | **YAML DSL** | Declarative rules with regex, glob, exact match, session conditions |
 | **Verdicts** | `ALLOW` · `BLOCK` · `REDACT` · `APPROVE` (human-in-the-loop) |
+| **HTTP Server** | FastAPI server with check, post-check, health, and constraints endpoints |
+| **OpenClaw Plugin** | Native plugin with before/after hooks and policy injection |
 | **PII Detection** | EMAIL, PHONE, CREDIT_CARD, SSN, IBAN, IP, PASSPORT, DOB + custom patterns |
 | **Async Engine** | Full `async`/`await` support for FastAPI, aiohttp, async agents |
 | **Approval Flow** | InMemory, CLI, Telegram, and Webhook backends with caching strategies |
@@ -159,6 +236,7 @@ pii_patterns:
 | **Prometheus** | `/metrics` endpoint with per-tool and PII labels + Grafana preset |
 | **Rule Testing** | YAML test cases for policies (`policyshield test`) |
 | **Rule Linter** | Static analysis: duplicates, broad patterns, missing messages, conflicts |
+| **Docker** | Container-ready with Dockerfile.server and docker-compose |
 
 ---
 
@@ -190,6 +268,9 @@ policyshield validate ./policies/          # Validate rules
 policyshield lint ./policies/rules.yaml    # Static analysis (6 checks)
 policyshield test ./policies/              # Run YAML test cases
 
+policyshield server --rules ./rules.yaml   # Start HTTP server
+policyshield server --rules ./rules.yaml --port 8100 --mode audit
+
 policyshield trace show ./traces/trace.jsonl
 policyshield trace violations ./traces/trace.jsonl
 policyshield trace stats --dir ./traces/ --format json
@@ -201,7 +282,7 @@ policyshield trace export ./traces/trace.jsonl -f html
 policyshield trace dashboard --port 8000 --prometheus
 
 # Initialize a new project
-policyshield init --preset security --no-interactive
+policyshield init --preset openclaw --no-interactive
 ```
 
 ---
@@ -209,6 +290,10 @@ policyshield init --preset security --no-interactive
 ## Docker
 
 ```bash
+# Run the HTTP server
+docker build -f Dockerfile.server -t policyshield-server .
+docker run -p 8100:8100 -v ./rules:/app/rules policyshield-server
+
 # Validate rules
 docker compose run policyshield validate policies/
 
@@ -227,6 +312,7 @@ docker compose run test
 |---------|-------------|
 | [`langchain_demo.py`](examples/langchain_demo.py) | LangChain tool wrapping |
 | [`async_demo.py`](examples/async_demo.py) | Async engine usage |
+| [`openclaw_rules.yaml`](examples/openclaw_rules.yaml) | OpenClaw preset rules (11 rules) |
 | [`policies/`](examples/policies/) | Production-ready rule sets (security, compliance, full) |
 
 ---
@@ -237,9 +323,9 @@ docker compose run test
 git clone https://github.com/mishabar410/PolicyShield.git
 cd PolicyShield
 python -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev,langchain]"
+pip install -e ".[dev,server]"
 
-pytest tests/ -v                 # 690+ tests
+pytest tests/ -v                 # 700+ tests
 ruff check policyshield/ tests/  # Lint
 ruff format --check policyshield/ tests/  # Format check
 ```
@@ -255,12 +341,12 @@ ruff format --check policyshield/ tests/  # Format check
 | **v0.1** | ✅ Core: YAML DSL, verdicts, PII, trace, CLI |
 | **v0.2** | ✅ Linter, hot reload, rate limiter, approval flow, LangChain |
 | **v0.3** | ✅ Async engine, CrewAI, OTel, webhooks, rule testing, policy diff |
-| **v0.4** | ✅ *(removed nanobot integration)* |
-| **v0.5** | ✅ DX: PyPI publish, docs site, GitHub Action, Docker, CLI init |
+| **v0.4** | ✅ Post-call PII scan, context enrichment, definition filtering |
+| **v0.5** | ✅ PyPI, docs site, GitHub Action, Docker, CLI init |
 | **v0.6** | ✅ Observability: trace search, cost estimator, alerts, dashboard, Grafana |
-| **v1.0** | 📋 Stable API, performance benchmarks, multi-tenant |
+| **v1.0** | ✅ HTTP server, OpenClaw plugin, engine hardening, benchmarks |
 
-See [ROADMAP.md](ROADMAP.md) for the full roadmap including v0.7–v1.0 and future ideas.
+See [ROADMAP.md](ROADMAP.md) for the full roadmap.
 
 ---
 

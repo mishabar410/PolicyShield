@@ -1,6 +1,6 @@
 # Presets
 
-PolicyShield includes three built-in presets for common use cases.
+PolicyShield includes four built-in presets for common use cases.
 
 ## Minimal
 
@@ -34,6 +34,22 @@ Compliance-focused rules including:
 
 ```bash
 policyshield init --preset compliance
+```
+
+## OpenClaw
+
+Rules specifically designed for [OpenClaw](https://github.com/AgenturAI/OpenClaw) integration. Includes 11 rules covering:
+
+- Block destructive shell commands (`rm -rf`, `mkfs`, etc.)
+- Redact PII in web requests, messages, and search
+- Block access to sensitive paths (`/etc/shadow`, SSH keys)
+- Approve file deletion operations
+- Rate-limit exec tool (60 calls per session)
+- Rate-limit web fetch (10 calls per minute)
+- Block subdomain enumeration
+
+```bash
+policyshield init --preset openclaw
 ```
 
 ## Custom presets

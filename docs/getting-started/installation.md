@@ -9,6 +9,9 @@ pip install policyshield
 ## With optional extras
 
 ```bash
+# HTTP server (OpenClaw integration, REST API)
+pip install "policyshield[server]"
+
 # LangChain integration
 pip install "policyshield[langchain]"
 
@@ -17,9 +20,6 @@ pip install "policyshield[crewai]"
 
 # OpenTelemetry tracing
 pip install "policyshield[otel]"
-
-# Documentation tools
-pip install "policyshield[docs]"
 
 # Development tools
 pip install "policyshield[dev]"
@@ -33,7 +33,7 @@ pip install "policyshield[all]"
 ```bash
 git clone https://github.com/mishabar410/PolicyShield.git
 cd PolicyShield
-pip install -e ".[dev]"
+pip install -e ".[dev,server]"
 ```
 
 ## Verify installation

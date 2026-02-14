@@ -1,5 +1,35 @@
 # Changelog
 
+## [1.0.0] - 2025-02-14
+
+### Added
+- **HTTP Server**: `policyshield server` — FastAPI HTTP API for framework-agnostic integration
+  - POST `/api/v1/check` — pre-call policy check (ALLOW/BLOCK/REDACT/APPROVE)
+  - POST `/api/v1/post-check` — post-call output PII scanning
+  - GET `/api/v1/health` — health check with rules count and mode
+  - GET `/api/v1/constraints` — human-readable policy summary for LLM context
+- **OpenClaw Plugin**: `openclaw-plugin-policyshield` npm package
+  - `before_tool_call` hook: block/redact/approve enforcement
+  - `after_tool_call` hook: output PII audit trail
+  - `before_agent_start` hook: policy constraint injection into system prompt
+  - Configurable via `openclaw.yaml`: url, mode, fail_open, timeout_ms
+  - Graceful degradation when server is unreachable
+- **OpenClaw Preset**: `policyshield init --preset openclaw` — 11 ready-to-use rules
+- **Zero-Trust Mode**: `default_verdict: block` in YAML rules
+- **PostCheckResult**: Structured response with redacted output for post-call scanning
+- **Engine Hardening**: fail_open/fail_closed error handling, `get_policy_summary()` API
+- **Docker Server**: `Dockerfile.server` with health check for containerized deployment
+- **Benchmarks**: p99 latency verification (< 10ms target)
+- **E2E Tests**: 12 Python E2E tests + 4 TypeScript plugin E2E tests
+- New optional dependency: `policyshield[server]` (FastAPI + uvicorn)
+- 700+ tests, 85% coverage
+
+### Changed
+- Development Status classifier: Beta → Production/Stable
+
+### Removed
+- Nanobot integration (removed in v0.4, cleaned from all docs)
+
 ## [0.6.0] - 2025-02-13
 
 ### Added

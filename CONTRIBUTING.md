@@ -8,7 +8,7 @@ Thanks for your interest in PolicyShield! Here's how to get started.
 git clone https://github.com/mishabar410/PolicyShield.git
 cd PolicyShield
 python -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev,langchain]"
+pip install -e ".[dev,server]"
 ```
 
 ## Development Workflow
@@ -45,11 +45,12 @@ pytest tests/ --cov=policyshield --cov-report=term-missing
 policyshield/
 ├── core/          # Data models, YAML parser
 ├── shield/        # ShieldEngine, PII detector, matcher
+├── server/        # FastAPI HTTP server (check, post-check, health, constraints)
 ├── approval/      # Approval backends (CLI, Telegram, Webhook)
-├── integrations/  # LangChain, CrewAI, Nanobot adapters
+├── integrations/  # LangChain, CrewAI adapters
 ├── trace/         # JSONL recorder, OpenTelemetry exporter
 ├── lint/          # Rule linter
-├── cli/           # CLI commands (validate, lint, test, init, nanobot)
+├── cli/           # CLI commands (validate, lint, test, init, server)
 └── config/        # Config file loader, JSON schema
 ```
 

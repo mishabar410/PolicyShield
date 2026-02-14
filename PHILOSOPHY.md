@@ -157,7 +157,7 @@ The mode is also explicit:
 
 The PolicyShield engine is a pure function: `check(tool_name, args, session_id, sender) → ShieldResult`. It has no dependency on any agent framework.
 
-Integration with specific frameworks (nanobot, OpenClaw, LangChain, CrewAI) is done through thin adapters that:
+Integration with specific frameworks (OpenClaw, LangChain, CrewAI) is done through thin adapters that:
 
 1. Intercept tool calls in the framework's execution path
 2. Call the engine
@@ -305,7 +305,7 @@ Every agent framework integration follows the same pattern:
 ```
 ┌────────────────────────────────────┐
 │          Agent Framework           │
-│  (OpenClaw, nanobot, LangChain)    │
+│  (OpenClaw, LangChain, CrewAI)     │
 │                                    │
 │   LLM → tool_call(name, args)      │
 │              │                     │

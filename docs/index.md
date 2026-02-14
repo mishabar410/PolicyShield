@@ -10,9 +10,11 @@ PolicyShield lets you define YAML rules that control what tools an AI agent can 
 - 🔍 **PII detection** — Built-in redaction for sensitive data
 - ✅ **Approval flows** — Human-in-the-loop for risky operations
 - 📊 **Tracing** — Full audit trail of every tool call
-- 🔌 **Integrations** — LangChain, CrewAI, FastAPI
+- 🌐 **HTTP Server** — Framework-agnostic REST API for tool call policy enforcement
+- 🔌 **OpenClaw Plugin** — Native plugin with before/after hooks
+- 🔗 **Integrations** — LangChain, CrewAI
 - 🧪 **Testing** — Validate rules before deployment
-- 🚀 **CLI** — Scaffold, validate, lint, test from the command line
+- 🚀 **CLI** — Scaffold, validate, lint, test, serve from the command line
 
 ## Quick Start
 
@@ -25,8 +27,9 @@ policyshield init --preset security --no-interactive
 # Validate your rules
 policyshield validate policies/
 
-# Lint for best practices
-policyshield lint policies/rules.yaml
+# Start the HTTP server
+pip install "policyshield[server]"
+policyshield server --rules policies/rules.yaml --port 8100
 ```
 
 ## How It Works
@@ -45,9 +48,18 @@ rules:
     message: "File deletion is not allowed."
 ```
 
+```python
+from policyshield.shield.engine import ShieldEngine
+
+engine = ShieldEngine(rules="policies/rules.yaml")
+result = engine.check("delete_file", {"path": "/data"})
+print(result.verdict)  # Verdict.BLOCK
+```
+
 ## Next Steps
 
 - [Installation](getting-started/installation.md)
 - [Quick Start Guide](getting-started/quickstart.md)
 - [Writing Rules](guides/writing-rules.md)
+- [OpenClaw Integration](integrations/openclaw.md)
 - [API Reference](api/core.md)

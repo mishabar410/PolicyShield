@@ -27,7 +27,7 @@ No agent code changes required. Works with any Python agent framework.
 |-----------|--------------|
 | **Declarative** | Security policies live in YAML, not in application code |
 | **Zero-trust tools** | Every call is checked; nothing is implicitly allowed |
-| **Framework-agnostic** | Standalone engine + adapters for nanobot, LangChain, CrewAI, and more |
+| **Framework-agnostic** | Standalone engine + adapters for OpenClaw, LangChain, CrewAI, and more |
 | **Non-invasive** | Monkey-patch or wrap — never fork the agent framework |
 | **Observable** | Every decision is traced, exported, and queryable |
 | **Testable** | Policies have their own test suite (`policyshield test`) |
@@ -36,7 +36,7 @@ No agent code changes required. Works with any Python agent framework.
 
 ```
 ┌──────────────────────────────────────────────────┐
-│  Agent Framework (nanobot / LangChain / custom)  │
+│  Agent Framework (OpenClaw / LangChain / custom)  │
 └───────────────────────┬──────────────────────────┘
                         │ tool call
                         ▼
@@ -80,6 +80,6 @@ No agent code changes required. Works with any Python agent framework.
 
 ## Status
 
-PolicyShield is at **v0.4** (Alpha). The core engine is stable, integrations are working, and we're heading toward a v1.0 stable release.
+PolicyShield is at **v1.0** (Stable). The core engine is production-ready with HTTP server, OpenClaw plugin, 700+ tests, and 85% coverage.
 
-See [ROADMAP.md](ROADMAP.md) for what's next.
+See [ROADMAP.md](ROADMAP.md) for future ideas.
