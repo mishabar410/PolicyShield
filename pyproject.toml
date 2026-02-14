@@ -43,6 +43,10 @@ dashboard = [
     "uvicorn[standard]>=0.20",
     "websockets>=11.0",
 ]
+server = [
+    "fastapi>=0.100",
+    "uvicorn[standard]>=0.20",
+]
 prometheus = [
     "prometheus-client>=0.17",
 ]
