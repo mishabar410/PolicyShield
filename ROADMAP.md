@@ -57,15 +57,24 @@
 - Dashboard frontend: dark-themed SPA
 - Prometheus exporter + Grafana preset
 
-### v1.0 — HTTP Server & OpenClaw ✅
-- HTTP Server: `policyshield server` with FastAPI (check, post-check, health, constraints)
-- OpenClaw Plugin: native TypeScript plugin with before/after hooks
-- OpenClaw Preset: `policyshield init --preset openclaw` (11 rules)
-- Zero-trust mode: `default_verdict: block`
-- Engine hardening: fail_open/fail_closed, `get_policy_summary()` API
-- Docker server: `Dockerfile.server` with health check
-- Benchmarks: p99 < 10ms verified
-- 700+ tests, 85% coverage
+### v0.7 — Audit Fixes & Plugin Compliance ✅ (current)
+- Async engine in HTTP server (no event loop blocking)
+- Server hot-reload with `/api/v1/reload` endpoint
+- OpenClaw Plugin rewritten for real `api.on()` API
+- APPROVE flow with human-in-the-loop polling
+- Benchmark CI gate (p99 < 5ms sync, < 10ms async)
+- Repo cleanup (docker paths, vendored docs)
+- 290+ tests, 85% coverage
+
+## Next
+
+### v1.0 — Production Release (planned)
+- OpenClaw plugin published to npm
+- E2E integration test suite (plugin ↔ server ↔ engine)
+- Schema versioning for rule format
+- Backward compatibility tests for rules
+- Production deployment guide
+- Security audit
 
 ---
 

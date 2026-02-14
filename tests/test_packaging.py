@@ -96,3 +96,63 @@ class TestPackageFiles:
         data = _load_pyproject()
         classifiers = data["project"].get("classifiers", [])
         assert any("Typed" in c for c in classifiers)
+
+
+class TestV07VersionSync:
+    """Tests for v0.7 release version consistency."""
+
+    def test_version_is_0_7_0(self):
+        from policyshield import __version__
+
+        assert __version__ == "0.7.0"
+
+    def test_pyproject_version_matches_init(self):
+        from policyshield import __version__
+
+        data = _load_pyproject()
+        assert data["project"]["version"] == __version__
+
+    def test_changelog_exists(self):
+        assert (ROOT / "CHANGELOG.md").exists()
+
+    def test_changelog_has_current_version(self):
+        content = (ROOT / "CHANGELOG.md").read_text()
+        assert "[0.7.0]" in content
+
+    def test_server_app_uses_dynamic_version(self):
+        import importlib
+
+        fastapi = importlib.util.find_spec("fastapi")
+        if fastapi is None:
+            import pytest
+
+            pytest.skip("fastapi not installed")
+
+        from policyshield import __version__
+        from policyshield.core.models import RuleConfig, RuleSet, Verdict
+        from policyshield.server.app import create_app
+        from policyshield.shield.async_engine import AsyncShieldEngine
+
+        rules = RuleSet(
+            shield_name="test",
+            version=1,
+            rules=[
+                RuleConfig(id="t", when={"tool": "x"}, then=Verdict.ALLOW),
+            ],
+        )
+        engine = AsyncShieldEngine(rules)
+        app = create_app(engine)
+        assert app.version == __version__
+
+    def test_plugin_version_matches(self):
+        import json
+
+        pkg = ROOT / "plugins" / "openclaw" / "package.json"
+        if not pkg.exists():
+            import pytest
+
+            pytest.skip("plugin package.json not found")
+
+        data = json.loads(pkg.read_text())
+        assert data["version"] == "0.7.0"
+

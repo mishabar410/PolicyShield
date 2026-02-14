@@ -1,6 +1,6 @@
 {
     "name": "openclaw-plugin-policyshield",
-    "version": "0.1.0",
+    "version": "0.7.0",
     "description": "PolicyShield plugin for OpenClaw — runtime tool call policy enforcement",
     "main": "dist/index.js",
     "types": "dist/index.d.ts",

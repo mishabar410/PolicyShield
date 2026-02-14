@@ -7,6 +7,8 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from policyshield import __version__
+
 from policyshield.server.models import (
     ApprovalStatusRequest,
     ApprovalStatusResponse,
@@ -50,7 +52,7 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
         if enable_watcher:
             engine.stop_watching()
 
-    app = FastAPI(title="PolicyShield", version="1.0.0", lifespan=lifespan)
+    app = FastAPI(title="PolicyShield", version=__version__, lifespan=lifespan)
 
     @app.post("/api/v1/check", response_model=CheckResponse)
     async def check(req: CheckRequest) -> CheckResponse:

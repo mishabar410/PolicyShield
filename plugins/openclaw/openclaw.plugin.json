@@ -2,7 +2,7 @@
     "id": "policyshield",
     "name": "PolicyShield",
     "description": "Runtime policy enforcement for AI agent tool calls — block, redact, audit",
-    "version": "0.1.0",
+    "version": "0.7.0",
     "configSchema": {
         "type": "object",
         "properties": {
