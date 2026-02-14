@@ -4,7 +4,38 @@ import type { PluginConfig } from "./types.js";
 export { PolicyShieldClient } from "./client.js";
 
 export default function register(ctx: { config: PluginConfig }) {
-    const client = new PolicyShieldClient(ctx.config);
+    const config = ctx.config ?? {};
+
+    // Config validation
+    if (config.url && typeof config.url !== "string") {
+        console.error("[policyshield] Invalid config: url must be a string");
+    }
+    if (
+        config.timeout_ms &&
+        (config.timeout_ms < 100 || config.timeout_ms > 30000)
+    ) {
+        console.warn("[policyshield] timeout_ms should be between 100 and 30000");
+    }
+
+    const client = new PolicyShieldClient(config);
+
+    // Async startup check (non-blocking)
+    client
+        .healthCheck()
+        .then((ok: boolean) => {
+            if (ok) {
+                console.log("[policyshield] ✓ Connected to PolicyShield server");
+            } else {
+                console.warn(
+                    "[policyshield] ⚠ PolicyShield server unreachable — running in degraded mode",
+                );
+            }
+        })
+        .catch(() => {
+            console.warn(
+                "[policyshield] ⚠ PolicyShield server unreachable — running in degraded mode",
+            );
+        });
 
     return {
         hooks: [
