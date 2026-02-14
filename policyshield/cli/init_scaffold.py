@@ -180,7 +180,6 @@ _COMPLIANCE_RULES: list[dict[str, Any]] = [
 ]
 
 
-
 def _get_preset_rules(preset: str) -> list[dict[str, Any]]:
     """Return rules for the given preset name."""
     presets = {
@@ -398,8 +397,6 @@ def _ask_preset(default: str) -> str:
     except (EOFError, KeyboardInterrupt):
         print()
         return default
-
-
 
 
 def _ask_trace() -> bool:

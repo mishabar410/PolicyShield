@@ -225,7 +225,6 @@ async def test_async_pii_detection():
 # ── Test 9: post_check returns ALLOW ─────────────────────────────────
 
 
-
 @pytest.mark.asyncio
 async def test_async_post_check(block_exec_rules):
     engine = AsyncShieldEngine(block_exec_rules)

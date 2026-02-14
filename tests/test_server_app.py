@@ -1,11 +1,14 @@
 """Tests for PolicyShield HTTP server (FastAPI app)."""
 
 import pytest
-from fastapi.testclient import TestClient
 
-from policyshield.core.models import RuleConfig, RuleSet, Verdict
-from policyshield.shield.engine import ShieldEngine
-from policyshield.server.app import create_app
+fastapi = pytest.importorskip("fastapi", reason="fastapi not installed")
+
+from fastapi.testclient import TestClient  # noqa: E402
+
+from policyshield.core.models import RuleConfig, RuleSet, Verdict  # noqa: E402
+from policyshield.server.app import create_app  # noqa: E402
+from policyshield.shield.engine import ShieldEngine  # noqa: E402
 
 
 def _make_engine() -> ShieldEngine:

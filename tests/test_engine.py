@@ -331,9 +331,7 @@ class TestMatcherErrorHandling:
         engine = ShieldEngine(rules, fail_open=False)
 
         # Monkey-patch matcher to throw
-        engine._matcher.find_best_match = lambda **kw: (_ for _ in ()).throw(
-            RuntimeError("matcher crash")
-        )
+        engine._matcher.find_best_match = lambda **kw: (_ for _ in ()).throw(RuntimeError("matcher crash"))
 
         result = engine.check("test", {"data": "val"})
         assert result.verdict == Verdict.BLOCK
@@ -346,9 +344,7 @@ class TestMatcherErrorHandling:
         engine = ShieldEngine(rules, fail_open=True)
 
         # Monkey-patch matcher to throw
-        engine._matcher.find_best_match = lambda **kw: (_ for _ in ()).throw(
-            RuntimeError("matcher crash")
-        )
+        engine._matcher.find_best_match = lambda **kw: (_ for _ in ()).throw(RuntimeError("matcher crash"))
 
         result = engine.check("test", {"data": "val"})
         assert result.verdict == Verdict.ALLOW

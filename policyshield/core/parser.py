@@ -150,9 +150,7 @@ def _load_rules_from_dir(dir_path: Path) -> RuleSet:
             try:
                 default_verdict = Verdict(dv)
             except ValueError:
-                raise PolicyShieldParseError(
-                    f"Invalid default_verdict '{dv}'", str(f)
-                )
+                raise PolicyShieldParseError(f"Invalid default_verdict '{dv}'", str(f))
         raw_rules = data.get("rules", [])
         for raw in raw_rules:
             all_rules.append(_parse_rule(raw, str(f)))
@@ -189,9 +187,7 @@ def _build_ruleset(data: dict, file_path: str) -> RuleSet:
         try:
             default_verdict = Verdict(dv)
         except ValueError:
-            raise PolicyShieldParseError(
-                f"Invalid default_verdict '{dv}'", file_path
-            )
+            raise PolicyShieldParseError(f"Invalid default_verdict '{dv}'", file_path)
 
     ruleset = RuleSet(
         shield_name=shield_name,

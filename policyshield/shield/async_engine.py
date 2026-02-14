@@ -253,6 +253,4 @@ class AsyncShieldEngine(BaseShieldEngine):
         Returns:
             PostCheckResult with PII matches and optional redacted output.
         """
-        return await asyncio.to_thread(
-            self._post_check_sync, tool_name, result, session_id
-        )
+        return await asyncio.to_thread(self._post_check_sync, tool_name, result, session_id)
