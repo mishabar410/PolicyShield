@@ -1,66 +1,189 @@
 # OpenClaw Integration
 
-PolicyShield integrates natively with [OpenClaw](https://github.com/AgenturAI/OpenClaw) through a TypeScript plugin and an HTTP server.
+PolicyShield integrates natively with [OpenClaw](https://github.com/AgenturAI/OpenClaw) as a plugin
+that intercepts every tool call and enforces declarative YAML-based security policies.
+
+> Verified with **OpenClaw 2026.2.13** and **PolicyShield 0.8.1**.
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────┐
-│           OpenClaw Agent            │
-│                                     │
-│   LLM → tool_call(name, args)       │
-│              │                      │
-│              ▼                      │
-│   ┌──────────────────────────┐      │
-│   │  PolicyShield Plugin     │      │
-│   │  (before/after hooks)    │      │
-│   └──────────┬───────────────┘      │
-│              │ HTTP                  │
-│              ▼                      │
-│   ┌──────────────────────────┐      │
-│   │  PolicyShield Server     │      │
-│   │  (Python + FastAPI)      │      │
-│   └──────────────────────────┘      │
-└─────────────────────────────────────┘
+┌──────────────────────────────────────────┐
+│             OpenClaw Agent               │
+│                                          │
+│   LLM → tool_call(name, args)            │
+│               │                          │
+│               ▼                          │
+│   ┌────────────────────────────────┐     │
+│   │   PolicyShield Plugin (TS)     │     │
+│   │                                │     │
+│   │  before_agent_start            │     │
+│   │    → inject policy constraints │     │
+│   │  before_tool_call              │     │
+│   │    → BLOCK / REDACT / APPROVE  │     │
+│   │  after_tool_call               │     │
+│   │    → scan output for PII       │     │
+│   └────────────┬───────────────────┘     │
+│                │ HTTP (localhost)         │
+│                ▼                         │
+│   ┌────────────────────────────────┐     │
+│   │   PolicyShield Server          │     │
+│   │   (Python + FastAPI)           │     │
+│   │                                │     │
+│   │   /api/v1/check                │     │
+│   │   /api/v1/post-check           │     │
+│   │   /api/v1/constraints          │     │
+│   │   /api/v1/health               │     │
+│   └────────────────────────────────┘     │
+└──────────────────────────────────────────┘
 ```
 
-## Setup
+The plugin communicates with the PolicyShield server over HTTP on every tool call.
+The server evaluates YAML rules and returns a verdict: **ALLOW**, **BLOCK**, **REDACT**, or **APPROVE**.
 
-### 1. Start the PolicyShield server
+---
+
+## Step-by-Step Setup
+
+### Step 1: Install and start the PolicyShield server
 
 ```bash
 pip install "policyshield[server]"
-policyshield server --rules ./rules.yaml --port 8100
+
+# Generate rules optimized for OpenClaw tools
+policyshield init --preset openclaw --no-interactive
+# → creates rules.yaml with 11 rules (see below)
+
+# Start the server (default port: 8100)
+policyshield server --rules rules.yaml --port 8100
 ```
 
-### 2. Install the OpenClaw plugin
+Verify the server is running:
 
 ```bash
-openclaw plugin install openclaw-plugin-policyshield
+curl http://localhost:8100/api/v1/health
+# → {"status":"ok","shield_name":"openclaw-policy","version":1,"rules_count":11,"mode":"ENFORCE"}
 ```
 
-### 3. Configure in `openclaw.yaml`
+### Step 2: Install the PolicyShield plugin into OpenClaw
 
-```yaml
-plugins:
-  policyshield:
-    url: http://localhost:8100
-    mode: enforce        # enforce | audit | disabled
-    fail_open: true      # allow calls when server is unreachable
-    timeout_ms: 5000
+```bash
+# From npm (published package)
+openclaw plugins install @policyshield/openclaw-plugin
+
+# Or from a local directory (for development)
+openclaw plugins install --link ./path/to/plugins/openclaw
 ```
+
+After installation, the plugin files are located at:
+
+```
+~/.openclaw/extensions/policyshield/
+```
+
+> **Note:** If `openclaw plugins install` gives a config validation error about plugin ID mismatch,
+> rename the directory to match the plugin ID:
+> ```bash
+> mv ~/.openclaw/extensions/openclaw-plugin ~/.openclaw/extensions/policyshield
+> ```
+
+### Step 3: Configure the plugin
+
+Set the PolicyShield server URL (if using a non-default port):
+
+```bash
+openclaw config set plugins.entries.policyshield.config.url http://localhost:8100
+```
+
+Optional — configure other settings:
+
+```bash
+# Disable fail-open (block calls when server is unreachable)
+openclaw config set plugins.entries.policyshield.config.fail_open false
+
+# Set timeout
+openclaw config set plugins.entries.policyshield.config.timeout_ms 3000
+```
+
+### Step 4: Verify the plugin is loaded
+
+```bash
+openclaw plugins info policyshield
+```
+
+Expected output:
+
+```
+PolicyShield
+id: policyshield
+PolicyShield — runtime policy enforcement for AI agent tool calls
+
+Status: loaded
+Source: ~/.openclaw/extensions/policyshield/dist/index.js
+Version: 0.8.1
+✓ Connected to PolicyShield server
+```
+
+If you see `⚠ PolicyShield server unreachable`, check that:
+
+1. The PolicyShield server is running
+2. The URL is correct (`openclaw config set plugins.entries.policyshield.config.url ...`)
+3. The port matches (default is `8100`)
+
+### Step 5: Test with a real agent
+
+```bash
+# Run an agent with a dangerous prompt — PolicyShield should block it
+openclaw agent --local --session-id test -m "Run the shell command: rm -rf /"
+
+# Expected response: "I'm unable to execute that command as it is considered
+# destructive and is blocked by policy."
+```
+
+---
 
 ## Plugin Hooks
 
 | Hook | When | What it does |
 |------|------|-------------|
-| `before_tool_call` | Before tool execution | Checks policy → ALLOW, BLOCK, REDACT, or APPROVE |
-| `after_tool_call` | After tool execution | Scans output for PII, creates audit record |
-| `before_agent_start` | At agent startup | Injects policy constraints into system prompt |
+| `before_agent_start` | Agent session starts | Fetches `/api/v1/constraints` and injects all active rules into the LLM system prompt |
+| `before_tool_call` | Before every tool execution | Calls `/api/v1/check` → returns ALLOW, BLOCK, REDACT, or APPROVE |
+| `after_tool_call` | After every tool execution | Calls `/api/v1/post-check` → scans tool output for PII leaks |
 
-## OpenClaw Preset
+### Verdict Handling
 
-Generate rules specifically for OpenClaw:
+| Verdict | Plugin Action |
+|---------|--------------|
+| **ALLOW** | Tool call proceeds normally |
+| **BLOCK** | Tool call is cancelled, agent receives block reason message |
+| **REDACT** | Tool arguments are modified (PII masked), then tool call proceeds |
+| **APPROVE** | Plugin polls `/api/v1/check-approval` until human approves/denies or timeout |
+
+---
+
+## Configuration Reference
+
+All settings are configured via the OpenClaw CLI:
+
+```bash
+openclaw config set plugins.entries.policyshield.config.<key> <value>
+```
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `url` | string | `http://localhost:8100` | PolicyShield server URL |
+| `mode` | string | `enforce` | `enforce` (block/redact active) or `disabled` (passthrough) |
+| `fail_open` | boolean | `true` | Allow tool calls when server is unreachable |
+| `timeout_ms` | number | `5000` | HTTP request timeout per check (ms) |
+| `approve_timeout_ms` | number | `60000` | Max time to wait for human approval (ms) |
+| `approve_poll_interval_ms` | number | `2000` | Polling interval for approval status (ms) |
+| `max_result_bytes` | number | `10000` | Max bytes of tool output sent for PII scanning |
+
+---
+
+## OpenClaw Preset Rules
+
+Generate rules specifically for OpenClaw's built-in tools:
 
 ```bash
 policyshield init --preset openclaw
@@ -68,25 +191,143 @@ policyshield init --preset openclaw
 
 This generates 11 rules covering:
 
-- **Block** destructive shell commands (`rm -rf`, `mkfs`, `dd if=`)
-- **Block** access to sensitive paths (`/etc/shadow`, SSH keys, `.env`)
-- **Redact** PII in web requests, messages, and search
-- **Approve** file deletion operations
-- **Rate-limit** exec tool (60 calls per session)
-- **Rate-limit** web fetch (10 calls per minute)
-- **Block** subdomain enumeration
+| Category | Rules |
+|----------|-------|
+| **Block** | Destructive shell commands (`rm -rf`, `mkfs`, `dd if=`) |
+| **Block** | Remote code execution (`curl \| sh`, `wget \| bash`) |
+| **Block** | Secrets exfiltration (`curl ... $API_KEY`) |
+| **Block** | Environment variable dumps (`env`, `printenv`) |
+| **Redact** | PII in outgoing messages, file writes, and file edits |
+| **Approve** | Writing to sensitive files (`.env`, `.pem`, `.key`, SSH keys) |
+| **Rate-limit** | `exec` tool (60 calls per session) |
+| **Rate-limit** | `web_fetch` tool (30 calls per session) |
 
-## Modes
+OpenClaw's built-in tools recognized by the preset:
+`exec`, `read`, `write`, `edit`, `message`, `web_fetch`, `web_search`, `browser`,
+`canvas`, `image`, `gateway`, `cron`, `tts`, `memory_search`, `memory_get`,
+`sessions_send`, `sessions_spawn`, `sessions_list`, `sessions_history`,
+`session_status`, `agents_list`.
 
-| Mode | Behavior |
-|------|----------|
-| `enforce` | Verdicts are applied: blocked calls fail, PII is redacted |
-| `audit` | Verdicts are logged but not applied (shadow mode) |
-| `disabled` | Plugin is off, all calls pass through |
+---
 
 ## Graceful Degradation
 
-When `fail_open: true` is set:
-- If the PolicyShield server is unreachable, tool calls are **allowed** (with a warning logged)
-- If there's a timeout, calls are allowed
-- All failures are recorded in the audit trail
+When `fail_open: true` (default):
+
+- **Server unreachable**: tool calls are allowed with a warning logged
+- **Timeout**: tool calls proceed as if allowed
+- **Server error**: tool calls proceed as if allowed
+- All failures are recorded on the server-side audit trail
+
+When `fail_open: false`:
+
+- **Server unreachable**: tool calls are **blocked**
+- This is the safer option for production deployments
+
+---
+
+## Docker Deployment
+
+Run the PolicyShield server in Docker alongside OpenClaw:
+
+```bash
+docker build -f Dockerfile.server -t policyshield-server .
+docker run -d \
+  -p 8100:8100 \
+  -v ./rules.yaml:/app/rules.yaml \
+  --name policyshield \
+  policyshield-server
+```
+
+Or use docker-compose:
+
+```yaml
+services:
+  policyshield:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    ports:
+      - "8100:8100"
+    volumes:
+      - ./rules.yaml:/app/rules.yaml
+    restart: unless-stopped
+```
+
+Then point the OpenClaw plugin to the Docker container:
+
+```bash
+openclaw config set plugins.entries.policyshield.config.url http://localhost:8100
+```
+
+---
+
+## Troubleshooting
+
+### Plugin shows "server unreachable"
+
+```
+⚠ PolicyShield server unreachable — running in degraded mode
+```
+
+**Fix:** Check the server URL and port:
+
+```bash
+# Verify server is running
+curl http://localhost:8100/api/v1/health
+
+# Update plugin URL if using a different port
+openclaw config set plugins.entries.policyshield.config.url http://localhost:<PORT>
+```
+
+### Plugin ID mismatch warning
+
+```
+plugins.entries.policyshield: plugin id mismatch (manifest uses "policyshield", entry hints "openclaw-plugin")
+```
+
+**Fix:** This is a cosmetic warning from the install process. It doesn't affect functionality.
+To silence it, ensure the extension directory name matches the plugin ID:
+
+```bash
+mv ~/.openclaw/extensions/openclaw-plugin ~/.openclaw/extensions/policyshield
+```
+
+### Agent can't find API key
+
+```
+No API key found for provider "anthropic"
+```
+
+**Fix:** Set the model provider and API key:
+
+```bash
+# Set the agent model to OpenAI (or your preferred provider)
+openclaw config set agents.list '[{"id":"main","model":"openai/gpt-4o-mini"}]'
+
+# Create the auth profile
+mkdir -p ~/.openclaw/agents/main/agent
+cat > ~/.openclaw/agents/main/agent/auth-profiles.json << EOF
+{
+  "openai": {
+    "apiKey": "sk-..."
+  }
+}
+EOF
+```
+
+### Plugin not listed
+
+```bash
+# List all plugins
+openclaw plugins list
+
+# Check plugin details
+openclaw plugins info policyshield
+```
+
+If the plugin is missing, reinstall:
+
+```bash
+openclaw plugins install @policyshield/openclaw-plugin
+```

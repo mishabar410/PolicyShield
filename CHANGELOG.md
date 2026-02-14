@@ -15,6 +15,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - **npm Publish**: `release.yml` now publishes `@policyshield/openclaw-plugin` to npm on tag push
 - **Plugin CI Job**: `ci.yml` runs typecheck, build, and vitest for the OpenClaw plugin
 - **Plugin README**: npm package page with quick start and configuration docs
+- **OpenClaw Integration Guide**: comprehensive step-by-step guide with real CLI commands,
+  troubleshooting, Docker deployment, and verified setup (OpenClaw 2026.2.13 tested)
 
 ### Changed
 - **Benchmark Gate**: benchmark job now blocks the build pipeline (added to `needs`)

@@ -100,32 +100,38 @@ policyshield init --preset security --no-interactive
 
 ## OpenClaw Integration
 
-PolicyShield integrates natively with [OpenClaw](https://github.com/openclaw/openclaw) as a plugin:
+PolicyShield integrates natively with [OpenClaw](https://github.com/AgenturAI/OpenClaw) as a plugin.
+Verified with OpenClaw 2026.2.13.
 
 ### 1. Start the PolicyShield server
 
 ```bash
 pip install "policyshield[server]"
-policyshield server --rules ./rules.yaml --port 8100
+policyshield init --preset openclaw --no-interactive   # → rules.yaml
+policyshield server --rules rules.yaml --port 8100
 ```
 
-### 2. Install the plugin
+### 2. Install the plugin into OpenClaw
 
 ```bash
-npm install @policyshield/openclaw-plugin
+openclaw plugins install @policyshield/openclaw-plugin
 ```
 
-### 3. Configure in `openclaw.yaml`
+### 3. Configure the server URL
 
-```yaml
-plugins:
-  policyshield:
-    url: http://localhost:8100
-    mode: enforce
-    fail_open: true
+```bash
+openclaw config set plugins.entries.policyshield.config.url http://localhost:8100
 ```
 
-See [`plugins/openclaw/README.md`](plugins/openclaw/README.md) for full configuration reference.
+### 4. Verify and test
+
+```bash
+openclaw plugins info policyshield    # → ✓ Connected to PolicyShield server
+openclaw agent --local -m "Run: rm -rf /"  # → BLOCKED by policy
+```
+
+See the **[full integration guide](docs/integrations/openclaw.md)** and
+[`plugins/openclaw/README.md`](plugins/openclaw/README.md) for configuration reference and troubleshooting.
 
 ---
 
