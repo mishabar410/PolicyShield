@@ -8,6 +8,7 @@ import type {
     PluginHookBeforeAgentStartEvent,
     PluginHookBeforeAgentStartResult,
     PluginHookAgentContext,
+    PluginLogger,
 } from "./openclaw-plugin-sdk.js";
 import { PolicyShieldClient } from "./client.js";
 import type { PluginConfig } from "./types.js";
@@ -16,6 +17,61 @@ export { PolicyShieldClient } from "./client.js";
 
 // Re-export SDK types that consumers may need
 export type { OpenClawPluginApi, OpenClawPluginDefinition } from "./openclaw-plugin-sdk.js";
+
+/**
+ * Polls the PolicyShield server for approval status with clean timeout handling.
+ * Uses AbortController + Promise.race for cancellation instead of a raw while loop.
+ */
+async function waitForApproval(
+    client: PolicyShieldClient,
+    approvalId: string,
+    timeoutMs: number,
+    pollIntervalMs: number,
+    log: PluginLogger,
+): Promise<PluginHookBeforeToolCallResult | void> {
+    const controller = new AbortController();
+    const { signal } = controller;
+
+    // Set hard timeout
+    const timeoutHandle = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+        while (!signal.aborted) {
+            await new Promise<void>((resolve, reject) => {
+                const timer = setTimeout(resolve, pollIntervalMs);
+                signal.addEventListener("abort", () => {
+                    clearTimeout(timer);
+                    reject(new DOMException("Aborted", "AbortError"));
+                }, { once: true });
+            });
+
+            try {
+                const status = await client.checkApproval(approvalId);
+                if (status.status === "approved") {
+                    return undefined; // proceed with tool call
+                }
+                if (status.status === "denied") {
+                    return {
+                        block: true,
+                        blockReason: `🛡️ PolicyShield: approval denied${status.responder ? ` by ${status.responder}` : ""}`,
+                    };
+                }
+                // status === "pending" → continue polling
+            } catch (pollErr) {
+                log.warn(`Approval poll error: ${String(pollErr)}`);
+            }
+        }
+    } catch {
+        // AbortError from timeout — expected
+    } finally {
+        clearTimeout(timeoutHandle);
+    }
+
+    return {
+        block: true,
+        blockReason: `⏳ PolicyShield: approval timed out after ${timeoutMs / 1000}s`,
+    };
+}
 
 /**
  * PolicyShield plugin for OpenClaw.
@@ -28,7 +84,7 @@ export type { OpenClawPluginApi, OpenClawPluginDefinition } from "./openclaw-plu
 const plugin: OpenClawPluginDefinition = {
     id: "policyshield",
     name: "PolicyShield",
-    version: "0.8.0",
+    version: "0.8.1",
     description: "PolicyShield — runtime policy enforcement for AI agent tool calls",
 
     async register(api: OpenClawPluginApi) {
@@ -92,28 +148,10 @@ const plugin: OpenClawPluginDefinition = {
                         return { params: verdict.modified_args };
                     }
                     if (verdict.verdict === "APPROVE" && verdict.approval_id) {
-                        const deadline = Date.now() + approveTimeoutMs;
-                        while (Date.now() < deadline) {
-                            await new Promise((r) => setTimeout(r, approvePollMs));
-                            try {
-                                const status = await client.checkApproval(verdict.approval_id);
-                                if (status.status === "approved") {
-                                    return undefined; // proceed
-                                }
-                                if (status.status === "denied") {
-                                    return {
-                                        block: true,
-                                        blockReason: `🛡️ PolicyShield: approval denied${status.responder ? ` by ${status.responder}` : ""}`,
-                                    };
-                                }
-                            } catch (pollErr) {
-                                log.warn(`Approval poll error: ${String(pollErr)}`);
-                            }
-                        }
-                        return {
-                            block: true,
-                            blockReason: `⏳ PolicyShield: approval timed out after ${approveTimeoutMs / 1000}s`,
-                        };
+                        return await waitForApproval(
+                            client, verdict.approval_id,
+                            approveTimeoutMs, approvePollMs, log,
+                        );
                     }
                     return undefined; // ALLOW
                 } catch (err) {

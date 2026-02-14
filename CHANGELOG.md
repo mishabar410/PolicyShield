@@ -4,6 +4,21 @@ All notable changes to PolicyShield will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.8.1] - 2026-02-14
+
+### Fixed
+- **APPROVE Polling**: replaced raw `while` loop with `AbortController`-based timeout for cleaner cancellation
+- **Documentation Drift**: moved zero-trust mode and output scanning from roadmap to implemented in `PHILOSOPHY.md`
+- **Version Sync**: unified Python (`0.7.0`) and npm plugin (`0.8.0`) versions to `0.8.1`
+
+### Added
+- **npm Publish**: `release.yml` now publishes `@policyshield/openclaw-plugin` to npm on tag push
+- **Plugin CI Job**: `ci.yml` runs typecheck, build, and vitest for the OpenClaw plugin
+- **Plugin README**: npm package page with quick start and configuration docs
+
+### Changed
+- **Benchmark Gate**: benchmark job now blocks the build pipeline (added to `needs`)
+
 ## [0.7.0] - 2026-02-14
 
 ### Fixed

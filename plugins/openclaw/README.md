@@ -1,68 +1,69 @@
-# PolicyShield Plugin for OpenClaw
+# @policyshield/openclaw-plugin
 
-Runtime policy enforcement for AI agent tool calls — block, redact, approve, allow.
+> 🛡️ PolicyShield plugin for [OpenClaw](https://github.com/openclaw/openclaw) — runtime tool call policy enforcement for AI agents.
+
+## What it does
+
+Intercepts every tool call in OpenClaw and enforces declarative YAML-based security policies:
+
+- **BLOCK** — prevent dangerous tool calls (e.g., `rm -rf /`)
+- **REDACT** — mask PII before it reaches tools (emails, phones, credit cards)
+- **APPROVE** — require human confirmation for sensitive operations
+- **ALLOW** — let safe calls through with audit trail
 
 ## Quick Start
 
-### 1. Install
+### 1. Install and start the PolicyShield server
+
+```bash
+pip install policyshield[server]
+policyshield init --preset openclaw   # creates rules.yaml
+policyshield server --rules rules.yaml
+```
+
+### 2. Install the OpenClaw plugin
 
 ```bash
 npm install @policyshield/openclaw-plugin
 ```
 
-### 2. Configure
-
-Add to your `openclaw.yaml`:
+### 3. Configure in `openclaw.yaml`
 
 ```yaml
 plugins:
-  policyshield:
-    url: "http://localhost:8100"
-    mode: "enforce"
-    fail_open: true
+  - name: policyshield
+    module: "@policyshield/openclaw-plugin"
+    config:
+      url: "http://localhost:8000"
+      mode: "enforce"        # "enforce" | "disabled"
+      fail_open: true        # allow calls if server unreachable
+      timeout_ms: 5000       # per-check timeout
 ```
 
-### 3. Run
+## Features
 
-Start the PolicyShield server, then launch OpenClaw as usual. The plugin auto-registers.
+- 🔒 **Pre-check**: blocks/redacts tool calls before execution
+- 📝 **Post-check**: scans tool output for PII leaks
+- 🧠 **Prompt enrichment**: injects active rules into agent context
+- ⏱️ **Human-in-the-loop**: APPROVE verdict with configurable timeout
+- 🛡️ **Fail-open**: graceful degradation when server is down
 
----
+## Configuration Options
 
-## How It Works
+| Option | Default | Description |
+|---|---|---|
+| `url` | `http://localhost:8000` | PolicyShield server URL |
+| `mode` | `enforce` | `enforce` or `disabled` |
+| `fail_open` | `true` | Allow calls if server unreachable |
+| `timeout_ms` | `5000` | Per-check timeout (ms) |
+| `approve_timeout_ms` | `60000` | Max wait for human approval (ms) |
+| `approve_poll_interval_ms` | `2000` | Approval polling interval (ms) |
+| `max_result_bytes` | `10000` | Max tool output bytes for post-check |
 
-| Hook | Action |
-|------|--------|
-| `before_tool_call` | Checks tool call against policy rules → **BLOCK**, **REDACT**, **APPROVE**, or **ALLOW** |
-| `after_tool_call` | Scans tool output for PII via post-check |
-| `before_agent_start` | Injects active policy constraints into agent context |
+## Documentation
 
-## Configuration Reference
+Full documentation: [github.com/policyshield/policyshield](https://github.com/policyshield/policyshield)
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `url` | string | `http://localhost:8100` | PolicyShield server URL |
-| `mode` | string | `enforce` | `enforce` or `disabled` (audit is server-side) |
-| `fail_open` | boolean | `true` | Allow tool calls when server is unreachable |
-| `timeout_ms` | number | `5000` | HTTP request timeout (ms) |
-| `approve_timeout_ms` | number | `60000` | Max wait for human approval (ms) |
-| `approve_poll_interval_ms` | number | `2000` | Polling interval for approval status (ms) |
-| `max_result_bytes` | number | `10000` | Max bytes of tool output sent for PII scan |
+## License
 
-## Graceful Degradation
-
-- **`fail_open: true`** (default) — Tool calls proceed with a warning if server is unreachable.
-- **`fail_open: false`** — All tool calls are blocked until the server recovers.
-
-## Development
-
-```bash
-npm test             # Run tests
-npm run typecheck    # Type check
-npm run build        # Build to dist/
-```
-
-## Requirements
-
-- OpenClaw (any recent version)
-- PolicyShield server running at configured URL
-- Node.js 18+
+MIT

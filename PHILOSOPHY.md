@@ -196,17 +196,17 @@ This enables:
 | **Hot reload** | Rules can be updated without restarting the agent | ✅ Implemented |
 | **System prompt enrichment** | Inject policy summaries into the LLM's context to reduce wasted blocked calls | ✅ Implemented |
 | **Tool filtering** | Remove unconditionally blocked tools from LLM's view entirely | ✅ Implemented |
+| **Zero-trust mode** | Explicit allow-list mode where unmatched tool calls are blocked by default (`default_verdict: BLOCK`) | ✅ Implemented |
+| **Output scanning** | Full PII scan on tool return values via post-check endpoint (not just arguments) | ✅ Implemented |
 
 ### Should Have (Roadmap)
 
 | Capability | Description | Why |
 |---|---|---|
 | **Semantic PII detection (L1)** | NER-based PII detection using spaCy/transformers in addition to regex | Regex alone has too many false positives/negatives for production DLP |
-| **Zero-trust mode** | Explicit allow-list mode where unmatcheded tool calls are blocked by default | Current default-allow behavior contradicts "zero-trust" claim |
 | **Rule composition** | Include/extend rule files, environment-specific overrides (dev/staging/prod) | Large deployments need rule modularity |
 | **Cross-session analytics** | Aggregate traces across sessions for organizational insights | Enterprise compliance needs |
 | **Conditional chaining** | Rules that depend on the result of previous tool calls in the same session | "Block `send_email` if `read_file` was called on a sensitive path" |
-| **Output scanning** | Full PII scan on tool return values (not just arguments) | Data can leak through tool outputs, not just inputs |
 | **Cost tracking** | Track estimated API cost per tool call and enforce budgets | LLM tool calls cost money; rate limiting alone isn't enough |
 
 ### Could Have (Future)

@@ -3,7 +3,7 @@
  *
  * Manually synchronized with openclaw/src/plugins/types.ts
  * Source of truth: https://github.com/openclaw/openclaw → src/plugins/types.ts
- * Last sync: 2026-02-14
+ * Last sync: 2026-02-14 (verified via raw download — all hook types match exactly)
  *
  * Only types used by the PolicyShield plugin are included here.
  * To re-sync: compare this file with the real types.ts and update differences.
@@ -140,14 +140,33 @@ export type OpenClawPluginApi = {
 // ---------------------------------------------------------------------------
 // Plugin Definition
 // ---------------------------------------------------------------------------
-export type PluginKind = "tool" | "channel" | "provider" | "gateway" | "agent" | "command" | string;
+export type PluginKind = "memory";
 
-export type OpenClawPluginConfigSchema = Record<string, {
-    type: string;
-    default?: unknown;
-    description?: string;
-    required?: boolean;
-}>;
+export type PluginConfigUiHint = {
+    label?: string;
+    help?: string;
+    advanced?: boolean;
+    sensitive?: boolean;
+    placeholder?: string;
+};
+
+export type PluginConfigValidation =
+    | { ok: true; value?: unknown }
+    | { ok: false; errors: string[] };
+
+export type OpenClawPluginConfigSchema = {
+    safeParse?: (value: unknown) => {
+        success: boolean;
+        data?: unknown;
+        error?: {
+            issues?: Array<{ path: Array<string | number>; message: string }>;
+        };
+    };
+    parse?: (value: unknown) => unknown;
+    validate?: (value: unknown) => PluginConfigValidation;
+    uiHints?: Record<string, PluginConfigUiHint>;
+    jsonSchema?: Record<string, unknown>;
+};
 
 export type OpenClawPluginDefinition = {
     id?: string;

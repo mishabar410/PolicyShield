@@ -80,7 +80,7 @@ describe("Plugin Registration (api.on pattern)", () => {
     it("exports correct metadata", () => {
         expect(plugin.id).toBe("policyshield");
         expect(plugin.name).toBe("PolicyShield");
-        expect(plugin.version).toBe("0.8.0");
+        expect(plugin.version).toBe("0.8.1");
         expect(plugin.description).toContain("PolicyShield");
     });
 });
