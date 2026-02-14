@@ -53,7 +53,7 @@ class TestOptionalDependencies:
     def test_extras_exist(self):
         data = _load_pyproject()
         extras = data["project"]["optional-dependencies"]
-        for group in ["langchain", "crewai", "otel", "dev", "docs", "nanobot", "all"]:
+        for group in ["langchain", "crewai", "otel", "dev", "docs", "all"]:
             assert group in extras, f"Missing optional dependency group: {group}"
 
     def test_dev_includes_pytest(self):

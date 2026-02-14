@@ -13,8 +13,6 @@ trace:
   enabled: true
   output_dir: ./traces
 
-nanobot:              # Optional
-  rules_path: policies/rules.yaml
 ```
 
 ## Options

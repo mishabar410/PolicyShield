@@ -93,116 +93,6 @@ Or scaffold a full project:
 policyshield init --preset security --no-interactive
 ```
 
----
-
-## Using with Nanobot
-
-PolicyShield integrates with [nanobot](https://github.com/nanobot-sh/nanobot) to enforce policies on all tool calls your agent makes.
-
-### Step 1. Install PolicyShield alongside nanobot
-
-```bash
-# In your nanobot project:
-pip install policyshield
-```
-
-### Step 2. Create rules for your agent
-
-Create `policies/rules.yaml` in your project root:
-
-```yaml
-shield_name: my-nanobot
-version: 1
-rules:
-  # Block dangerous shell commands
-  - id: block-rm-rf
-    when:
-      tool: exec
-      args_match:
-        command: { contains: "rm -rf" }
-    then: block
-    message: "Destructive shell commands are not allowed."
-
-  # Redact PII from any outgoing messages
-  - id: redact-pii-messages
-    when:
-      tool: send_message
-    then: redact
-
-  # Block all file deletion
-  - id: block-delete
-    when:
-      tool: delete_file
-    then: block
-    message: "File deletion is disabled."
-```
-
-### Step 3. Run nanobot through PolicyShield
-
-The simplest way — just prefix your usual command:
-
-```bash
-policyshield nanobot --rules policies/rules.yaml agent -m "Hello!"
-policyshield nanobot --rules policies/rules.yaml gateway
-```
-
-Or if you create `AgentLoop` in your own Python code:
-
-```python
-from nanobot.agent.loop import AgentLoop
-from policyshield.integrations.nanobot import shield_agent_loop
-
-loop = AgentLoop(bus=bus, provider=provider, workspace=workspace)
-shield_agent_loop(loop, rules_path="policies/rules.yaml")  # ← one line
-```
-
-That's it. Every tool call your agent makes will now pass through PolicyShield. Blocked tools return an error message to the LLM, which replans automatically.
-
-### What happens under the hood
-
-`shield_agent_loop()` monkey-patches your existing loop instance (no nanobot source changes needed):
-
-1. **Wraps the ToolRegistry** — every `execute()` call is checked against your rules
-2. **Filters blocked tools from LLM context** — the LLM never sees tools it can't use
-3. **Injects constraints into the system prompt** — the LLM knows what's forbidden
-4. **Scans tool results for PII** — post-call audit and tainting
-5. **Tracks sessions** — rate limits work per-conversation
-
-### Optional: standalone mode (no AgentLoop)
-
-You can also use PolicyShield with nanobot's `ToolRegistry` directly, without `AgentLoop`:
-
-```python
-from policyshield.integrations.nanobot.installer import install_shield
-
-# Create a shielded registry
-registry = install_shield(rules_path="policies/rules.yaml")
-
-# Register your tools
-registry.register_func("echo", lambda message="": f"Echo: {message}")
-registry.register_func("delete_file", lambda path="": f"Deleted {path}")
-
-# This works:
-result = await registry.execute("echo", {"message": "hello"})
-# → "Echo: hello"
-
-# This is blocked:
-result = await registry.execute("delete_file", {"path": "/etc/passwd"})
-# → "🛡️ BLOCKED: File deletion is disabled."
-```
-
-### Configuration options
-
-```python
-shield_agent_loop(
-    loop,
-    rules_path="policies/rules.yaml",  # Required. Path to YAML rules
-    mode="ENFORCE",       # ENFORCE (default) | AUDIT (log only) | DISABLED
-    fail_open=True,       # True (default): shield errors don't block tools
-)
-```
-
-See the [full nanobot integration guide](docs/nanobot_integration.md) for approval flows, custom PII patterns, rate limiting, and more.
 
 ---
 
@@ -310,10 +200,6 @@ policyshield trace export ./traces/trace.jsonl -f html
 # Launch the live web dashboard
 policyshield trace dashboard --port 8000 --prometheus
 
-# Run nanobot with PolicyShield enforcement
-policyshield nanobot --rules rules.yaml agent -m "Hello!"
-policyshield nanobot --rules rules.yaml gateway
-
 # Initialize a new project
 policyshield init --preset security --no-interactive
 ```
@@ -339,9 +225,6 @@ docker compose run test
 
 | Example | Description |
 |---------|-------------|
-| [`nanobot_shield_example.py`](examples/nanobot_shield_example.py) | Nanobot standalone — run this to see PolicyShield in action |
-| [`nanobot_shield_agentloop.py`](examples/nanobot_shield_agentloop.py) | AgentLoop configuration reference |
-| [`nanobot_rules.yaml`](examples/nanobot_rules.yaml) | Example policy rules for nanobot |
 | [`langchain_demo.py`](examples/langchain_demo.py) | LangChain tool wrapping |
 | [`async_demo.py`](examples/async_demo.py) | Async engine usage |
 | [`policies/`](examples/policies/) | Production-ready rule sets (security, compliance, full) |
@@ -372,7 +255,7 @@ ruff format --check policyshield/ tests/  # Format check
 | **v0.1** | ✅ Core: YAML DSL, verdicts, PII, trace, CLI |
 | **v0.2** | ✅ Linter, hot reload, rate limiter, approval flow, LangChain |
 | **v0.3** | ✅ Async engine, CrewAI, OTel, webhooks, rule testing, policy diff |
-| **v0.4** | ✅ Nanobot: monkey-patch, CLI wrapper, session propagation, PII scan |
+| **v0.4** | ✅ *(removed nanobot integration)* |
 | **v0.5** | ✅ DX: PyPI publish, docs site, GitHub Action, Docker, CLI init |
 | **v0.6** | ✅ Observability: trace search, cost estimator, alerts, dashboard, Grafana |
 | **v1.0** | 📋 Stable API, performance benchmarks, multi-tenant |

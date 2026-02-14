@@ -39,7 +39,6 @@ class TestV05FilesExist:
 
     EXPECTED_FILES = [
         "policyshield/cli/init_scaffold.py",
-        "policyshield/integrations/nanobot/cli_wrapper.py",
         "policyshield/py.typed",
         ".github/workflows/ci.yml",
         ".github/workflows/release.yml",
@@ -71,7 +70,6 @@ class TestV05TestCoverage:
 
     V05_TEST_FILES = [
         "tests/test_cli_init.py",
-        "tests/test_cli_nanobot.py",
         "tests/test_packaging.py",
         "tests/test_ci_config.py",
         "tests/test_github_action.py",

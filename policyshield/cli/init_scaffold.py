@@ -179,32 +179,6 @@ _COMPLIANCE_RULES: list[dict[str, Any]] = [
     },
 ]
 
-_NANOBOT_EXTRA_RULES: list[dict[str, Any]] = [
-    {
-        "id": "block-nanobot-exec",
-        "description": "Block exec tool in nanobot",
-        "when": {"tool": "exec", "args_match": {"command": {"regex": r"rm\s+-rf|sudo|chmod\s+777"}}},
-        "then": "block",
-        "severity": "critical",
-        "message": "Dangerous exec commands blocked in nanobot.",
-    },
-    {
-        "id": "block-nanobot-spawn",
-        "description": "Block nanobot spawn_process",
-        "when": {"tool": "spawn_process"},
-        "then": "block",
-        "severity": "high",
-        "message": "Spawning processes is not allowed in nanobot.",
-    },
-    {
-        "id": "redact-nanobot-send",
-        "description": "Redact PII from nanobot send_message",
-        "when": {"tool": "send_message"},
-        "then": "redact",
-        "severity": "medium",
-        "message": "PII redacted from nanobot messages.",
-    },
-]
 
 
 def _get_preset_rules(preset: str) -> list[dict[str, Any]]:
@@ -287,7 +261,6 @@ def _to_yaml_str(data: dict[str, Any], indent: int = 0) -> str:
 def scaffold(
     directory: str | Path,
     preset: str = "minimal",
-    nanobot: bool = False,
     interactive: bool = True,
 ) -> list[str]:
     """Create a starter project scaffold.
@@ -295,7 +268,6 @@ def scaffold(
     Args:
         directory: Target directory for the scaffold.
         preset: Rule preset (minimal, security, compliance).
-        nanobot: Whether to include nanobot-specific rules.
         interactive: Whether to prompt user for choices.
 
     Returns:
@@ -308,15 +280,12 @@ def scaffold(
     # Interactive mode: ask questions
     if interactive:
         preset = _ask_preset(preset)
-        nanobot = _ask_nanobot(nanobot)
         trace_enabled = _ask_trace()
     else:
         trace_enabled = True
 
     # Get rules
     rules = _get_preset_rules(preset)
-    if nanobot:
-        rules.extend([dict(r) for r in _NANOBOT_EXTRA_RULES])
 
     # Build rules data
     rules_data = {
@@ -342,8 +311,6 @@ def scaffold(
             "output_dir": "./traces",
         },
     }
-    if nanobot:
-        config_data["nanobot"] = {"rules_path": "policies/rules.yaml"}
 
     # Create files
     created: list[str] = []
@@ -433,18 +400,6 @@ def _ask_preset(default: str) -> str:
         return default
 
 
-def _ask_nanobot(default: bool) -> bool:
-    """Interactively ask about nanobot support."""
-    try:
-        answer = input(f"Add nanobot-specific rules? [{'Y/n' if default else 'y/N'}]: ").strip().lower()
-        if answer in ("y", "yes"):
-            return True
-        if answer in ("n", "no"):
-            return False
-        return default
-    except (EOFError, KeyboardInterrupt):
-        print()
-        return default
 
 
 def _ask_trace() -> bool:

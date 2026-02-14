@@ -21,9 +21,8 @@
 ## [0.5.0] - 2025-02-12
 
 ### Added
-- **CLI `policyshield init`**: Scaffold new projects with presets (`minimal`, `security`, `compliance`), nanobot support, auto-generated test cases
-- **CLI nanobot wrapper**: Extracted `cli_wrapper.py` with `patch_agent_loop_class()` and `run_nanobot_cli()`
-- **PyPI packaging**: Updated metadata, Beta status, 7 optional dependency groups (`langchain`, `crewai`, `otel`, `nanobot`, `docs`, `dev`, `all`)
+- **CLI `policyshield init`**: Scaffold new projects with presets (`minimal`, `security`, `compliance`), auto-generated test cases
+- **PyPI packaging**: Updated metadata, Beta status, optional dependency groups (`langchain`, `crewai`, `otel`, `docs`, `dev`, `all`)
 - **GitHub Actions CI**: Enhanced with format check, coverage XML artifact, build job with twine check
 - **Release workflow**: Automated PyPI publishing on version tags
 - **Reusable GitHub Action**: `.github/actions/lint-rules/` for validating and linting rules in CI
@@ -43,11 +42,6 @@
 - Post-call PII scan: tool results are scanned and tainted PII types are recorded
 - `get_definitions()` override: unconditionally blocked tools are hidden from LLM context
 - Context enrichment: active policy constraints are injected into the LLM system prompt
-- Subagent shield propagation via `SubagentManager.shield_config`
-- `approval_backend` parameter in `install_shield()` for CLI/Telegram/Webhook approval flows
-- Comprehensive nanobot integration guide (`docs/nanobot_integration.md`)
-- Working examples: `nanobot_shield_example.py`, `nanobot_shield_agentloop.py`, `nanobot_rules.yaml`
-- Integration tests with real nanobot `Tool` objects (`test_nanobot_real_tools.py`)
 - 26 new tests, bringing total to 461
 
 ## [0.3.1] - 2025-02-11
@@ -64,9 +58,6 @@
 - Passport regex narrowed from 6–9 to 7–9 digits to reduce false positives
 
 ### Added
-- Nanobot integration: `ShieldedToolRegistry` extends nanobot's `ToolRegistry` with async support
-- `install_shield()` helper to wrap existing nanobot registries
-- `AgentLoop.shield_config` parameter for optional PolicyShield enablement
 - 23 audit regression tests (`test_audit_fixes.py`), bringing total to 437
 
 ## [0.3.0] - 2025-02-11
@@ -110,5 +101,4 @@
 - Session manager with tool call tracking
 - Trace recorder (JSONL)
 - CLI: validate, trace show, trace violations
-- Nanobot integration
 - 10 E2E test scenarios

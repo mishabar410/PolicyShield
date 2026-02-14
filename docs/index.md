@@ -10,7 +10,7 @@ PolicyShield lets you define YAML rules that control what tools an AI agent can 
 - 🔍 **PII detection** — Built-in redaction for sensitive data
 - ✅ **Approval flows** — Human-in-the-loop for risky operations
 - 📊 **Tracing** — Full audit trail of every tool call
-- 🔌 **Integrations** — LangChain, CrewAI, Nanobot, FastAPI
+- 🔌 **Integrations** — LangChain, CrewAI, FastAPI
 - 🧪 **Testing** — Validate rules before deployment
 - 🚀 **CLI** — Scaffold, validate, lint, test from the command line
 

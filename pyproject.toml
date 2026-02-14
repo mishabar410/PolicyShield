@@ -38,7 +38,6 @@ otel = [
     "opentelemetry-sdk>=1.20",
     "opentelemetry-exporter-otlp-proto-grpc>=1.20",
 ]
-nanobot = ["nanobot>=0.1"]
 dashboard = [
     "fastapi>=0.100",
     "uvicorn[standard]>=0.20",
@@ -59,7 +58,7 @@ dev = [
     "tomli; python_version < '3.11'",
 ]
 all = [
-    "policyshield[langchain,crewai,otel,nanobot,dashboard,prometheus,docs,dev]",
+    "policyshield[langchain,crewai,otel,dashboard,prometheus,docs,dev]",
 ]
 
 [project.scripts]

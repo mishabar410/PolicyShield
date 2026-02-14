@@ -41,9 +41,3 @@ def test_import_integrations():
     import policyshield.integrations
 
     assert policyshield.integrations is not None
-
-
-def test_import_integrations_nanobot():
-    import policyshield.integrations.nanobot
-
-    assert policyshield.integrations.nanobot is not None

@@ -12,7 +12,6 @@ import pytest
 
 from policyshield.cli.main import app
 from policyshield.core.models import ShieldMode, Verdict
-from policyshield.integrations.nanobot.registry import ShieldedToolRegistry
 from policyshield.shield.engine import ShieldEngine
 from policyshield.trace.recorder import TraceRecorder
 
@@ -183,28 +182,3 @@ class TestCLIValidate:
         captured = capsys.readouterr()
         assert "Valid" in captured.out
         assert "4" in captured.out  # 4 rules
-
-
-class TestShieldedToolRegistryE2E:
-    """Scenario 10: Full integration with ShieldedToolRegistry."""
-
-    def test_registry_blocks_destructive(self):
-        import asyncio
-
-        engine = ShieldEngine(FIXTURES_DIR / "security.yaml")
-        registry = ShieldedToolRegistry(engine)
-
-        exec_called = []
-        read_called = []
-        registry.register_func("exec", lambda **kw: exec_called.append(kw) or "ok")
-        registry.register_func("read_file", lambda **kw: read_called.append(kw) or "ok")
-
-        # Blocked call returns shield message
-        result = asyncio.run(registry.execute("exec", {"command": "rm -rf /"}))
-        assert "BLOCKED" in result
-        assert len(exec_called) == 0  # exec was NOT called
-
-        # Allowed call
-        result = asyncio.run(registry.execute("read_file", {"path": "/tmp"}))
-        assert result == "ok"
-        assert len(read_called) == 1  # read_file WAS called

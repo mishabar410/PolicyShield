@@ -42,7 +42,6 @@ nav:
   - Integrations:
     - LangChain: integrations/langchain.md
     - CrewAI: integrations/crewai.md
-    - Nanobot: integrations/nanobot.md
     - FastAPI: integrations/fastapi.md
   - CI/CD:
     - GitHub Actions: github-action.md
