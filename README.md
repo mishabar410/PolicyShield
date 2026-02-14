@@ -334,22 +334,6 @@ ruff format --check policyshield/ tests/  # Format check
 
 ---
 
-## Roadmap
-
-| Version | Status |
-|---------|--------|
-| **v0.1** | ✅ Core: YAML DSL, verdicts, PII, trace, CLI |
-| **v0.2** | ✅ Linter, hot reload, rate limiter, approval flow, LangChain |
-| **v0.3** | ✅ Async engine, CrewAI, OTel, webhooks, rule testing, policy diff |
-| **v0.4** | ✅ Post-call PII scan, context enrichment, definition filtering |
-| **v0.5** | ✅ PyPI, docs site, GitHub Action, Docker, CLI init |
-| **v0.6** | ✅ Observability: trace search, cost estimator, alerts, dashboard, Grafana |
-| **v1.0** | ✅ HTTP server, OpenClaw plugin, engine hardening, benchmarks |
-
-See [ROADMAP.md](ROADMAP.md) for the full roadmap.
-
----
-
 ## License
 
 [MIT](LICENSE)
