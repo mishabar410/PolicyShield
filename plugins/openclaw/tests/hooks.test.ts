@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { plugin, type OpenClawPluginApi } from "../src/index.js";
+import plugin, { type OpenClawPluginApi } from "../src/index.js";
 
 function mockFetch(response: unknown, status = 200) {
     return vi.spyOn(globalThis, "fetch").mockResolvedValue({
@@ -18,21 +18,38 @@ function mockFetchError() {
 
 type HookHandler = (...args: unknown[]) => unknown;
 
-/** Create a fake OpenClaw API that captures registered hooks. */
+/** Create a mock OpenClaw Plugin API that matches the real shape. */
 function createMockApi(config: Record<string, unknown> = {}) {
     const hooks = new Map<string, { handler: HookHandler; priority?: number }>();
     const logs: string[] = [];
-    const api: OpenClawPluginApi = {
+    const api = {
+        id: "policyshield",
+        name: "PolicyShield",
+        source: "test",
+        config: {},
         pluginConfig: config,
+        runtime: {},
         logger: {
             info: (msg: string) => logs.push(`INFO: ${msg}`),
             warn: (msg: string) => logs.push(`WARN: ${msg}`),
             debug: (msg: string) => logs.push(`DEBUG: ${msg}`),
+            error: (msg: string) => logs.push(`ERROR: ${msg}`),
         },
+        registerTool: () => { },
+        registerHook: () => { },
+        registerHttpHandler: () => { },
+        registerHttpRoute: () => { },
+        registerChannel: () => { },
+        registerGatewayMethod: () => { },
+        registerCli: () => { },
+        registerService: () => { },
+        registerProvider: () => { },
+        registerCommand: () => { },
+        resolvePath: (input: string) => input,
         on: (hookName: string, handler: HookHandler, opts?: { priority?: number }) => {
             hooks.set(hookName, { handler, priority: opts?.priority });
         },
-    };
+    } as unknown as OpenClawPluginApi;
     return { api, hooks, logs };
 }
 
@@ -44,7 +61,7 @@ describe("Plugin Registration (api.on pattern)", () => {
     it("registers three hooks via api.on()", async () => {
         mockFetch({}, 200); // health check
         const { api, hooks } = createMockApi({ mode: "disabled" });
-        await plugin.register(api);
+        await plugin.register!(api);
         expect(hooks.size).toBe(3);
         expect(hooks.has("before_tool_call")).toBe(true);
         expect(hooks.has("after_tool_call")).toBe(true);
@@ -54,14 +71,15 @@ describe("Plugin Registration (api.on pattern)", () => {
     it("sets correct priorities", async () => {
         mockFetch({}, 200);
         const { api, hooks } = createMockApi({ mode: "disabled" });
-        await plugin.register(api);
+        await plugin.register!(api);
         expect(hooks.get("before_tool_call")?.priority).toBe(100);
         expect(hooks.get("after_tool_call")?.priority).toBe(100);
         expect(hooks.get("before_agent_start")?.priority).toBe(50);
     });
 
     it("exports correct metadata", () => {
-        expect(plugin.name).toBe("policyshield");
+        expect(plugin.id).toBe("policyshield");
+        expect(plugin.name).toBe("PolicyShield");
         expect(plugin.version).toBe("0.7.0");
         expect(plugin.description).toContain("PolicyShield");
     });
@@ -75,11 +93,11 @@ describe("before_tool_call hook", () => {
     it("BLOCK verdict", async () => {
         mockFetch({ verdict: "BLOCK", message: "dangerous" });
         const { api, hooks } = createMockApi({});
-        await plugin.register(api);
+        await plugin.register!(api);
         const handler = hooks.get("before_tool_call")!.handler;
         const result = await handler(
             { toolName: "rm", params: {} },
-            { sessionKey: "sess-1", agentId: "agent-1" },
+            { sessionKey: "sess-1", agentId: "agent-1", toolName: "rm" },
         );
         expect(result).toEqual({
             block: true,
@@ -94,11 +112,11 @@ describe("before_tool_call hook", () => {
             modified_args: { x: "***" },
         });
         const { api, hooks } = createMockApi({});
-        await plugin.register(api);
+        await plugin.register!(api);
         const handler = hooks.get("before_tool_call")!.handler;
         const result = await handler(
             { toolName: "send", params: { x: "secret" } },
-            { sessionKey: "sess-1", agentId: "agent-1" },
+            { sessionKey: "sess-1", agentId: "agent-1", toolName: "send" },
         );
         expect(result).toEqual({ params: { x: "***" } });
     });
@@ -106,11 +124,11 @@ describe("before_tool_call hook", () => {
     it("ALLOW verdict", async () => {
         mockFetch({ verdict: "ALLOW", message: "" });
         const { api, hooks } = createMockApi({});
-        await plugin.register(api);
+        await plugin.register!(api);
         const handler = hooks.get("before_tool_call")!.handler;
         const result = await handler(
             { toolName: "echo", params: {} },
-            { sessionKey: "sess-1", agentId: "agent-1" },
+            { sessionKey: "sess-1", agentId: "agent-1", toolName: "echo" },
         );
         expect(result).toBeUndefined();
     });
@@ -138,11 +156,11 @@ describe("before_tool_call hook", () => {
         });
 
         const { api, hooks } = createMockApi({});
-        await plugin.register(api);
+        await plugin.register!(api);
         const handler = hooks.get("before_tool_call")!.handler;
         const result = await handler(
             { toolName: "deploy", params: {} },
-            { sessionKey: "sess-1", agentId: "agent-1" },
+            { sessionKey: "sess-1", agentId: "agent-1", toolName: "deploy" },
         );
         expect(result).toBeUndefined(); // approved → proceed
     });
@@ -171,11 +189,11 @@ describe("before_tool_call hook", () => {
         });
 
         const { api, hooks } = createMockApi({});
-        await plugin.register(api);
+        await plugin.register!(api);
         const handler = hooks.get("before_tool_call")!.handler;
         const result = await handler(
             { toolName: "deploy", params: {} },
-            { sessionKey: "sess-1", agentId: "agent-1" },
+            { sessionKey: "sess-1", agentId: "agent-1", toolName: "deploy" },
         );
         expect(result).toEqual({
             block: true,
@@ -192,11 +210,11 @@ describe("after_tool_call hook", () => {
     it("sends post-check", async () => {
         const spy = mockFetch({ pii_types: [] });
         const { api, hooks } = createMockApi({ mode: "disabled" });
-        await plugin.register(api);
+        await plugin.register!(api);
         const handler = hooks.get("after_tool_call")!.handler;
         await handler(
             { toolName: "echo", params: { x: 1 }, result: "ok" },
-            { sessionKey: "sess-1", agentId: "agent-1" },
+            { sessionKey: "sess-1", agentId: "agent-1", toolName: "echo" },
         );
         const calls = spy.mock.calls.filter((c) =>
             String(c[0]).includes("/post-check"),
@@ -207,7 +225,7 @@ describe("after_tool_call hook", () => {
     it("handles non-string result", async () => {
         const spy = mockFetch({ pii_types: [] });
         const { api, hooks } = createMockApi({ mode: "disabled" });
-        await plugin.register(api);
+        await plugin.register!(api);
         const handler = hooks.get("after_tool_call")!.handler;
         await handler(
             {
@@ -215,7 +233,7 @@ describe("after_tool_call hook", () => {
                 params: {},
                 result: { rows: [1, 2, 3] },
             },
-            { sessionKey: "sess-1", agentId: "agent-1" },
+            { sessionKey: "sess-1", agentId: "agent-1", toolName: "query" },
         );
         const calls = spy.mock.calls.filter((c) =>
             String(c[0]).includes("/post-check"),
@@ -234,9 +252,12 @@ describe("before_agent_start hook", () => {
     it("injects constraints", async () => {
         mockFetch({ summary: "No file deletions allowed" });
         const { api, hooks } = createMockApi({ mode: "disabled" });
-        await plugin.register(api);
+        await plugin.register!(api);
         const handler = hooks.get("before_agent_start")!.handler;
-        const result = (await handler()) as { prependContext: string } | undefined;
+        const result = (await handler(
+            { prompt: "help me" },
+            { agentId: "a1", sessionKey: "sess-1" },
+        )) as { prependContext: string } | undefined;
         expect(result).toBeDefined();
         expect(result!.prependContext).toContain("PolicyShield");
         expect(result!.prependContext).toContain("No file deletions");
@@ -245,9 +266,12 @@ describe("before_agent_start hook", () => {
     it("server down — returns undefined", async () => {
         mockFetchError();
         const { api, hooks } = createMockApi({});
-        await plugin.register(api);
+        await plugin.register!(api);
         const handler = hooks.get("before_agent_start")!.handler;
-        const result = await handler();
+        const result = await handler(
+            { prompt: "hello" },
+            { agentId: "a1" },
+        );
         expect(result).toBeUndefined();
     });
 });

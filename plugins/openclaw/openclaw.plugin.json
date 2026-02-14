@@ -1,35 +1,27 @@
 {
     "id": "policyshield",
-    "name": "PolicyShield",
-    "description": "Runtime policy enforcement for AI agent tool calls — block, redact, audit",
-    "version": "0.7.0",
     "configSchema": {
         "type": "object",
         "properties": {
             "url": {
                 "type": "string",
-                "default": "http://localhost:8100",
-                "description": "PolicyShield server URL"
+                "default": "http://localhost:8100"
             },
             "mode": {
-                "type": "string",
                 "enum": [
                     "enforce",
                     "audit",
                     "disabled"
                 ],
-                "default": "enforce",
-                "description": "Enforcement mode"
+                "default": "enforce"
             },
             "fail_open": {
                 "type": "boolean",
-                "default": true,
-                "description": "Allow tool calls when server is unreachable"
+                "default": true
             },
             "timeout_ms": {
                 "type": "number",
-                "default": 5000,
-                "description": "HTTP request timeout in milliseconds"
+                "default": 5000
             }
         }
     }

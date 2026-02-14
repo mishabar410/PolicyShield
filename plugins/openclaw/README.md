@@ -1,62 +1,70 @@
 # PolicyShield Plugin for OpenClaw
 
-Runtime policy enforcement for AI agent tool calls.
+Runtime policy enforcement for AI agent tool calls — block, redact, audit, approve.
 
 ## Installation
 
-```bash
-openclaw plugin install openclaw-plugin-policyshield
+Place this extension in your OpenClaw workspace's `extensions/` directory, or install via the plugin registry once published.
+
 ```
-
-## Prerequisites
-
-PolicyShield server must be running:
-
-```bash
-pip install policyshield[server]
-policyshield server --rules ./rules.yaml --port 8100
+extensions/
+  policyshield/
+    index.ts
+    src/
+    openclaw.plugin.json
+    package.json
 ```
 
 ## Configuration
 
-In `openclaw.yaml`:
+Add to your OpenClaw config (`openclaw.yaml` or UI):
 
 ```yaml
 plugins:
   policyshield:
-    url: http://localhost:8100
-    mode: enforce        # enforce | audit | disabled
-    fail_open: true      # allow calls when server is down
-    timeout_ms: 5000     # HTTP timeout
+    url: "http://localhost:8100"      # PolicyShield server URL
+    mode: "enforce"                    # enforce | audit | disabled
+    fail_open: true                    # allow tool calls when server is unreachable
+    timeout_ms: 5000                   # HTTP request timeout
 ```
 
 ## How It Works
 
-1. **before_tool_call**: Every tool call is checked against your policy rules
-2. **BLOCK**: Dangerous operations are stopped before execution
-3. **REDACT**: PII is automatically masked in arguments
-4. **after_tool_call**: Tool outputs are scanned for PII (audit trail)
-5. **before_agent_start**: Active rules are injected into the agent's context
+The plugin hooks into three OpenClaw lifecycle events:
+
+| Hook | What it does |
+|------|-------------|
+| `before_tool_call` | Checks the tool call against PolicyShield rules. Can **BLOCK**, **REDACT** parameters, require **APPROVE** (human-in-the-loop), or **ALLOW**. |
+| `after_tool_call` | Scans tool output for PII via the PolicyShield post-check API. |
+| `before_agent_start` | Injects active policy constraints into the agent's context. |
 
 ## Modes
 
-| Mode       | Behavior                                                  |
-|------------|-----------------------------------------------------------|
-| `enforce`  | Block/redact based on rules (default)                     |
-| `audit`    | Log verdicts but always allow (for testing)               |
-| `disabled` | Skip all checks (pass-through)                            |
+- **`enforce`** — Full enforcement. BLOCK/REDACT/APPROVE verdicts are applied.
+- **`audit`** — Logs verdicts but always allows tool calls (shadow mode).
+- **`disabled`** — Plugin does nothing (ALLOW everything).
 
 ## Graceful Degradation
 
-- If the server is unreachable at startup, the plugin logs a warning and continues
-- If `fail_open: true` (default), tool calls are allowed when the server is down
-- If `fail_open: false`, tool calls are blocked when the server is unreachable
+If the PolicyShield server is unreachable:
+- **`fail_open: true`** (default) — Tool calls proceed with a warning logged.
+- **`fail_open: false`** — All tool calls are blocked until the server recovers.
 
 ## Development
 
 ```bash
-cd plugins/openclaw
-npm install
-npm run build   # compile TypeScript
-npm test        # run tests
+# Run tests
+npm test
+
+# Type check
+npx tsc --noEmit
+
+# Build
+npm run build
 ```
+
+## Requirements
+
+- OpenClaw (any recent version)
+- PolicyShield server running at the configured URL
+- Node.js 18+ (for `fetch` and `AbortSignal.timeout`)

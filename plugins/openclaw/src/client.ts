@@ -1,3 +1,4 @@
+import type { PluginLogger } from "./openclaw-plugin-sdk.js";
 import type {
     PluginConfig,
     CheckRequest,
@@ -13,12 +14,14 @@ export class PolicyShieldClient {
     private readonly timeout: number;
     private readonly mode: string;
     private readonly failOpen: boolean;
+    private readonly logger?: PluginLogger;
 
-    constructor(config: PluginConfig = {}) {
+    constructor(config: PluginConfig = {}, logger?: PluginLogger) {
         this.url = (config.url ?? "http://localhost:8100").replace(/\/$/, "");
         this.timeout = config.timeout_ms ?? 5000;
         this.mode = config.mode ?? "enforce";
         this.failOpen = config.fail_open ?? true;
+        this.logger = logger;
     }
 
     async check(req: CheckRequest): Promise<CheckResponse> {
@@ -37,7 +40,7 @@ export class PolicyShieldClient {
             }
             const verdict = (await res.json()) as CheckResponse;
             if (this.mode === "audit") {
-                console.log(
+                this.logger?.info(
                     `[policyshield:audit] ${req.tool_name}: ${verdict.verdict} — ${verdict.message}`,
                 );
                 return { verdict: "ALLOW", message: "" };
@@ -45,7 +48,7 @@ export class PolicyShieldClient {
             return verdict;
         } catch (err) {
             if (this.failOpen) {
-                console.warn(
+                this.logger?.warn(
                     `[policyshield] server unreachable, fail-open: ${String(err)}`,
                 );
                 return { verdict: "ALLOW", message: "" };

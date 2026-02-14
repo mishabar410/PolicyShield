@@ -1,4 +1,11 @@
-# PolicyShield rules — preset: openclaw
+# PolicyShield rules for OpenClaw agents
+#
+# Real OpenClaw tool names (from openclaw/src/agents/tools/):
+#   message, canvas, image, gateway, cron, tts, sessions_send,
+#   sessions_spawn, sessions_list, sessions_history, session_status,
+#   agents_list, memory_search, memory_get
+#
+# Tool names from MCP servers or custom tools will vary by setup.
 shield_name: openclaw-policy
 version: 1
 rules:
