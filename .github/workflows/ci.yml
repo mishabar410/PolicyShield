@@ -61,3 +61,16 @@ jobs:
         with:
           name: dist
           path: dist/
+
+  benchmark:
+    runs-on: ubuntu-latest
+    needs: [test]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -e ".[dev,server]"
+      - name: Run benchmarks
+        run: pytest tests/test_benchmark.py tests/test_server_benchmark.py -m benchmark -v --tb=short

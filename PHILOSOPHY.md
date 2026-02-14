@@ -280,7 +280,8 @@ PolicyShield sits in the hot path of every tool call. Its overhead must be negli
 - LLM inference time (seconds)
 - Tool execution time (milliseconds to seconds)
 
-**Target: < 5ms per check** for rule matching, PII scan, and verdict building combined.
+**Performance target:** < 5ms p99 per sync check, < 10ms p99 per async check
+(async includes `asyncio.to_thread` overhead for CPU-bound regex matching).
 
 ### Memory footprint
 

@@ -92,6 +92,9 @@ line-length = 120
 target-version = "py310"
 
 [tool.pytest.ini_options]
-markers = ["benchmark: performance benchmarks (not run by default)"]
+markers = [
+    "benchmark: performance benchmarks (deselect with '-m \"not benchmark\"')",
+    "slow: slow tests",
+]
 addopts = "-m 'not benchmark'"
 
