@@ -1,0 +1,19 @@
+FROM python:3.12-slim AS base
+
+WORKDIR /app
+
+# Install only server dependencies
+COPY pyproject.toml README.md ./
+COPY policyshield/ policyshield/
+RUN pip install --no-cache-dir ".[server]"
+
+# Default rules (can be overridden by volume mount)
+COPY examples/fastapi_agent/policies/rules.yaml /app/rules.yaml
+
+EXPOSE 8100
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8100/api/v1/health')"
+
+ENTRYPOINT ["policyshield", "server"]
+CMD ["--rules", "/app/rules.yaml", "--port", "8100", "--host", "0.0.0.0"]
