@@ -4,6 +4,15 @@ All notable changes to PolicyShield will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.8.2] - 2026-02-15
+
+### Fixed
+- **SPEC.md**: deleted — code examples were outdated (old plugin pattern, wrong CLI commands, features marked TODO already implemented)
+- **ROADMAP.md**: added v0.8 status, moved npm publish from v1.0 planned (already done), updated v1.0 goals
+
+### Added
+- **Troubleshooting**: added common issues table to main README (5 entries)
+
 ## [0.8.1] - 2026-02-14
 
 ### Fixed

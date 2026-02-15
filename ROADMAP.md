@@ -57,7 +57,7 @@
 - Dashboard frontend: dark-themed SPA
 - Prometheus exporter + Grafana preset
 
-### v0.7 — Audit Fixes & Plugin Compliance ✅ (current)
+### v0.7 — Audit Fixes & Plugin Compliance ✅
 - Async engine in HTTP server (no event loop blocking)
 - Server hot-reload with `/api/v1/reload` endpoint
 - OpenClaw Plugin rewritten for real `api.on()` API
@@ -66,15 +66,23 @@
 - Repo cleanup (docker paths, vendored docs)
 - 290+ tests, 85% coverage
 
+### v0.8 — Docs & npm Publish ✅ (current)
+- `@policyshield/openclaw-plugin` published to npm
+- OpenClaw integration docs fully rewritten
+- Documentation consistency pass across README, plugin README, integration guide
+- 715+ tests
+
 ## Next
 
 ### v1.0 — Production Release (planned)
-- OpenClaw plugin published to npm
-- E2E integration test suite (plugin ↔ server ↔ engine)
-- Schema versioning for rule format
-- Backward compatibility tests for rules
+- E2E integration test suite (plugin ↔ server ↔ engine, real HTTP)
+- Bounded session storage (LRU eviction, TTL)
+- Rule composition (`include:` / `extends:` / `priority:`)
+- Server authentication (Bearer token for `/api/v1/reload`)
+- Mypy type checking in CI
+- Coverage gate raised to 90%
+- `SECURITY.md` with threat model
 - Production deployment guide
-- Security audit
 
 ---
 

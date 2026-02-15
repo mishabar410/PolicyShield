@@ -316,6 +316,20 @@ docker compose run test
 
 ---
 
+## Troubleshooting
+
+| Problem | Solution |
+|---------|----------|
+| `Connection refused` on plugin install | Start PolicyShield server first: `policyshield server --rules rules.yaml` |
+| Server starts but plugin gets timeouts | Check port matches — default is `8100`. Configure in OpenClaw: `openclaw config set plugins.policyshield.url http://localhost:8100` |
+| Rules not reloading after edit | Hot-reload watches the file passed to `--rules`. Or call `POST /api/v1/reload` manually |
+| `policyshield: command not found` | Install with server extra: `pip install "policyshield[server]"` |
+| PII not detected in non-English text | Current PII detector is regex-based (L0). RU patterns (INN, SNILS, passport) are supported. NER-based L1 detection is on the roadmap |
+
+For OpenClaw-specific issues, see the [full integration guide](docs/integrations/openclaw.md).
+
+---
+
 ## Development
 
 ```bash
@@ -324,7 +338,7 @@ cd PolicyShield
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev,server]"
 
-pytest tests/ -v                 # 700+ tests
+pytest tests/ -v                 # 715+ tests
 ruff check policyshield/ tests/  # Lint
 ruff format --check policyshield/ tests/  # Format check
 ```
