@@ -355,6 +355,46 @@ openclaw plugins install @policyshield/openclaw-plugin
 
 ---
 
+## Limitations & Trade-offs
+
+### Output PII Scanning — Cannot Block
+
+The `after_tool_call` hook in OpenClaw's plugin SDK returns `void`. This means:
+
+- ✅ PolicyShield **detects** PII in tool output (email, phone, SSN, etc.)
+- ✅ PolicyShield **logs** PII detection as an audit event
+- ✅ PolicyShield **taints** the session (if `taint_chain` is enabled)
+- ❌ PolicyShield **cannot modify or block** the output — it has already been delivered to the agent
+
+**Mitigation:** Enable `taint_chain` in your rules to block subsequent outgoing calls (like `send_message`, `web_fetch`) after PII is detected in output:
+
+```yaml
+taint_chain:
+  enabled: true
+  outgoing_tools: [send_message, web_fetch, exec]
+```
+
+This prevents the agent from **leaking** PII to external services, even though it has already **seen** the PII.
+
+### Two-Process Architecture
+
+PolicyShield runs as a separate Python process from OpenClaw (Node.js). This means:
+
+- **Latency:** Each tool call adds an HTTP round-trip (~1-5ms on localhost)
+- **Deployment:** Two processes to manage (or use Docker Compose)
+- **Failure mode:** If PolicyShield crashes, behavior depends on `fail_open` config
+
+### Regex-Based PII Detection
+
+Current PII detection uses regex patterns (Level 0). This means:
+
+- ✅ Fast (<1ms per scan)
+- ❌ May produce false positives (e.g., numbers that look like phone numbers)
+- ❌ Cannot detect semantic PII (e.g., "call John at his home number")
+- 🔜 NER-based detection (Level 1) is on the roadmap
+
+---
+
 ## Upgrading
 
 See the [Migration Guide](openclaw-migration.md) for version-specific upgrade instructions.

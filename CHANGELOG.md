@@ -4,6 +4,28 @@ All notable changes to PolicyShield will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.9.0] - 2026-02-15
+
+### Added
+- `policyshield openclaw setup/teardown/status` CLI commands
+- Server Bearer token authentication via `POLICYSHIELD_API_TOKEN`
+- PII taint chain: `taint_chain` config in rules YAML
+- `/api/v1/clear-taint` endpoint
+- E2E test suite with real OpenClaw (Docker Compose)
+- SDK type auto-sync script + CI job
+- Compatibility matrix and migration guide
+- `docker-compose.openclaw.yml` for one-file deployment
+
+### Changed
+- Plugin config: added `api_token` field
+- OpenClaw preset rules: includes `taint_chain` (disabled by default)
+- Quickstart: three options (one-command, Docker, step-by-step)
+
+### Documentation
+- Explicit limitations section (output blocking, PII detection)
+- Migration guide: 0.7→0.8 and 0.8→0.9
+- Version compatibility table
+
 ## [0.8.2] - 2026-02-15
 
 ### Fixed

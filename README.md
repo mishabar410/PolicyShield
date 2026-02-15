@@ -98,40 +98,55 @@ policyshield init --preset security --no-interactive
 
 ---
 
-## OpenClaw Integration
+## ⚡ OpenClaw Integration (60 seconds)
 
 PolicyShield integrates natively with [OpenClaw](https://github.com/AgenturAI/OpenClaw) as a plugin.
 Verified with OpenClaw 2026.2.13.
 
-### 1. Start the PolicyShield server
+### Option A: One Command (recommended)
 
 ```bash
 pip install "policyshield[server]"
-policyshield init --preset openclaw --no-interactive   # → rules.yaml
+policyshield openclaw setup
+```
+
+That's it. This will:
+1. Generate security rules (`rules.yaml`)
+2. Start PolicyShield server (port 8100)
+3. Install the OpenClaw plugin
+4. Configure the connection
+5. Verify everything works
+
+### Option B: Docker
+
+```bash
+curl -O https://raw.githubusercontent.com/mishabar410/PolicyShield/main/docker/docker-compose.openclaw.yml
+docker compose -f docker-compose.openclaw.yml up
+```
+
+### Option C: Step by Step
+
+```bash
+# 1. Install and generate rules
+pip install "policyshield[server]"
+policyshield init --preset openclaw
+
+# 2. Start server (new terminal)
 policyshield server --rules rules.yaml --port 8100
-```
 
-### 2. Install the plugin into OpenClaw
-
-```bash
+# 3. Install plugin
 openclaw plugins install @policyshield/openclaw-plugin
-```
 
-### 3. Configure the server URL
-
-```bash
+# 4. Configure
 openclaw config set plugins.entries.policyshield.config.url http://localhost:8100
-```
 
-### 4. Verify and test
-
-```bash
-openclaw plugins info policyshield    # → ✓ Connected to PolicyShield server
-openclaw agent --local -m "Run: rm -rf /"  # → BLOCKED by policy
+# 5. Verify
+curl http://localhost:8100/api/v1/health
 ```
 
 See the **[full integration guide](docs/integrations/openclaw.md)** and
-[`plugins/openclaw/README.md`](plugins/openclaw/README.md) for configuration reference and troubleshooting.
+[`plugins/openclaw/README.md`](plugins/openclaw/README.md) for configuration, troubleshooting,
+and the [Migration Guide](docs/integrations/openclaw-migration.md) for version upgrades.
 
 ---
 

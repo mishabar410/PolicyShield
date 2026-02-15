@@ -66,11 +66,23 @@
 - Repo cleanup (docker paths, vendored docs)
 - 290+ tests, 85% coverage
 
-### v0.8 — Docs & npm Publish ✅ (current)
+### v0.8 — Docs & npm Publish ✅
 - `@policyshield/openclaw-plugin` published to npm
 - OpenClaw integration docs fully rewritten
 - Documentation consistency pass across README, plugin README, integration guide
 - 715+ tests
+
+### v0.9 — OpenClaw 10/10 ✅ (current)
+- SDK type auto-sync script + CI (weekly cron)
+- E2E integration tests with real OpenClaw (Docker Compose, 5 scenarios)
+- E2E CI job on every PR
+- Server Bearer token authentication (`POLICYSHIELD_API_TOKEN`)
+- PII taint chain: block outgoing calls after PII leak in output
+- `policyshield openclaw setup` — one-command integration
+- Compatibility matrix and migration guide
+- Quickstart: Option A (1 cmd), Option B (Docker), Option C (step-by-step)
+- Explicit limitations documentation (output blocking, PII detection)
+- 720+ tests
 
 ## Next
 
