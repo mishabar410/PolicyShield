@@ -43,7 +43,6 @@ _VALID_YAML = textwrap.dedent("""\
         endpoint: http://otel:4317
       approval:
         backend: inmemory
-        timeout: 60.0
 """)
 
 _RULES_YAML = textwrap.dedent("""\
@@ -91,7 +90,6 @@ def test_load_from_file(tmp_path, monkeypatch):
     assert cfg.sanitizer_max_string_length == 5000
     assert cfg.otel_enabled is True
     assert cfg.otel_service_name == "my-shield"
-    assert cfg.approval_timeout == 60.0
 
 
 def test_env_var_expansion(tmp_path, monkeypatch):

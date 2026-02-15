@@ -112,10 +112,15 @@ class AsyncShieldEngine(BaseShieldEngine):
         # Session state for condition matching
         session_state = self._build_session_state(session_id)
 
+        # Snapshot matcher + rule_set atomically to avoid race with hot-reload
+        with self._lock:
+            matcher = self._matcher
+            rule_set = self._rule_set
+
         # Offload CPU-bound matching to thread
         try:
             match = await asyncio.to_thread(
-                self._matcher.find_best_match,
+                matcher.find_best_match,
                 tool_name=tool_name,
                 args=args,
                 session_state=session_state,
@@ -132,7 +137,7 @@ class AsyncShieldEngine(BaseShieldEngine):
             )
 
         if match is None:
-            default = self._rule_set.default_verdict
+            default = rule_set.default_verdict
             if default == Verdict.BLOCK:
                 return ShieldResult(
                     verdict=Verdict.BLOCK,
@@ -226,6 +231,14 @@ class AsyncShieldEngine(BaseShieldEngine):
 
         # Offload sync approval backend submit to thread
         await asyncio.to_thread(self._approval_backend.submit, req)
+
+        # Store metadata for cache population after resolution
+        self._approval_meta[req.request_id] = {
+            "tool_name": tool_name,
+            "rule_id": rule.id,
+            "session_id": session_id,
+            "strategy": strategy,
+        }
 
         # Return APPROVE verdict with the approval_id for async polling
         return ShieldResult(

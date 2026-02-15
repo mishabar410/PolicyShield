@@ -294,34 +294,58 @@ class PIIDetector:
                     start, end = match.span
                     value = value[:start] + match.masked_value + value[end:]
                 redacted[field_name] = value
-            elif "." in field_name:
+            elif "." in field_name or "[" in field_name:
                 # Nested field: navigate into the dict to redact in-place
-                parts = field_name.split(".")
+                parts = self._parse_field_path(field_name)
                 self._redact_nested(redacted, parts, matches)
 
         return redacted, all_matches
 
+    @staticmethod
+    def _parse_field_path(field_name: str) -> list[str | int]:
+        """Parse a field path like ``items[0].name`` into ``['items', 0, 'name']``."""
+        parts: list[str | int] = []
+        for segment in field_name.split("."):
+            # Split "key[0]" → key, 0
+            bracket = segment.find("[")
+            if bracket == -1:
+                parts.append(segment)
+            else:
+                if bracket > 0:
+                    parts.append(segment[:bracket])
+                # Extract all indices: e.g. "[0][1]" → 0, 1
+                for idx_match in re.finditer(r"\[(\d+)\]", segment):
+                    parts.append(int(idx_match.group(1)))
+        return parts
+
     def _redact_nested(
         self,
         data: dict[str, Any],
-        parts: list[str],
+        parts: list[str | int],
         matches: list[PIIMatch],
     ) -> None:
-        """Redact a nested field located at dot-separated path *parts*."""
+        """Redact a nested field located at parsed path *parts*."""
         obj: Any = data
         for part in parts[:-1]:
-            if isinstance(obj, dict) and part in obj:
-                obj = obj[part]
-            elif isinstance(obj, list):
-                try:
-                    obj = obj[int(part)]
-                except (ValueError, IndexError):
+            if isinstance(part, int):
+                if isinstance(obj, list) and part < len(obj):
+                    obj = obj[part]
+                else:
                     return
+            elif isinstance(obj, dict) and part in obj:
+                obj = obj[part]
             else:
                 return
 
         key = parts[-1]
-        if isinstance(obj, dict) and key in obj and isinstance(obj[key], str):
+        if isinstance(key, int):
+            if isinstance(obj, list) and key < len(obj) and isinstance(obj[key], str):
+                value = obj[key]
+                for match in sorted(matches, key=lambda m: m.span[0], reverse=True):
+                    start, end = match.span
+                    value = value[:start] + match.masked_value + value[end:]
+                obj[key] = value
+        elif isinstance(obj, dict) and key in obj and isinstance(obj[key], str):
             value = obj[key]
             for match in sorted(matches, key=lambda m: m.span[0], reverse=True):
                 start, end = match.span

@@ -403,3 +403,98 @@ class TestPassportRegex:
         matches = detector.scan("Product AB123456 ships tomorrow")
         passport = [m for m in matches if m.pii_type == PIIType.PASSPORT]
         assert len(passport) == 0, "6-digit product codes should not match"
+
+
+# ── NEW: PII array-index redaction ───────────────────────────────────
+
+
+class TestPIIArrayRedaction:
+    """redact_dict should handle PII inside list elements and nested array paths."""
+
+    def test_redact_string_in_list(self):
+        detector = PIIDetector()
+        data = {"emails": ["alice@example.com", "safe_text"]}
+        redacted, matches = detector.redact_dict(data)
+        assert len(matches) >= 1
+        assert "alice@example.com" not in str(redacted["emails"][0])
+
+    def test_redact_nested_dict_in_list(self):
+        detector = PIIDetector()
+        data = {"users": [{"name": "Bob", "email": "bob@corp.com"}]}
+        redacted, matches = detector.redact_dict(data)
+        assert len(matches) >= 1
+        assert "bob@corp.com" not in str(redacted["users"][0]["email"])
+
+    def test_parse_field_path(self):
+        parts = PIIDetector._parse_field_path("items[0].contact.email")
+        assert parts == ["items", 0, "contact", "email"]
+
+    def test_parse_field_path_multiple_indices(self):
+        parts = PIIDetector._parse_field_path("a[0][1].b")
+        assert parts == ["a", 0, 1, "b"]
+
+    def test_parse_field_path_simple(self):
+        parts = PIIDetector._parse_field_path("simple")
+        assert parts == ["simple"]
+
+
+# ── NEW: Idempotent approval polling ─────────────────────────────────
+
+
+class TestApprovalIdempotentPolling:
+    """get_approval_status should be safe to call multiple times."""
+
+    def test_poll_twice_returns_same_result(self, tmp_path):
+        from policyshield.approval.memory import InMemoryBackend
+
+        backend = InMemoryBackend()
+        rules_path = _write_rule(
+            tmp_path,
+            [{"id": "approve-it", "when": {"tool": "sensitive"}, "then": "APPROVE"}],
+        )
+        engine = ShieldEngine(str(rules_path), approval_backend=backend)
+        result = engine.check("sensitive")
+        assert result.verdict == Verdict.APPROVE
+
+        backend.respond(result.approval_id, approved=True, responder="admin")
+        status1 = engine.get_approval_status(result.approval_id)
+        status2 = engine.get_approval_status(result.approval_id)
+        assert status1["status"] == "approved"
+        assert status1 == status2
+
+
+# ── NEW: Approval cache population ───────────────────────────────────
+
+
+class TestApprovalCachePopulation:
+    """get_approval_status should populate the approval cache."""
+
+    def test_cache_populated_after_approval(self, tmp_path):
+        from policyshield.approval.cache import ApprovalCache, ApprovalStrategy
+        from policyshield.approval.memory import InMemoryBackend
+
+        backend = InMemoryBackend()
+        cache = ApprovalCache(strategy=ApprovalStrategy.PER_RULE)
+        rules_path = _write_rule(
+            tmp_path,
+            [
+                {
+                    "id": "approve-it",
+                    "when": {"tool": "sensitive"},
+                    "then": "APPROVE",
+                    "approval_strategy": "per_rule",
+                }
+            ],
+        )
+        engine = ShieldEngine(
+            str(rules_path), approval_backend=backend, approval_cache=cache
+        )
+        result = engine.check("sensitive", session_id="s1")
+        assert result.verdict == Verdict.APPROVE
+
+        backend.respond(result.approval_id, approved=True, responder="admin")
+        engine.get_approval_status(result.approval_id)
+
+        cached = cache.get("sensitive", "approve-it", "s1")
+        assert cached is not None
+        assert cached.approved is True

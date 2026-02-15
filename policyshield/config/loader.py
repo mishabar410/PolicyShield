@@ -58,7 +58,6 @@ class PolicyShieldConfig:
 
     # approval
     approval_backend: str = "inmemory"
-    approval_timeout: float = 300.0
 
 
 # ────────────────────────────────────────────────────────────────────
@@ -165,7 +164,6 @@ def _build_config(data: dict) -> PolicyShieldConfig:
         otel_service_name=otel.get("service_name", "policyshield") if isinstance(otel, dict) else "policyshield",
         otel_endpoint=otel.get("endpoint") if isinstance(otel, dict) else None,
         approval_backend=approval.get("backend", "inmemory") if isinstance(approval, dict) else "inmemory",
-        approval_timeout=float(approval.get("timeout", 300.0)) if isinstance(approval, dict) else 300.0,
     )
 
 
@@ -309,7 +307,6 @@ def render_config(config: PolicyShieldConfig) -> str:
             },
             "approval": {
                 "backend": config.approval_backend,
-                "timeout": config.approval_timeout,
             },
         }
     }

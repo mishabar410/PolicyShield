@@ -42,7 +42,6 @@ class BaseShieldEngine:
         trace_recorder: TraceRecorder | None = None,
         rate_limiter: object | None = None,
         approval_backend: ApprovalBackend | None = None,
-        approval_timeout: float = 300.0,
         approval_cache: ApprovalCache | None = None,
         fail_open: bool = True,
         otel_exporter: object | None = None,
@@ -58,7 +57,6 @@ class BaseShieldEngine:
             trace_recorder: Optional trace recorder instance.
             rate_limiter: Optional RateLimiter instance.
             approval_backend: Optional approval backend for APPROVE verdicts.
-            approval_timeout: Seconds to wait for approval response.
             approval_cache: Optional approval cache for batch strategies.
             fail_open: If True, errors in shield don't block tool calls.
             otel_exporter: Optional OTelExporter for OpenTelemetry integration.
@@ -79,13 +77,16 @@ class BaseShieldEngine:
         self._tracer = trace_recorder
         self._rate_limiter = rate_limiter
         self._approval_backend = approval_backend
-        self._approval_timeout = approval_timeout
         self._approval_cache = approval_cache
         self._fail_open = fail_open
         self._otel = otel_exporter
         self._sanitizer = sanitizer
         self._lock = threading.Lock()
         self._watcher = None
+        # Approval metadata for cache population after resolution
+        self._approval_meta: dict[str, dict] = {}
+        # Resolved approval statuses for idempotent polling
+        self._resolved_approvals: dict[str, dict] = {}
 
         # Taint chain config
         tc = self._rule_set.taint_chain
@@ -263,6 +264,14 @@ class BaseShieldEngine:
         )
         self._approval_backend.submit(req)
 
+        # Store metadata for cache population after resolution
+        self._approval_meta[req.request_id] = {
+            "tool_name": tool_name,
+            "rule_id": rule.id,
+            "session_id": session_id,
+            "strategy": strategy,
+        }
+
         # Return APPROVE verdict with the approval_id for async polling
         return ShieldResult(
             verdict=Verdict.APPROVE,
@@ -277,15 +286,36 @@ class BaseShieldEngine:
         Returns:
             dict with 'status' ('pending', 'approved', 'denied') and optional 'responder'.
         """
+        # Return cached result for idempotent polling
+        if approval_id in self._resolved_approvals:
+            return self._resolved_approvals[approval_id]
+
         if self._approval_backend is None:
             return {"status": "denied", "responder": None}
 
         resp = self._approval_backend.wait_for_response(approval_id, timeout=0.0)
         if resp is None:
             return {"status": "pending", "responder": None}
+
+        # Build and cache the resolved status
         if resp.approved:
-            return {"status": "approved", "responder": resp.responder}
-        return {"status": "denied", "responder": resp.responder}
+            result = {"status": "approved", "responder": resp.responder}
+        else:
+            result = {"status": "denied", "responder": resp.responder}
+        self._resolved_approvals[approval_id] = result
+
+        # Populate approval cache for batch strategies
+        if self._approval_cache is not None and approval_id in self._approval_meta:
+            meta = self._approval_meta.pop(approval_id)
+            self._approval_cache.put(
+                tool_name=meta["tool_name"],
+                rule_id=meta["rule_id"],
+                session_id=meta["session_id"],
+                response=resp,
+                strategy=meta["strategy"],
+            )
+
+        return result
 
     # ------------------------------------------------------------------ #
     #  Shared helpers                                                     #
