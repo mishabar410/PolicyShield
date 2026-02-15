@@ -1,0 +1,14 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+COPY pyproject.toml .
+COPY policyshield/ policyshield/
+
+RUN pip install --no-cache-dir ".[server]"
+
+# Copy E2E test rules
+COPY tests/e2e-openclaw/rules/ /app/rules/
+
+EXPOSE 8100
+
+CMD ["policyshield", "server", "--rules", "/app/rules/e2e-rules.yaml", "--host", "0.0.0.0", "--port", "8100"]

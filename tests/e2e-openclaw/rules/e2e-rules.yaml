@@ -1,0 +1,27 @@
+version: "1"
+default_verdict: allow
+
+rules:
+  - id: block-rm
+    tool: exec
+    match:
+      args:
+        command:
+          contains: "rm -rf"
+    then: block
+    message: "Destructive command blocked"
+
+  - id: redact-email
+    tool: "*"
+    match:
+      pii: [EMAIL]
+    then: redact
+
+  - id: approve-write
+    tool: write_file
+    match:
+      args:
+        path:
+          glob: "/etc/**"
+    then: approve
+    message: "System file write requires approval"

@@ -1,0 +1,14 @@
+{
+    "name": "@policyshield/e2e-openclaw-tests",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "test": "vitest run",
+        "test:watch": "vitest"
+    },
+    "devDependencies": {
+        "vitest": "^1.0.0",
+        "typescript": "^5.0.0",
+        "@types/node": "^25.2.3"
+    }
+}

@@ -1,0 +1,47 @@
+# ⚠️ TIER 3 — MANUAL ONLY
+# Requires LLM_API_KEY and ~5 min build time (no public OpenClaw image).
+# See tests/e2e-openclaw/RESEARCH.md for full rationale.
+#
+# Usage:
+#   export LLM_API_KEY=sk-...
+#   docker compose up --build
+#
+# Prerequisites:
+#   - Docker daemon running
+#   - LLM API key with sufficient quota
+#   - plugins/openclaw built: cd plugins/openclaw && npm run build
+
+services:
+  policyshield:
+    build:
+      context: ../../
+      dockerfile: tests/e2e-openclaw/Dockerfile.policyshield
+    ports:
+      - "8100:8100"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8100/api/v1/health"]
+      interval: 2s
+      timeout: 5s
+      retries: 10
+    environment:
+      - POLICYSHIELD_LOG_LEVEL=debug
+
+  openclaw:
+    # No public image — must build from source.
+    # Clone https://github.com/openclaw/openclaw and build:
+    #   docker build -t openclaw-local .
+    # Then replace 'openclaw-local' below with the built image tag.
+    image: openclaw-local
+    depends_on:
+      policyshield:
+        condition: service_healthy
+    volumes:
+      # Mount PolicyShield plugin into OpenClaw's extensions directory
+      - ../../plugins/openclaw/dist/:/home/node/.openclaw/extensions/policyshield/
+      # Mount plugin package.json for discovery
+      - ../../plugins/openclaw/package.json:/home/node/.openclaw/extensions/policyshield/package.json:ro
+    environment:
+      - OPENCLAW_GATEWAY_TOKEN=test-token-e2e
+      - LLM_API_KEY=${LLM_API_KEY}
+    ports:
+      - "18789:18789"
