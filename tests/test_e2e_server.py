@@ -113,8 +113,8 @@ class TestE2EServer:
         assert resp.status_code == 200
         assert resp.json()["verdict"] == "REDACT"
 
-    def test_e2e_redact_overrides_approve(self, e2e_client: TestClient):
-        """write + .env file → REDACT wins over APPROVE (higher priority)."""
+    def test_e2e_approve_wins_over_redact(self, e2e_client: TestClient):
+        """write + .env file → BLOCK because APPROVE (high) > REDACT (medium) and no backend configured."""
         resp = e2e_client.post(
             "/api/v1/check",
             json={
@@ -124,8 +124,9 @@ class TestE2EServer:
             },
         )
         assert resp.status_code == 200
-        # REDACT (priority 2) > APPROVE (priority 1) → redact-pii-in-writes wins
-        assert resp.json()["verdict"] == "REDACT"
+        # approve-dotenv-write (severity: high) wins over redact-pii-in-writes (severity: medium).
+        # With no approval backend configured, engine returns BLOCK.
+        assert resp.json()["verdict"] == "BLOCK"
 
     # ── POST-CHECK ───────────────────────────────────────────────────── #
 

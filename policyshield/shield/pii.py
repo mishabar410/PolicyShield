@@ -81,11 +81,11 @@ BUILTIN_PATTERNS: list[PIIPattern] = [
     PIIPattern(
         pii_type=PIIType.PHONE,
         pattern=re.compile(
-            r"(?:\+\d{1,3}[-.\s]?)?"       # optional country code
-            r"\(?\d{1,4}\)?"               # area code
-            r"[-.\s]?\d{1,4}"              # first group
-            r"[-.\s]?\d{1,4}"              # second group
-            r"(?:[-.\s]?\d{1,4})?"         # optional third group
+            r"(?:\+\d{1,3}[-.\s]?)?"  # optional country code
+            r"\(?\d{1,4}\)?"  # area code
+            r"[-.\s]?\d{1,4}"  # first group
+            r"[-.\s]?\d{1,4}"  # second group
+            r"(?:[-.\s]?\d{1,4})?"  # optional third group
         ),
         label="phone",
     ),

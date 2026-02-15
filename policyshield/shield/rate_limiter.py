@@ -66,8 +66,7 @@ class RateLimiter:
         self._last_cleanup = now
         max_window = max((c.window_seconds for c in self._configs), default=60)
         stale_keys = [
-            k for k, w in self._windows.items()
-            if not w.timestamps or (now - w.timestamps[-1]) > max_window * 2
+            k for k, w in self._windows.items() if not w.timestamps or (now - w.timestamps[-1]) > max_window * 2
         ]
         for k in stale_keys:
             del self._windows[k]
