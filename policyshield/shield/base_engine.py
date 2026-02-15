@@ -144,10 +144,7 @@ class BaseShieldEngine:
                 return ShieldResult(
                     verdict=Verdict.BLOCK,
                     rule_id="__pii_taint__",
-                    message=(
-                        f"Session tainted: {session.taint_details}. "
-                        "Outgoing calls blocked until reviewed."
-                    ),
+                    message=(f"Session tainted: {session.taint_details}. Outgoing calls blocked until reviewed."),
                 )
 
         # Session state for condition matching
@@ -374,7 +371,9 @@ class BaseShieldEngine:
             session.set_taint(f"PII detected in {tool_name} output: {pii_types}")
             logger.warning(
                 "Session %s tainted: PII (%s) in %s output",
-                session_id, pii_types, tool_name,
+                session_id,
+                pii_types,
+                tool_name,
             )
 
         return PostCheckResult(

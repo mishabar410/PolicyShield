@@ -111,8 +111,7 @@ def _cmd_setup(parsed: argparse.Namespace) -> int:
             env["POLICYSHIELD_API_TOKEN"] = api_token
         cli = _get_cli_path()
         server_process = subprocess.Popen(
-            [cli, "server",
-             "--rules", str(rules_path), "--port", str(port)],
+            [cli, "server", "--rules", str(rules_path), "--port", str(port)],
             env=env,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
@@ -147,8 +146,7 @@ def _cmd_setup(parsed: argparse.Namespace) -> int:
     try:
         # Install the npm package into a temporary prefix
         subprocess.run(
-            ["npm", "install", "--prefix", str(ext_dir),
-             "@policyshield/openclaw-plugin@latest"],
+            ["npm", "install", "--prefix", str(ext_dir), "@policyshield/openclaw-plugin@latest"],
             check=True,
             capture_output=True,
         )

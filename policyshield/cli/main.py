@@ -31,6 +31,7 @@ def app(args: list[str] | None = None) -> int:
 
     # openclaw subcommands (setup / teardown / status)
     from policyshield.cli.openclaw import add_openclaw_subcommands
+
     add_openclaw_subcommands(subparsers)
 
     # validate command
@@ -194,6 +195,7 @@ def app(args: list[str] | None = None) -> int:
         return _cmd_server(parsed)
     elif parsed.command == "openclaw":
         from policyshield.cli.openclaw import cmd_openclaw
+
         return cmd_openclaw(parsed)
     else:
         parser.print_help()
