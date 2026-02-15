@@ -327,6 +327,7 @@ docker compose run test
 | PII not detected in non-English text | Current PII detector is regex-based (L0). RU patterns (INN, SNILS, passport) are supported. NER-based L1 detection is on the roadmap |
 
 For OpenClaw-specific issues, see the [full integration guide](docs/integrations/openclaw.md).
+For upgrading between versions, see the [Compatibility & Migration Guide](docs/integrations/openclaw-migration.md).
 
 ---
 

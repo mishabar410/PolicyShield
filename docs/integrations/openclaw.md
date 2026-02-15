@@ -331,3 +331,30 @@ If the plugin is missing, reinstall:
 ```bash
 openclaw plugins install @policyshield/openclaw-plugin
 ```
+
+---
+
+## Compatibility
+
+### Version Matrix
+
+| PolicyShield Server | PolicyShield Plugin | OpenClaw | Status |
+|---------------------|---------------------|----------|--------|
+| 0.9.x               | 0.9.x               | ≥ 2026.2 | ✅ Verified (E2E) |
+| 0.8.x               | 0.8.x               | ≥ 2026.2 | ✅ Verified (unit tests) |
+| ≤ 0.7.x             | ≤ 0.7.x             | —        | ❌ Incompatible (API mismatch) |
+
+> **Important:** Server and plugin versions should always match (both 0.9.x).
+> Cross-version combinations (e.g., server 0.8 + plugin 0.9) are not tested.
+
+### How We Verify
+
+- **E2E tests** run on every PR: Docker Compose stack with real OpenClaw + PolicyShield
+- **SDK type sync** checked weekly: CI compares our stubs with upstream OpenClaw types
+- **Plugin unit tests** with mocked API cover all hook signatures
+
+---
+
+## Upgrading
+
+See the [Migration Guide](openclaw-migration.md) for version-specific upgrade instructions.
