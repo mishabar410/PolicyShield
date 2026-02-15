@@ -44,7 +44,7 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
-    needs: [lint, test, benchmark, plugin-test]
+    needs: [lint, test, benchmark, plugin-test, plugin-e2e-smoke]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -93,3 +93,21 @@ jobs:
         run: npm run build
       - name: Test
         run: npm test
+
+  plugin-e2e-smoke:
+    runs-on: ubuntu-latest
+    needs: [plugin-test]
+    defaults:
+      run:
+        working-directory: tests/e2e-openclaw
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install plugin dependencies
+        run: cd ../../plugins/openclaw && npm ci
+      - name: Install e2e test dependencies
+        run: npm install
+      - name: Run Tier 2 smoke tests + E2E scenarios
+        run: npx vitest run --reporter=verbose
