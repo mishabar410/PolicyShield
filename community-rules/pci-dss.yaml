@@ -1,0 +1,102 @@
+# PCI-DSS Compliance Rules for PolicyShield
+#
+# These rules help enforce PCI-DSS requirements for AI agents
+# that process, store, or transmit cardholder data.
+#
+# Usage:
+#   policyshield validate community-rules/pci-dss.yaml
+#   policyshield server --rules community-rules/pci-dss.yaml
+#
+# Note: PCI-DSS compliance requires many controls beyond
+# tool-call policy. These rules cover the data-in-transit
+# and data-handling aspects relevant to AI agent tool calls.
+
+shield_name: pci-dss-compliance
+version: 1
+
+rules:
+  # ── Cardholder Data Protection (Req 3 & 4) ───────────
+  - id: redact-card-data-outgoing
+    when:
+      tool: [send_email, send_message, web_fetch, post_to_api, write_file, write]
+    then: redact
+    message: "Cardholder data redacted (PCI-DSS Req 3.4)"
+
+  # ── Block Plaintext Card Storage (Req 3.1) ───────────
+  - id: block-card-storage
+    when:
+      tool: [write_file, write, edit]
+      args_match:
+        content: { regex: "\\b\\d{4}[\\s-]?\\d{4}[\\s-]?\\d{4}[\\s-]?\\d{4}\\b" }
+    then: block
+    message: "Plaintext card number storage blocked (PCI-DSS Req 3.1)"
+
+  # ── Block CVV/CVC Storage (Req 3.2) ──────────────────
+  - id: block-cvv-storage
+    when:
+      tool: [write_file, write, edit, query_database]
+      args_match:
+        content: { regex: "\\b(CVV|CVC|CVV2)\\s*[:=]\\s*\\d{3,4}\\b" }
+    then: block
+    message: "CVV/CVC storage is strictly prohibited (PCI-DSS Req 3.2)"
+
+  # ── Block External Transmission of Card Data (Req 4) ─
+  - id: block-card-external-transfer
+    when:
+      tool: web_fetch
+      args_match:
+        url: { not_regex: "(payment-gateway\\.|stripe\\.|braintree\\.|adyen\\.)" }
+        body: { regex: "\\b\\d{13,19}\\b" }
+    then: block
+    message: "Card data transmission blocked — use approved payment gateway only (PCI-DSS Req 4.1)"
+
+  # ── Access Control (Req 7) ───────────────────────────
+  - id: approve-payment-processing
+    when:
+      tool: [process_payment, charge_card, refund_payment]
+    then: approve
+    message: "Payment processing requires authorized personnel approval"
+
+  - id: block-payment-data-export
+    when:
+      tool: [export_data, query_database]
+      args_match:
+        query: { regex: "(card_number|pan|credit_card|payment)" }
+    then: block
+    message: "Payment data export blocked (PCI-DSS Req 7.1)"
+
+  # ── Logging and Monitoring (Req 10) ──────────────────
+  - id: rate-limit-payment-ops
+    when:
+      tool: [process_payment, charge_card, refund_payment]
+      session:
+        tool_count.process_payment: { gt: 10 }
+    then: block
+    message: "Payment operation rate limit exceeded — possible fraud"
+
+  # ── Block Debug/Test Card Numbers in Production ──────
+  - id: block-test-cards
+    when:
+      tool: [process_payment, charge_card]
+      args_match:
+        card_number: { regex: "^(4111111111111111|5500000000000004|378282246310005|6011111111111117)$" }
+    then: block
+    message: "Test card numbers blocked in production"
+
+rate_limits:
+  - tool: process_payment
+    max_calls: 10
+    window_seconds: 300
+    per_session: true
+  - tool: refund_payment
+    max_calls: 5
+    window_seconds: 300
+    per_session: true
+
+pii_patterns:
+  - name: PAN
+    pattern: "\\b(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14}|3[47][0-9]{13}|6(?:011|5[0-9]{2})[0-9]{12})\\b"
+  - name: CVV
+    pattern: "\\b\\d{3,4}\\b"
+  - name: EXPIRY_DATE
+    pattern: "\\b(0[1-9]|1[0-2])[/\\-](2[0-9]|[3-9][0-9])\\b"

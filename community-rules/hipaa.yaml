@@ -1,0 +1,103 @@
+# HIPAA Compliance Rules for PolicyShield
+#
+# These rules help enforce HIPAA privacy and security requirements
+# for AI agents that process Protected Health Information (PHI).
+#
+# Usage:
+#   policyshield validate community-rules/hipaa.yaml
+#   policyshield server --rules community-rules/hipaa.yaml
+#
+# Note: These rules cover common PHI scenarios. Customize for
+# your specific covered entity and business associate agreements.
+
+shield_name: hipaa-compliance
+version: 1
+
+rules:
+  # ── PHI Redaction in All Outgoing Communications ──────
+  - id: redact-phi-outgoing
+    when:
+      tool: [send_email, send_message, web_fetch, post_to_api, send_sms]
+    then: redact
+    message: "PHI redacted before external transmission (HIPAA §164.502)"
+
+  - id: redact-phi-in-files
+    when:
+      tool: [write_file, write, edit]
+    then: redact
+    message: "PHI redacted in file outputs"
+
+  # ── Block External Data Transmission ──────────────────
+  - id: block-external-phi-transfer
+    when:
+      tool: web_fetch
+      args_match:
+        url: { not_regex: "(internal\\.|localhost|127\\.0\\.0\\.1|10\\.|172\\.(1[6-9]|2\\d|3[01])\\.|192\\.168\\.)" }
+    then: block
+    message: "External API calls blocked — PHI containment (HIPAA §164.312(e)(1))"
+
+  # ── Patient Record Modification ───────────────────────
+  - id: approve-record-modification
+    when:
+      tool: [update_patient_record, modify_ehr, write_medical_note]
+    then: approve
+    message: "Patient record changes require authorized clinician approval"
+    approval_strategy: per_call
+
+  - id: block-record-deletion
+    when:
+      tool: [delete_patient_record, purge_ehr]
+    then: block
+    message: "Patient record deletion blocked — retention policy (HIPAA §164.530(j))"
+
+  # ── Prescription and Medication Safety ────────────────
+  - id: approve-prescription
+    when:
+      tool: [create_prescription, modify_prescription]
+    then: approve
+    message: "Prescription changes require physician approval"
+
+  # ── Access Control ────────────────────────────────────
+  - id: rate-limit-patient-access
+    when:
+      tool: [query_patient, get_medical_record, search_patients]
+      session:
+        tool_count.query_patient: { gt: 15 }
+    then: block
+    message: "Patient record access rate limit — potential unauthorized browsing"
+
+  # ── Block Bulk Export ─────────────────────────────────
+  - id: block-bulk-phi-export
+    when:
+      tool: [export_data, query_database]
+      args_match:
+        query: { regex: "SELECT\\s+\\*|LIMIT\\s+(\\d{3,})" }
+    then: block
+    message: "Bulk PHI export blocked — use minimum necessary standard"
+
+  # ── Block Screenshot/Recording of PHI ─────────────────
+  - id: block-phi-capture
+    when:
+      tool: [screenshot, screen_capture, record_screen]
+    then: block
+    message: "Screen capture blocked — PHI visibility risk"
+
+rate_limits:
+  - tool: query_patient
+    max_calls: 15
+    window_seconds: 300
+    per_session: true
+  - tool: get_medical_record
+    max_calls: 10
+    window_seconds: 300
+    per_session: true
+
+pii_patterns:
+  - name: MRN
+    pattern: "MRN[:\\s]?\\d{7,10}"
+  - name: ICD_CODE
+    pattern: "\\b[A-Z]\\d{2}\\.\\d{1,4}\\b"
+  - name: NPI
+    pattern: "\\b\\d{10}\\b"
+  - name: DEA_NUMBER
+    pattern: "\\b[A-Z]{2}\\d{7}\\b"

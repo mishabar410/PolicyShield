@@ -1,0 +1,86 @@
+# GDPR Compliance Rules for PolicyShield
+#
+# These rules help enforce GDPR data protection requirements
+# for AI agents that process EU personal data.
+#
+# Usage:
+#   policyshield validate community-rules/gdpr.yaml
+#   policyshield server --rules community-rules/gdpr.yaml
+#
+# Note: These rules provide a baseline. Customize for your
+# specific data processing activities and legal basis.
+
+shield_name: gdpr-compliance
+version: 1
+
+rules:
+  # ── Right to be Forgotten ─────────────────────────────
+  - id: approve-data-deletion
+    when:
+      tool: [delete_user_data, erase_record, anonymize_user]
+    then: approve
+    message: "Data deletion requests require DPO approval"
+    approval_strategy: per_call
+
+  # ── Data Minimization ─────────────────────────────────
+  - id: redact-pii-outgoing
+    when:
+      tool: [send_email, send_message, web_fetch, post_to_api]
+    then: redact
+    message: "PII redacted before external transmission (GDPR Art. 5(1)(c))"
+
+  - id: redact-pii-in-files
+    when:
+      tool: [write_file, write, edit]
+    then: redact
+    message: "PII redacted in file outputs"
+
+  # ── Cross-Border Transfer Protection ──────────────────
+  - id: block-non-eu-transfer
+    when:
+      tool: web_fetch
+      args_match:
+        url: { regex: "\\.(cn|ru|us|in|br)(/|$|:)" }
+    then: block
+    message: "Cross-border data transfer blocked — requires adequacy decision (GDPR Art. 45)"
+
+  # ── Consent-Based Processing ──────────────────────────
+  - id: approve-marketing-send
+    when:
+      tool: [send_email, send_sms, send_notification]
+      args_match:
+        purpose: { eq: "marketing" }
+    then: approve
+    message: "Marketing communications require explicit consent verification"
+
+  # ── Access Logging ────────────────────────────────────
+  - id: block-bulk-data-export
+    when:
+      tool: [query_database, export_data]
+      args_match:
+        query: { regex: "SELECT\\s+\\*|LIMIT\\s+\\d{4,}" }
+    then: block
+    message: "Bulk data exports blocked — use filtered queries only"
+
+  # ── Rate Limiting on Personal Data Access ─────────────
+  - id: rate-limit-data-access
+    when:
+      tool: [query_database, get_user_profile, search_users]
+      session:
+        tool_count.query_database: { gt: 20 }
+    then: block
+    message: "Personal data access rate limit exceeded"
+
+rate_limits:
+  - tool: query_database
+    max_calls: 20
+    window_seconds: 300
+    per_session: true
+
+pii_patterns:
+  - name: EU_TAX_ID
+    pattern: "\\b[A-Z]{2}\\d{8,12}\\b"
+  - name: IBAN
+    pattern: "\\b[A-Z]{2}\\d{2}[A-Z0-9]{4}\\d{7}([A-Z0-9]?){0,16}\\b"
+  - name: DE_PERSONALAUSWEIS
+    pattern: "\\b[CFGHJKLMNPRTVWXYZ0-9]{9}\\b"

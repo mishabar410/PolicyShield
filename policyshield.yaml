@@ -1,0 +1,6 @@
+# PolicyShield configuration
+mode: ENFORCE
+fail_open: true
+trace:
+  enabled: true
+  output_dir: ./traces

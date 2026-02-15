@@ -84,7 +84,7 @@ async function waitForApproval(
 const plugin: OpenClawPluginDefinition = {
     id: "policyshield",
     name: "PolicyShield",
-    version: "0.8.1",
+    version: "0.9.0",
     description: "PolicyShield — runtime policy enforcement for AI agent tool calls",
 
     async register(api: OpenClawPluginApi) {

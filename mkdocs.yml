@@ -39,11 +39,13 @@ nav:
     - Testing Rules: guides/testing-rules.md
     - CLI Reference: guides/cli.md
     - Presets: guides/presets.md
+  - Use Cases: use-cases.md
   - Integrations:
     - OpenClaw: integrations/openclaw.md
     - LangChain: integrations/langchain.md
     - CrewAI: integrations/crewai.md
     - FastAPI: integrations/fastapi.md
+  - Comparison: comparison.md
   - CI/CD:
     - GitHub Actions: github-action.md
   - API Reference:

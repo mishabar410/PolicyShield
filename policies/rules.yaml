@@ -1,0 +1,106 @@
+# PolicyShield rules — preset: openclaw
+shield_name: openclaw-policy
+version: 1
+rules:
+- id: block-destructive-exec
+  description: Block destructive shell commands
+  when:
+    tool: exec
+    args_match:
+      command:
+        regex: \b(rm\s+-rf|rm\s+-r\s+/|mkfs|dd\s+if=|chmod\s+777|chmod\s+-R\s+777)\b
+  then: block
+  severity: critical
+  message: Destructive command blocked by PolicyShield
+- id: block-curl-pipe-sh
+  description: Block remote code execution via curl|sh
+  when:
+    tool: exec
+    args_match:
+      command:
+        regex: curl.*\|.*sh|wget.*\|.*sh|curl.*\|.*bash
+  then: block
+  severity: critical
+  message: Remote code execution via curl|sh is blocked
+- id: block-secrets-exfil
+  description: Block potential secrets exfiltration
+  when:
+    tool: exec
+    args_match:
+      command:
+        regex: \b(curl|wget|nc|ncat|scp|rsync)\b.*\b(AWS_SECRET|OPENAI_API_KEY|API_KEY|SECRET_KEY|password|token|private.key)\b
+  then: block
+  severity: critical
+  message: Potential secrets exfiltration blocked
+- id: block-env-dump
+  description: Block environment variable dumps
+  when:
+    tool: exec
+    args_match:
+      command:
+        regex: \benv\b|\bprintenv\b|\bset\b.*export
+  then: block
+  severity: high
+  message: Environment variable dump is restricted
+- id: redact-pii-in-messages
+  description: Redact PII in outgoing messages
+  when:
+    tool: message
+  then: redact
+  severity: high
+  message: PII detected and redacted in outgoing message
+- id: redact-pii-in-writes
+  description: Redact PII in file writes
+  when:
+    tool: write
+  then: redact
+  severity: medium
+  message: PII detected and redacted in file write
+- id: redact-pii-in-edits
+  description: Redact PII in file edits
+  when:
+    tool: edit
+  then: redact
+  severity: medium
+  message: PII detected and redacted in file edit
+- id: approve-dotenv-write
+  description: Require approval for writing sensitive files
+  when:
+    tool: write
+    args_match:
+      path:
+        regex: \.(env|pem|key|crt|p12|pfx)(\..*)?$
+  then: approve
+  severity: high
+  priority: 100
+  message: Writing to sensitive file requires approval
+- id: approve-ssh-access
+  description: Require approval for SSH key modification
+  when:
+    tool: write
+    args_match:
+      path:
+        contains: .ssh/
+  then: approve
+  severity: critical
+  priority: 100
+  message: SSH key modification requires approval
+- id: rate-limit-exec
+  description: Rate limit exec calls
+  when:
+    tool: exec
+    session:
+      tool_count.exec:
+        gt: 60
+  then: block
+  message: exec rate limit exceeded (60/min)
+- id: rate-limit-web
+  description: Rate limit web_fetch calls
+  when:
+    tool: web_fetch
+    session:
+      tool_count.web_fetch:
+        gt: 30
+  then: block
+  message: web_fetch rate limit exceeded (30/min)
+default_verdict: allow

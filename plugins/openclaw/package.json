@@ -37,12 +37,12 @@
     "author": "PolicyShield Contributors",
     "repository": {
         "type": "git",
-        "url": "https://github.com/policyshield/policyshield",
+        "url": "https://github.com/mishabar410/PolicyShield",
         "directory": "plugins/openclaw"
     },
-    "homepage": "https://github.com/policyshield/policyshield/tree/main/plugins/openclaw#readme",
+    "homepage": "https://github.com/mishabar410/PolicyShield/tree/main/plugins/openclaw#readme",
     "bugs": {
-        "url": "https://github.com/policyshield/policyshield/issues"
+        "url": "https://github.com/mishabar410/PolicyShield/issues"
     },
     "engines": {
         "node": ">=18.0.0"

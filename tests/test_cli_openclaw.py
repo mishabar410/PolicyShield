@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 from policyshield.cli.main import app
 
 
@@ -10,7 +12,8 @@ class TestOpenClawCLI:
 
     def test_openclaw_status_no_server(self, capsys) -> None:
         """Status should report server not reachable when no server is running."""
-        code = app(["openclaw", "status"])
+        with patch("policyshield.cli.openclaw.urllib.request.urlopen", side_effect=OSError("mock")):
+            code = app(["openclaw", "status"])
         assert code == 0
         captured = capsys.readouterr()
         assert "not reachable" in captured.out

@@ -392,6 +392,16 @@ docker compose run test
 | [`openclaw_rules.yaml`](examples/openclaw_rules.yaml) | OpenClaw preset rules (11 rules) |
 | [`policies/`](examples/policies/) | Production-ready rule sets (security, compliance, full) |
 
+### Community Rule Packs
+
+| Pack | Rules | Focus |
+|------|-------|-------|
+| [`gdpr.yaml`](community-rules/gdpr.yaml) | 8 | EU data protection, cross-border transfers |
+| [`hipaa.yaml`](community-rules/hipaa.yaml) | 9 | PHI protection, patient record safety |
+| [`pci-dss.yaml`](community-rules/pci-dss.yaml) | 9 | Cardholder data, payment gateway enforcement |
+
+> **How does PolicyShield compare to alternatives?** See the [Comparison page](docs/comparison.md).
+
 ---
 
 ## Troubleshooting

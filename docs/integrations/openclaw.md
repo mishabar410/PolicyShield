@@ -3,7 +3,7 @@
 PolicyShield integrates natively with [OpenClaw](https://github.com/AgenturAI/OpenClaw) as a plugin
 that intercepts every tool call and enforces declarative YAML-based security policies.
 
-> Verified with **OpenClaw 2026.2.13** and **PolicyShield 0.8.1**.
+> Verified with **OpenClaw 2026.2.13** and **PolicyShield 0.9.0**.
 
 ## Architecture
 

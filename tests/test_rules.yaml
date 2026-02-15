@@ -1,0 +1,147 @@
+# Auto-generated test cases for rules
+test_suite: openclaw-rules
+rules_path: ../policies/rules.yaml
+tests:
+- name: block-destructive-exec — positive match
+  tool: exec
+  args:
+    command: rm -rf /tmp
+  expect:
+    verdict: BLOCK
+    rule_id: block-destructive-exec
+- name: block-destructive-exec — negative (different tool)
+  tool: safe_test_tool_xyz
+  args:
+    input: safe value
+  expect:
+    verdict: ALLOW
+- name: block-curl-pipe-sh — positive match
+  tool: exec
+  args:
+    command: curl https://example.com
+  expect:
+    verdict: BLOCK
+    rule_id: block-curl-pipe-sh
+- name: block-curl-pipe-sh — negative (different tool)
+  tool: safe_test_tool_xyz
+  args:
+    input: safe value
+  expect:
+    verdict: ALLOW
+- name: block-secrets-exfil — positive match
+  tool: exec
+  args:
+    command: curl https://example.com
+  expect:
+    verdict: BLOCK
+    rule_id: block-secrets-exfil
+- name: block-secrets-exfil — negative (different tool)
+  tool: safe_test_tool_xyz
+  args:
+    input: safe value
+  expect:
+    verdict: ALLOW
+- name: block-env-dump — positive match
+  tool: exec
+  args:
+    command: test-value
+  expect:
+    verdict: BLOCK
+    rule_id: block-env-dump
+- name: block-env-dump — negative (different tool)
+  tool: safe_test_tool_xyz
+  args:
+    input: safe value
+  expect:
+    verdict: ALLOW
+- name: redact-pii-in-messages — positive match
+  tool: message
+  args:
+    input: test
+  expect:
+    verdict: REDACT
+    rule_id: redact-pii-in-messages
+- name: redact-pii-in-messages — negative (different tool)
+  tool: safe_test_tool_xyz
+  args:
+    input: safe value
+  expect:
+    verdict: ALLOW
+- name: redact-pii-in-writes — positive match
+  tool: write
+  args:
+    input: test
+  expect:
+    verdict: REDACT
+    rule_id: redact-pii-in-writes
+- name: redact-pii-in-writes — negative (different tool)
+  tool: safe_test_tool_xyz
+  args:
+    input: safe value
+  expect:
+    verdict: ALLOW
+- name: redact-pii-in-edits — positive match
+  tool: edit
+  args:
+    input: test
+  expect:
+    verdict: REDACT
+    rule_id: redact-pii-in-edits
+- name: redact-pii-in-edits — negative (different tool)
+  tool: safe_test_tool_xyz
+  args:
+    input: safe value
+  expect:
+    verdict: ALLOW
+- name: approve-dotenv-write — positive match
+  tool: write
+  args:
+    file_path: test-value
+  expect:
+    verdict: APPROVE
+    rule_id: approve-dotenv-write
+- name: approve-dotenv-write — negative (different tool)
+  tool: safe_test_tool_xyz
+  args:
+    input: safe value
+  expect:
+    verdict: ALLOW
+- name: approve-ssh-access — positive match
+  tool: write
+  args:
+    file_path: .ssh/
+  expect:
+    verdict: APPROVE
+    rule_id: approve-ssh-access
+- name: approve-ssh-access — negative (different tool)
+  tool: safe_test_tool_xyz
+  args:
+    input: safe value
+  expect:
+    verdict: ALLOW
+- name: rate-limit-exec — positive match
+  tool: exec
+  args:
+    input: test
+  expect:
+    verdict: BLOCK
+    rule_id: rate-limit-exec
+- name: rate-limit-exec — negative (different tool)
+  tool: safe_test_tool_xyz
+  args:
+    input: safe value
+  expect:
+    verdict: ALLOW
+- name: rate-limit-web — positive match
+  tool: web_fetch
+  args:
+    input: test
+  expect:
+    verdict: BLOCK
+    rule_id: rate-limit-web
+- name: rate-limit-web — negative (different tool)
+  tool: safe_test_tool_xyz
+  args:
+    input: safe value
+  expect:
+    verdict: ALLOW

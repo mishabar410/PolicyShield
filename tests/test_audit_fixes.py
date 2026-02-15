@@ -486,9 +486,7 @@ class TestApprovalCachePopulation:
                 }
             ],
         )
-        engine = ShieldEngine(
-            str(rules_path), approval_backend=backend, approval_cache=cache
-        )
+        engine = ShieldEngine(str(rules_path), approval_backend=backend, approval_cache=cache)
         result = engine.check("sensitive", session_id="s1")
         assert result.verdict == Verdict.APPROVE
 
