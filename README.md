@@ -7,6 +7,8 @@
 [![CI](https://github.com/mishabar410/PolicyShield/actions/workflows/ci.yml/badge.svg)](https://github.com/mishabar410/PolicyShield/actions/workflows/ci.yml)
 [![Docs](https://img.shields.io/badge/docs-mkdocs-blue.svg)](https://mishabar410.github.io/PolicyShield/)
 [![Coverage: 85%](https://img.shields.io/badge/coverage-85%25-brightgreen.svg)](#development)
+[![npm](https://img.shields.io/npm/v/@policyshield/openclaw-plugin?color=CB3837&label=npm%20plugin)](https://www.npmjs.com/package/@policyshield/openclaw-plugin)
+[![Security Policy](https://img.shields.io/badge/security-policy-blueviolet.svg)](SECURITY.md)
 
 **Declarative firewall for AI agent tool calls.**
 
@@ -401,6 +403,24 @@ docker compose run test
 | [`pci-dss.yaml`](community-rules/pci-dss.yaml) | 9 | Cardholder data, payment gateway enforcement |
 
 > **How does PolicyShield compare to alternatives?** See the [Comparison page](docs/comparison.md).
+
+---
+
+## Benchmarks
+
+Measured on commodity hardware (Apple M-series, Python 3.13). [Target: <5ms sync, <10ms async.](PHILOSOPHY.md)
+
+| Operation | p50 | p99 | Target |
+|-----------|-----|-----|--------|
+| Sync check (ALLOW) | 0.01ms | 0.01ms | <5ms ✅ |
+| Sync check (BLOCK) | 0.01ms | 0.01ms | <5ms ✅ |
+| Async check | 0.05ms | 0.10ms | <10ms ✅ |
+
+Run benchmarks yourself:
+
+```bash
+pytest tests/test_benchmark.py -m benchmark -v -s
+```
 
 ---
 

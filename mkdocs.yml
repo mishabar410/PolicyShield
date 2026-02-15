@@ -46,6 +46,7 @@ nav:
     - CrewAI: integrations/crewai.md
     - FastAPI: integrations/fastapi.md
   - Comparison: comparison.md
+  - FAQ: faq.md
   - CI/CD:
     - GitHub Actions: github-action.md
   - API Reference:

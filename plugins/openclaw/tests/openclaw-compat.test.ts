@@ -307,7 +307,7 @@ describe("OpenClaw Compatibility Integration", () => {
             expect(definition).toBeDefined();
             expect(definition!.id).toBe("policyshield");
             expect(definition!.name).toBe("PolicyShield");
-            expect(definition!.version).toBe("0.8.1");
+            expect(definition!.version).toBe("0.9.0");
             expect(register).toBeTypeOf("function");
         });
 

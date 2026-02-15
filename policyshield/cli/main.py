@@ -138,6 +138,12 @@ def app(args: list[str] | None = None) -> int:
     show_parser2.add_argument("path", nargs="?", default=None, help="Config file path")
     config_subparsers.add_parser("init", help="Create default policyshield.yaml")
 
+    # playground command
+    play_parser = subparsers.add_parser("playground", help="Interactive rule testing REPL")
+    play_parser.add_argument("--rules", required=True, help="Path to YAML rules file")
+    play_parser.add_argument("--tool", default=None, help="Single check: tool name (non-interactive)")
+    play_parser.add_argument("--args", default=None, help="Single check: JSON args string")
+
     # server command
     server_parser = subparsers.add_parser("server", help="Start PolicyShield HTTP server")
     server_parser.add_argument("--rules", required=True, help="Path to YAML rules file or directory")
@@ -191,6 +197,12 @@ def app(args: list[str] | None = None) -> int:
         else:
             config_parser.print_help()
             return 1
+    elif parsed.command == "playground":
+        from policyshield.cli.playground import cmd_playground, run_single_check
+
+        if parsed.tool:
+            return run_single_check(parsed.rules, parsed.tool, parsed.args)
+        return cmd_playground(parsed.rules)
     elif parsed.command == "server":
         return _cmd_server(parsed)
     elif parsed.command == "openclaw":
