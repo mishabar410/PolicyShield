@@ -69,10 +69,13 @@ curl http://localhost:8100/api/v1/health
 
 ```bash
 # From npm (published package)
-openclaw plugins install @policyshield/openclaw-plugin
+npm install --prefix ~/.openclaw/extensions/policyshield @policyshield/openclaw-plugin
+cp -r ~/.openclaw/extensions/policyshield/node_modules/@policyshield/openclaw-plugin/* \
+     ~/.openclaw/extensions/policyshield/
 
 # Or from a local directory (for development)
-openclaw plugins install --link ./path/to/plugins/openclaw
+cp -r ./plugins/openclaw ~/.openclaw/extensions/policyshield
+cd ~/.openclaw/extensions/policyshield && npm install
 ```
 
 After installation, the plugin files are located at:
@@ -81,28 +84,26 @@ After installation, the plugin files are located at:
 ~/.openclaw/extensions/policyshield/
 ```
 
-> **Note:** If `openclaw plugins install` gives a config validation error about plugin ID mismatch,
-> rename the directory to match the plugin ID:
-> ```bash
-> mv ~/.openclaw/extensions/openclaw-plugin ~/.openclaw/extensions/policyshield
-> ```
-
 ### Step 3: Configure the plugin
 
-Set the PolicyShield server URL (if using a non-default port):
+Add the plugin entry to `~/.openclaw/openclaw.json`:
 
-```bash
-openclaw config set plugins.entries.policyshield.config.url http://localhost:8100
-```
-
-Optional — configure other settings:
-
-```bash
-# Disable fail-open (block calls when server is unreachable)
-openclaw config set plugins.entries.policyshield.config.fail_open false
-
-# Set timeout
-openclaw config set plugins.entries.policyshield.config.timeout_ms 3000
+```json
+{
+  "plugins": {
+    "enabled": true,
+    "entries": {
+      "policyshield": {
+        "enabled": true,
+        "config": {
+          "url": "http://localhost:8100",
+          "fail_open": true,
+          "timeout_ms": 5000
+        }
+      }
+    }
+  }
+}
 ```
 
 ### Step 4: Verify the plugin is loaded
@@ -329,7 +330,9 @@ openclaw plugins info policyshield
 If the plugin is missing, reinstall:
 
 ```bash
-openclaw plugins install @policyshield/openclaw-plugin
+npm install --prefix ~/.openclaw/extensions/policyshield @policyshield/openclaw-plugin
+cp -r ~/.openclaw/extensions/policyshield/node_modules/@policyshield/openclaw-plugin/* \
+     ~/.openclaw/extensions/policyshield/
 ```
 
 ---

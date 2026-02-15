@@ -28,7 +28,12 @@
 
 #### Migration steps
 1. Update server: `pip install --upgrade "policyshield[server]"`
-2. Update plugin: `openclaw plugins update @policyshield/openclaw-plugin`
+2. Update plugin:
+   ```bash
+   npm install --prefix ~/.openclaw/extensions/policyshield @policyshield/openclaw-plugin@latest
+   cp -r ~/.openclaw/extensions/policyshield/node_modules/@policyshield/openclaw-plugin/* \
+        ~/.openclaw/extensions/policyshield/
+   ```
 3. (Optional) Set API token:
    ```bash
    export POLICYSHIELD_API_TOKEN="your-secret-token"
@@ -50,8 +55,13 @@
 - `mode: audit` removed from plugin config (audit mode is server-side only)
 
 #### Migration steps
-1. Uninstall old plugin: `openclaw plugins remove policy-shield`
-2. Install new plugin: `openclaw plugins install @policyshield/openclaw-plugin`
+1. Remove old plugin: `rm -rf ~/.openclaw/extensions/policy-shield`
+2. Install new plugin:
+   ```bash
+   npm install --prefix ~/.openclaw/extensions/policyshield @policyshield/openclaw-plugin
+   cp -r ~/.openclaw/extensions/policyshield/node_modules/@policyshield/openclaw-plugin/* \
+        ~/.openclaw/extensions/policyshield/
+   ```
 3. Update config key: `plugins.entries.policy-shield` → `plugins.entries.policyshield`
 4. If using `mode: audit` in plugin config: remove it, configure on server:
    ```bash

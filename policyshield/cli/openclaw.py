@@ -14,6 +14,19 @@ import urllib.request
 from pathlib import Path
 
 
+def _get_cli_path() -> str:
+    """Return path to the policyshield CLI entry point."""
+    cli = shutil.which("policyshield")
+    if cli:
+        return cli
+    # Fallback: look next to the current python executable
+    bindir = Path(sys.executable).parent
+    candidate = bindir / "policyshield"
+    if candidate.exists():
+        return str(candidate)
+    raise FileNotFoundError("Cannot find 'policyshield' CLI. Is it installed?")
+
+
 def add_openclaw_subcommands(subparsers: argparse._SubParsersAction) -> None:
     """Register 'openclaw' subcommands onto the main CLI parser."""
     oc_parser = subparsers.add_parser("openclaw", help="OpenClaw integration commands")
@@ -60,19 +73,31 @@ def _cmd_setup(parsed: argparse.Namespace) -> int:
     no_server: bool = parsed.no_server
     api_token: str | None = parsed.api_token
 
-    rules_path = Path(rules_dir) / "rules.yaml"
+    rules_dir_path = Path(rules_dir)
+    # init creates policies/rules.yaml; allow plain rules.yaml too
+    rules_candidates = [
+        rules_dir_path / "policies" / "rules.yaml",
+        rules_dir_path / "rules.yaml",
+    ]
+    rules_path = next((p for p in rules_candidates if p.exists()), None)
 
     # Step 1: Generate rules
     print("→ [1/5] Generating OpenClaw preset rules...")
-    if rules_path.exists():
+    if rules_path is not None:
         print(f"  Rules already exist at {rules_path}, skipping.")
     else:
         try:
+            cli = _get_cli_path()
             subprocess.run(
-                [sys.executable, "-m", "policyshield", "init", "--preset", "openclaw", "--no-interactive", str(rules_dir)],
+                [cli, "init", "--preset", "openclaw", "--no-interactive", str(rules_dir)],
                 check=True,
                 capture_output=True,
             )
+            # re-discover after init
+            rules_path = next((p for p in rules_candidates if p.exists()), None)
+            if rules_path is None:
+                print("  ✗ Init ran but rules.yaml was not created.", file=sys.stderr)
+                return 1
             print(f"  ✓ Rules created: {rules_path}")
         except subprocess.CalledProcessError as e:
             print(f"  ✗ Failed to generate rules: {e.stderr.decode()}", file=sys.stderr)
@@ -84,8 +109,9 @@ def _cmd_setup(parsed: argparse.Namespace) -> int:
         env = dict(os.environ)
         if api_token:
             env["POLICYSHIELD_API_TOKEN"] = api_token
+        cli = _get_cli_path()
         server_process = subprocess.Popen(
-            [sys.executable, "-m", "policyshield", "server",
+            [cli, "server",
              "--rules", str(rules_path), "--port", str(port)],
             env=env,
             stdout=subprocess.DEVNULL,
@@ -107,40 +133,61 @@ def _cmd_setup(parsed: argparse.Namespace) -> int:
     else:
         print("→ [2/5] Skipping server start (--no-server)")
 
-    # Step 3: Install plugin
+    # Step 3: Install plugin via npm into OpenClaw extensions directory
     print("→ [3/5] Installing OpenClaw plugin...")
     if not shutil.which("openclaw"):
         print("  ✗ 'openclaw' CLI not found. Install OpenClaw first:", file=sys.stderr)
         print("    npm install -g @openclaw/cli", file=sys.stderr)
         return 1
+    if not shutil.which("npm"):
+        print("  ✗ 'npm' not found. Install Node.js first.", file=sys.stderr)
+        return 1
+    ext_dir = Path.home() / ".openclaw" / "extensions" / "policyshield"
+    ext_dir.mkdir(parents=True, exist_ok=True)
     try:
+        # Install the npm package into a temporary prefix
         subprocess.run(
-            ["openclaw", "plugins", "install", "@policyshield/openclaw-plugin"],
+            ["npm", "install", "--prefix", str(ext_dir),
+             "@policyshield/openclaw-plugin@latest"],
             check=True,
             capture_output=True,
         )
-        print("  ✓ Plugin installed")
+        # Copy package contents to extension root (OpenClaw expects files at top level)
+        pkg_dir = ext_dir / "node_modules" / "@policyshield" / "openclaw-plugin"
+        if pkg_dir.exists():
+            for item in pkg_dir.iterdir():
+                dest = ext_dir / item.name
+                if item.is_dir():
+                    shutil.copytree(item, dest, dirs_exist_ok=True)
+                else:
+                    shutil.copy2(item, dest)
+        print(f"  ✓ Plugin installed: {ext_dir}")
     except subprocess.CalledProcessError as e:
-        print(f"  ✗ Failed to install plugin: {e}", file=sys.stderr)
+        stderr_text = e.stderr.decode() if e.stderr else str(e)
+        print(f"  ✗ Failed to install plugin: {stderr_text}", file=sys.stderr)
         return 1
 
-    # Step 4: Configure plugin
-    print("→ [4/5] Configuring plugin URL...")
+    # Step 4: Configure plugin in OpenClaw config
+    print("→ [4/5] Configuring plugin...")
     url = f"http://localhost:{port}"
+    oc_config_path = Path.home() / ".openclaw" / "openclaw.json"
     try:
-        subprocess.run(
-            ["openclaw", "config", "set", "plugins.entries.policyshield.config.url", url],
-            check=True,
-            capture_output=True,
-        )
+        if oc_config_path.exists():
+            oc_config = json.loads(oc_config_path.read_text())
+        else:
+            oc_config = {}
+        plugins = oc_config.setdefault("plugins", {})
+        plugins.setdefault("enabled", True)
+        entries = plugins.setdefault("entries", {})
+        ps_entry = entries.setdefault("policyshield", {})
+        ps_entry["enabled"] = True
+        ps_config = ps_entry.setdefault("config", {})
+        ps_config["url"] = url
         if api_token:
-            subprocess.run(
-                ["openclaw", "config", "set", "plugins.entries.policyshield.config.api_token", api_token],
-                check=True,
-                capture_output=True,
-            )
+            ps_config["api_token"] = api_token
+        oc_config_path.write_text(json.dumps(oc_config, indent=2) + "\n")
         print(f"  ✓ Plugin configured: {url}")
-    except subprocess.CalledProcessError as e:
+    except Exception as e:
         print(f"  ✗ Failed to configure plugin: {e}", file=sys.stderr)
         return 1
 

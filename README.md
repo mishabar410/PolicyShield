@@ -111,7 +111,7 @@ policyshield openclaw setup
 ```
 
 That's it. This will:
-1. Generate security rules (`rules.yaml`)
+1. Generate security rules (`policies/rules.yaml`)
 2. Start PolicyShield server (port 8100)
 3. Install the OpenClaw plugin
 4. Configure the connection
@@ -132,13 +132,15 @@ pip install "policyshield[server]"
 policyshield init --preset openclaw
 
 # 2. Start server (new terminal)
-policyshield server --rules rules.yaml --port 8100
+policyshield server --rules policies/rules.yaml --port 8100
 
-# 3. Install plugin
-openclaw plugins install @policyshield/openclaw-plugin
+# 3. Install plugin into OpenClaw extensions
+npm install --prefix ~/.openclaw/extensions/policyshield @policyshield/openclaw-plugin
+cp -r ~/.openclaw/extensions/policyshield/node_modules/@policyshield/openclaw-plugin/* \
+     ~/.openclaw/extensions/policyshield/
 
-# 4. Configure
-openclaw config set plugins.entries.policyshield.config.url http://localhost:8100
+# 4. Add to ~/.openclaw/openclaw.json under "plugins.entries":
+# { "policyshield": { "enabled": true, "config": { "url": "http://localhost:8100" } } }
 
 # 5. Verify
 curl http://localhost:8100/api/v1/health

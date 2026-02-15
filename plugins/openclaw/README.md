@@ -2,7 +2,7 @@
 
 > 🛡️ PolicyShield plugin for [OpenClaw](https://github.com/AgenturAI/OpenClaw) — runtime tool call policy enforcement for AI agents.
 
-> Verified with **OpenClaw 2026.2.13** and **PolicyShield 0.8.1**.
+> Verified with **OpenClaw 2026.2.13** and **PolicyShield 0.9.0**.
 
 ## What it does
 
@@ -19,8 +19,8 @@ Intercepts every tool call in OpenClaw and enforces declarative YAML-based secur
 
 ```bash
 pip install "policyshield[server]"
-policyshield init --preset openclaw --no-interactive  # → rules.yaml
-policyshield server --rules rules.yaml --port 8100
+policyshield init --preset openclaw --no-interactive
+policyshield server --rules policies/rules.yaml --port 8100
 ```
 
 Verify: `curl http://localhost:8100/api/v1/health`
@@ -28,14 +28,20 @@ Verify: `curl http://localhost:8100/api/v1/health`
 ### 2. Install the plugin into OpenClaw
 
 ```bash
-openclaw plugins install @policyshield/openclaw-plugin
+npm install --prefix ~/.openclaw/extensions/policyshield @policyshield/openclaw-plugin
+cp -r ~/.openclaw/extensions/policyshield/node_modules/@policyshield/openclaw-plugin/* \
+     ~/.openclaw/extensions/policyshield/
 ```
 
 ### 3. Configure the server URL
 
-```bash
-openclaw config set plugins.entries.policyshield.config.url http://localhost:8100
+Add to `~/.openclaw/openclaw.json` under `plugins.entries`:
+
+```json
+"policyshield": { "enabled": true, "config": { "url": "http://localhost:8100" } }
 ```
+
+Or use the one-command setup: `policyshield openclaw setup`
 
 ### 4. Verify the plugin is loaded
 
