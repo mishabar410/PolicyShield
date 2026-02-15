@@ -11,6 +11,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - Server Bearer token authentication via `POLICYSHIELD_API_TOKEN`
 - PII taint chain: `taint_chain` config in rules YAML
 - `/api/v1/clear-taint` endpoint
+- `/api/v1/respond-approval` and `/api/v1/pending-approvals` endpoints for APPROVE flow
+- Telegram approval backend via `POLICYSHIELD_TELEGRAM_TOKEN` / `POLICYSHIELD_TELEGRAM_CHAT_ID` env vars
+- Non-blocking APPROVE verdict: `/check` returns `approval_id` immediately for async polling
 - E2E test suite with real OpenClaw (Docker Compose)
 - SDK type auto-sync script + CI job
 - Compatibility matrix and migration guide

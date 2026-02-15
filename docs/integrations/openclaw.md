@@ -32,6 +32,9 @@ that intercepts every tool call and enforces declarative YAML-based security pol
 │   │                                │     │
 │   │   /api/v1/check                │     │
 │   │   /api/v1/post-check           │     │
+│   │   /api/v1/check-approval       │     │
+│   │   /api/v1/respond-approval     │     │
+│   │   /api/v1/pending-approvals    │     │
 │   │   /api/v1/constraints          │     │
 │   │   /api/v1/health               │     │
 │   └────────────────────────────────┘     │
@@ -159,6 +162,43 @@ openclaw agent --local --session-id test -m "Run the shell command: rm -rf /"
 | **BLOCK** | Tool call is cancelled, agent receives block reason message |
 | **REDACT** | Tool arguments are modified (PII masked), then tool call proceeds |
 | **APPROVE** | Plugin polls `/api/v1/check-approval` until human approves/denies or timeout |
+
+---
+
+## APPROVE Flow with Telegram
+
+When a rule returns `then: approve`, PolicyShield can send an approval request to a Telegram chat with inline ✅ Approve / ❌ Deny buttons.
+
+### Setup
+
+1. **Create a Telegram bot** via [@BotFather](https://t.me/BotFather) and get the token.
+2. **Get your chat ID** (send `/start` to your bot, then use [@userinfobot](https://t.me/userinfobot)).
+3. **Start the server with env vars:**
+
+```bash
+POLICYSHIELD_TELEGRAM_TOKEN="YOUR_BOT_TOKEN" \
+POLICYSHIELD_TELEGRAM_CHAT_ID="YOUR_CHAT_ID" \
+policyshield server --rules rules.yaml --port 8100
+```
+
+If the env vars are not set, the server uses the InMemory backend — approvals are managed via the REST API.
+
+### How it works
+
+```
+1. /api/v1/check → verdict: APPROVE, approval_id: "abc-123"
+2. Bot sends Telegram message with ✅/❌ buttons
+3. User taps a button → bot processes callback_query
+4. /api/v1/check-approval → status: approved/denied
+```
+
+### Approval REST Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/v1/check-approval` | POST | Poll approval status by `approval_id` |
+| `/api/v1/respond-approval` | POST | Approve or deny (for InMemory backend) |
+| `/api/v1/pending-approvals` | GET | List all pending approval requests |
 
 ---
 

@@ -78,8 +78,8 @@ class CompiledRule:
 # Priority score for verdicts (higher = more restrictive)
 _VERDICT_PRIORITY: dict[Verdict, int] = {
     Verdict.ALLOW: 0,
-    Verdict.APPROVE: 1,
-    Verdict.REDACT: 2,
+    Verdict.REDACT: 1,
+    Verdict.APPROVE: 2,
     Verdict.BLOCK: 3,
 }
 

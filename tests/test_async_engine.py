@@ -2,7 +2,6 @@
 
 import asyncio
 import json
-import threading
 
 import pytest
 
@@ -99,82 +98,67 @@ async def test_async_redact(redact_rules):
     assert result.modified_args is not None
 
 
-# ── Test 4: APPROVE → InMemory → ALLOW ───────────────────────────────
+# ── Test 4: APPROVE → returns approval_id immediately ─────────────────
 
 
 @pytest.mark.asyncio
 async def test_async_approve_allow(approve_rules):
+    """APPROVE verdict returns immediately with approval_id (non-blocking)."""
     backend = InMemoryBackend()
     engine = AsyncShieldEngine(
         approve_rules,
         approval_backend=backend,
-        approval_timeout=5.0,
     )
 
-    # Approve in a background thread (InMemory uses threading.Event)
-    def _approve():
-        import time
-
-        for _ in range(50):
-            time.sleep(0.05)
-            reqs = backend.pending()
-            if reqs:
-                backend.respond(reqs[0].request_id, approved=True, responder="admin")
-                return
-
-    t = threading.Thread(target=_approve, daemon=True)
-    t.start()
-
     result = await engine.check("delete_user", {"user_id": "123"})
-    assert result.verdict == Verdict.ALLOW
-    t.join(timeout=3)
+    assert result.verdict == Verdict.APPROVE
+    assert result.approval_id is not None
+
+    # Verify the request was submitted to the backend
+    pending = backend.pending()
+    assert len(pending) == 1
+    assert pending[0].tool_name == "delete_user"
+
+    # Approve it and verify via backend
+    backend.respond(result.approval_id, approved=True, responder="admin")
+    resp = backend.wait_for_response(result.approval_id, timeout=1.0)
+    assert resp is not None
+    assert resp.approved is True
 
 
-# ── Test 5: APPROVE → InMemory → DENY ────────────────────────────────
+# ── Test 5: APPROVE → deny via backend ────────────────────────────────
 
 
 @pytest.mark.asyncio
 async def test_async_approve_deny(approve_rules):
+    """APPROVE verdict + subsequent denial via backend."""
     backend = InMemoryBackend()
     engine = AsyncShieldEngine(
         approve_rules,
         approval_backend=backend,
-        approval_timeout=5.0,
     )
 
-    def _deny():
-        import time
-
-        for _ in range(50):
-            time.sleep(0.05)
-            reqs = backend.pending()
-            if reqs:
-                backend.respond(reqs[0].request_id, approved=False, responder="admin")
-                return
-
-    t = threading.Thread(target=_deny, daemon=True)
-    t.start()
-
     result = await engine.check("delete_user", {"user_id": "123"})
-    assert result.verdict == Verdict.BLOCK
-    assert "denied" in result.message.lower()
-    t.join(timeout=3)
+    assert result.verdict == Verdict.APPROVE
+    assert result.approval_id is not None
+
+    # Deny it
+    backend.respond(result.approval_id, approved=False, responder="admin")
+    resp = backend.wait_for_response(result.approval_id, timeout=1.0)
+    assert resp is not None
+    assert resp.approved is False
 
 
-# ── Test 6: APPROVE timeout ──────────────────────────────────────────
+# ── Test 6: APPROVE without backend → BLOCK ──────────────────────────
 
 
 @pytest.mark.asyncio
 async def test_async_approve_timeout(approve_rules):
-    backend = InMemoryBackend()
-    engine = AsyncShieldEngine(
-        approve_rules,
-        approval_backend=backend,
-        approval_timeout=0.1,  # very short timeout
-    )
+    """Without an approval backend, APPROVE falls back to BLOCK."""
+    engine = AsyncShieldEngine(approve_rules)  # no backend
     result = await engine.check("delete_user", {"user_id": "123"})
     assert result.verdict == Verdict.BLOCK
-    assert "timed out" in result.message.lower()
+    assert "no approval backend" in result.message.lower()
 
 
 # ── Test 7: Rate limiter blocks ──────────────────────────────────────

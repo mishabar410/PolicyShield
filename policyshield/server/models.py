@@ -91,3 +91,35 @@ class ClearTaintResponse(BaseModel):
 
     status: str = "ok"
     session_id: str
+
+
+class RespondApprovalRequest(BaseModel):
+    """Request body for the /api/v1/respond-approval endpoint."""
+
+    approval_id: str
+    approved: bool
+    responder: str = ""
+    comment: str = ""
+
+
+class RespondApprovalResponse(BaseModel):
+    """Response body for the /api/v1/respond-approval endpoint."""
+
+    status: str = "ok"
+    approval_id: str
+
+
+class PendingApprovalItem(BaseModel):
+    """Single pending approval in the list."""
+
+    approval_id: str
+    tool_name: str
+    rule_id: str
+    message: str
+    args: dict = {}
+
+
+class PendingApprovalsResponse(BaseModel):
+    """Response body for the /api/v1/pending-approvals endpoint."""
+
+    approvals: list[PendingApprovalItem] = []

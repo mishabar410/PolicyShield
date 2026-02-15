@@ -39,3 +39,25 @@ policyshield config validate
 # Show resolved config
 policyshield config show
 ```
+
+## Approval Backend
+
+The APPROVE verdict requires a backend to handle approval requests. The server auto-selects based on environment variables:
+
+| Env Var | Description |
+|---------|-------------|
+| `POLICYSHIELD_TELEGRAM_TOKEN` | Telegram Bot API token (from [@BotFather](https://t.me/BotFather)) |
+| `POLICYSHIELD_TELEGRAM_CHAT_ID` | Chat or group ID to send approval requests to |
+
+- **Both set** → Telegram backend (sends messages with ✅/❌ inline buttons)
+- **Not set** → InMemory backend (manage via `/api/v1/respond-approval` REST endpoint)
+
+```bash
+# Telegram mode
+POLICYSHIELD_TELEGRAM_TOKEN="..." \
+POLICYSHIELD_TELEGRAM_CHAT_ID="..." \
+policyshield server --rules rules.yaml --port 8100
+
+# InMemory mode (default)
+policyshield server --rules rules.yaml --port 8100
+```

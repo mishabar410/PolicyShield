@@ -19,9 +19,13 @@ from policyshield.server.models import (
     ClearTaintResponse,
     ConstraintsResponse,
     HealthResponse,
+    PendingApprovalItem,
+    PendingApprovalsResponse,
     PostCheckRequest,
     PostCheckResponse,
     ReloadResponse,
+    RespondApprovalRequest,
+    RespondApprovalResponse,
 )
 from policyshield.shield.async_engine import AsyncShieldEngine
 
@@ -150,5 +154,38 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
         if session is not None:
             session.clear_taint()
         return ClearTaintResponse(session_id=req.session_id)
+
+    @app.post("/api/v1/respond-approval", response_model=RespondApprovalResponse, dependencies=auth)
+    async def respond_approval(req: RespondApprovalRequest) -> RespondApprovalResponse:
+        """Respond to a pending approval request (approve or deny)."""
+        backend = engine._approval_backend
+        if backend is None:
+            raise HTTPException(status_code=500, detail="No approval backend configured")
+        backend.respond(
+            request_id=req.approval_id,
+            approved=req.approved,
+            responder=req.responder,
+            comment=req.comment,
+        )
+        return RespondApprovalResponse(approval_id=req.approval_id)
+
+    @app.get("/api/v1/pending-approvals", response_model=PendingApprovalsResponse, dependencies=auth)
+    async def pending_approvals() -> PendingApprovalsResponse:
+        """List all pending approval requests."""
+        backend = engine._approval_backend
+        if backend is None:
+            return PendingApprovalsResponse()
+        pending = backend.pending()
+        items = [
+            PendingApprovalItem(
+                approval_id=r.request_id,
+                tool_name=r.tool_name,
+                rule_id=r.rule_id,
+                message=r.message,
+                args=r.args,
+            )
+            for r in pending
+        ]
+        return PendingApprovalsResponse(approvals=items)
 
     return app

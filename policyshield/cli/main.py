@@ -233,6 +233,8 @@ def _cmd_server(parsed: argparse.Namespace) -> int:
         )
         return 1
 
+    import os
+
     from policyshield.core.models import ShieldMode
     from policyshield.server.app import create_app
     from policyshield.shield.async_engine import AsyncShieldEngine
@@ -249,7 +251,21 @@ def _cmd_server(parsed: argparse.Namespace) -> int:
         print(f"ERROR: rules not found: {rules_path}", file=sys.stderr)
         return 1
 
-    engine = AsyncShieldEngine(rules=rules_path, mode=mode)
+    # Use Telegram backend if env vars are set, otherwise InMemory
+    tg_token = os.environ.get("POLICYSHIELD_TELEGRAM_TOKEN")
+    tg_chat = os.environ.get("POLICYSHIELD_TELEGRAM_CHAT_ID")
+    if tg_token and tg_chat:
+        from policyshield.approval.telegram import TelegramApprovalBackend
+
+        approval_backend = TelegramApprovalBackend(bot_token=tg_token, chat_id=tg_chat)
+        print(f"  Approval: Telegram (chat_id={tg_chat})")
+    else:
+        from policyshield.approval.memory import InMemoryBackend
+
+        approval_backend = InMemoryBackend()
+        print("  Approval: InMemory (use REST API to respond)")
+
+    engine = AsyncShieldEngine(rules=rules_path, mode=mode, approval_backend=approval_backend)
     print("PolicyShield server starting...")
     print(f"  Rules: {rules_path} ({engine.rule_count} rules)")
     print(f"  Mode: {mode.value}")

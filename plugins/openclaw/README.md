@@ -72,7 +72,7 @@ openclaw agent --local --session-id test -m "Run: rm -rf /"
 - 🔒 **Pre-check**: blocks/redacts tool calls before execution
 - 📝 **Post-check**: scans tool output for PII leaks
 - 🧠 **Prompt enrichment**: injects active rules into agent context
-- ⏱️ **Human-in-the-loop**: APPROVE verdict with configurable timeout and polling
+- ⏱️ **Human-in-the-loop**: APPROVE verdict with Telegram or REST approval backends
 - 🛡️ **Fail-open**: graceful degradation when server is down
 
 ## Configuration
