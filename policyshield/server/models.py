@@ -78,3 +78,16 @@ class ApprovalStatusResponse(BaseModel):
     approval_id: str
     status: str  # "pending" | "approved" | "denied"
     responder: str | None = None
+
+
+class ClearTaintRequest(BaseModel):
+    """Request body for the /api/v1/clear-taint endpoint."""
+
+    session_id: str
+
+
+class ClearTaintResponse(BaseModel):
+    """Response body for the /api/v1/clear-taint endpoint."""
+
+    status: str = "ok"
+    session_id: str

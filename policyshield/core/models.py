@@ -84,6 +84,15 @@ class RuleConfig(BaseModel):
     approval_strategy: str | None = None  # "once", "per_session", "per_rule", "per_tool"
 
 
+class TaintChainConfig(BaseModel):
+    """Configuration for PII taint chain."""
+
+    model_config = ConfigDict(frozen=True)
+
+    enabled: bool = False
+    outgoing_tools: list[str] = []
+
+
 class RuleSet(BaseModel):
     """A set of rules loaded from YAML files."""
 
@@ -93,6 +102,7 @@ class RuleSet(BaseModel):
     version: int
     rules: list[RuleConfig]
     default_verdict: Verdict = Verdict.ALLOW
+    taint_chain: TaintChainConfig = TaintChainConfig()
 
     def enabled_rules(self) -> list[RuleConfig]:
         """Return only rules with enabled=True."""
@@ -144,11 +154,23 @@ class SessionState(BaseModel):
     tool_counts: dict[str, int] = {}
     total_calls: int = 0
     taints: set[PIIType] = set()
+    pii_tainted: bool = False
+    taint_details: str | None = None
 
     def increment(self, tool_name: str) -> None:
         """Increment tool call counters."""
         self.tool_counts[tool_name] = self.tool_counts.get(tool_name, 0) + 1
         self.total_calls += 1
+
+    def set_taint(self, reason: str) -> None:
+        """Mark session as PII-tainted."""
+        self.pii_tainted = True
+        self.taint_details = reason
+
+    def clear_taint(self) -> None:
+        """Clear PII taint from session."""
+        self.pii_tainted = False
+        self.taint_details = None
 
 
 class TraceRecord(BaseModel):

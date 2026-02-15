@@ -87,6 +87,11 @@ class BaseShieldEngine:
         self._lock = threading.Lock()
         self._watcher = None
 
+        # Taint chain config
+        tc = self._rule_set.taint_chain
+        self._taint_enabled: bool = tc.enabled
+        self._outgoing_tools: set[str] = set(tc.outgoing_tools)
+
     # ------------------------------------------------------------------ #
     #  Core check logic (sync)                                           #
     # ------------------------------------------------------------------ #
@@ -110,7 +115,7 @@ class BaseShieldEngine:
         session_id: str,
         sender: str | None,
     ) -> ShieldResult:
-        """Synchronous check logic: sanitize → rate-limit → match → PII → verdict."""
+        """Synchronous check logic: sanitize → rate-limit → taint → match → PII → verdict."""
         # Sanitize args
         if self._sanitizer is not None:
             san_result = self._sanitizer.sanitize(args)
@@ -130,6 +135,19 @@ class BaseShieldEngine:
                     verdict=Verdict.BLOCK,
                     rule_id="__rate_limit__",
                     message=rl_result.message,
+                )
+
+        # PII taint chain — block outgoing calls if session is tainted
+        if self._taint_enabled and tool_name in self._outgoing_tools:
+            session = self._session_mgr.get_or_create(session_id)
+            if session.pii_tainted:
+                return ShieldResult(
+                    verdict=Verdict.BLOCK,
+                    rule_id="__pii_taint__",
+                    message=(
+                        f"Session tainted: {session.taint_details}. "
+                        "Outgoing calls blocked until reviewed."
+                    ),
                 )
 
         # Session state for condition matching
@@ -349,6 +367,16 @@ class BaseShieldEngine:
             self._session_mgr.add_taint(session_id, pm.pii_type)
             tainted = True
 
+        # Set PII taint on session if taint chain is enabled
+        if tainted and self._taint_enabled:
+            session = self._session_mgr.get_or_create(session_id)
+            pii_types = ", ".join(m.pii_type.value for m in pii_matches)
+            session.set_taint(f"PII detected in {tool_name} output: {pii_types}")
+            logger.warning(
+                "Session %s tainted: PII (%s) in %s output",
+                session_id, pii_types, tool_name,
+            )
+
         return PostCheckResult(
             pii_matches=pii_matches,
             redacted_output=redacted_output,
@@ -431,6 +459,11 @@ class BaseShieldEngine:
         """Return current rule set (thread-safe)."""
         with self._lock:
             return self._rule_set
+
+    @property
+    def session_manager(self) -> SessionManager:
+        """Return the session manager."""
+        return self._session_mgr
 
     def get_policy_summary(self) -> str:
         """Return human-readable summary of active rules for LLM context."""

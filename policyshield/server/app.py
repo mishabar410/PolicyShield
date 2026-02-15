@@ -15,6 +15,8 @@ from policyshield.server.models import (
     ApprovalStatusResponse,
     CheckRequest,
     CheckResponse,
+    ClearTaintRequest,
+    ClearTaintResponse,
     ConstraintsResponse,
     HealthResponse,
     PostCheckRequest,
@@ -140,5 +142,13 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
             status=result["status"],
             responder=result.get("responder"),
         )
+
+    @app.post("/api/v1/clear-taint", response_model=ClearTaintResponse, dependencies=auth)
+    async def clear_taint(req: ClearTaintRequest) -> ClearTaintResponse:
+        """Clear PII taint from a session, re-enabling outgoing calls."""
+        session = engine.session_manager.get(req.session_id)
+        if session is not None:
+            session.clear_taint()
+        return ClearTaintResponse(session_id=req.session_id)
 
     return app

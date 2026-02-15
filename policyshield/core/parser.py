@@ -189,11 +189,18 @@ def _build_ruleset(data: dict, file_path: str) -> RuleSet:
         except ValueError:
             raise PolicyShieldParseError(f"Invalid default_verdict '{dv}'", file_path)
 
+    # Parse taint_chain config (optional)
+    from policyshield.core.models import TaintChainConfig
+
+    taint_chain_data = data.get("taint_chain", {})
+    taint_chain = TaintChainConfig(**taint_chain_data) if taint_chain_data else TaintChainConfig()
+
     ruleset = RuleSet(
         shield_name=shield_name,
         version=version,
         rules=rules,
         default_verdict=default_verdict,
+        taint_chain=taint_chain,
     )
     validate_rule_set(ruleset)
     return ruleset
