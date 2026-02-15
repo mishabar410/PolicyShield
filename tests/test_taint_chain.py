@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
 
 from policyshield.core.models import (
     RuleConfig,
