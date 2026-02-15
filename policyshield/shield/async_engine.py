@@ -99,6 +99,16 @@ class AsyncShieldEngine(BaseShieldEngine):
                     message=rl_result.message,
                 )
 
+        # PII taint chain — block outgoing calls if session is tainted
+        if self._taint_enabled and tool_name in self._outgoing_tools:
+            session = self._session_mgr.get_or_create(session_id)
+            if session.pii_tainted:
+                return ShieldResult(
+                    verdict=Verdict.BLOCK,
+                    rule_id="__pii_taint__",
+                    message=(f"Session tainted: {session.taint_details}. Outgoing calls blocked until reviewed."),
+                )
+
         # Session state for condition matching
         session_state = self._build_session_state(session_id)
 

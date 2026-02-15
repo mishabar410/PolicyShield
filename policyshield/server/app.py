@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
 import os
 from contextlib import asynccontextmanager
 
@@ -56,7 +57,7 @@ async def verify_token(request: Request) -> None:
     auth_header = request.headers.get("Authorization", "")
     if not auth_header.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing Bearer token")
-    if auth_header[7:] != token:
+    if not hmac.compare_digest(auth_header[7:], token):
         raise HTTPException(status_code=403, detail="Invalid token")
 
 
@@ -158,7 +159,7 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
     @app.post("/api/v1/respond-approval", response_model=RespondApprovalResponse, dependencies=auth)
     async def respond_approval(req: RespondApprovalRequest) -> RespondApprovalResponse:
         """Respond to a pending approval request (approve or deny)."""
-        backend = engine._approval_backend
+        backend = engine.approval_backend
         if backend is None:
             raise HTTPException(status_code=500, detail="No approval backend configured")
         backend.respond(
@@ -172,7 +173,7 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
     @app.get("/api/v1/pending-approvals", response_model=PendingApprovalsResponse, dependencies=auth)
     async def pending_approvals() -> PendingApprovalsResponse:
         """List all pending approval requests."""
-        backend = engine._approval_backend
+        backend = engine.approval_backend
         if backend is None:
             return PendingApprovalsResponse()
         pending = backend.pending()

@@ -11,6 +11,11 @@ RUN pip install --no-cache-dir ".[server]"
 RUN mkdir -p /app/rules
 COPY examples/fastapi_agent/policies/rules.yaml /app/rules/rules.yaml
 
+# Create non-root user for security
+RUN groupadd -r pshield && useradd -r -g pshield -d /app pshield \
+    && chown -R pshield:pshield /app
+USER pshield
+
 EXPOSE 8100
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s \

@@ -53,6 +53,24 @@ class RateLimiter:
         # key = (tool, session_id) for per-session, (tool, "__global__") for global
         self._windows: dict[tuple[str, str], _SlidingWindow] = defaultdict(_SlidingWindow)
         self._lock = threading.Lock()
+        self._last_cleanup = 0.0
+        self._cleanup_interval = 60.0  # seconds between stale window evictions
+
+    def _cleanup_stale_windows(self, now: float) -> None:
+        """Remove windows with no recent timestamps to prevent memory leaks.
+
+        Must be called under self._lock.
+        """
+        if now - self._last_cleanup < self._cleanup_interval:
+            return
+        self._last_cleanup = now
+        max_window = max((c.window_seconds for c in self._configs), default=60)
+        stale_keys = [
+            k for k, w in self._windows.items()
+            if not w.timestamps or (now - w.timestamps[-1]) > max_window * 2
+        ]
+        for k in stale_keys:
+            del self._windows[k]
 
     @classmethod
     def from_yaml_dict(cls, data: list[dict]) -> RateLimiter:
@@ -94,6 +112,7 @@ class RateLimiter:
         now = time.monotonic()
 
         with self._lock:
+            self._cleanup_stale_windows(now)
             for config in self._configs:
                 if config.tool != "*" and config.tool != tool_name:
                     continue

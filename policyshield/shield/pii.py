@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import copy
 import re
 from dataclasses import dataclass
 from typing import Any
 
 from policyshield.core.models import PIIMatch, PIIType
+
+# Maximum string length to scan for PII (prevents ReDoS on huge inputs)
+MAX_SCAN_LENGTH = 50_000
 
 
 @dataclass
@@ -76,12 +80,22 @@ BUILTIN_PATTERNS: list[PIIPattern] = [
     ),
     PIIPattern(
         pii_type=PIIType.PHONE,
-        pattern=re.compile(r"\+?\d{1,3}[-.\s]?\(?\d{1,4}\)?[-.\s]?\d{1,4}[-.\s]?\d{1,9}"),
+        pattern=re.compile(
+            r"(?:\+\d{1,3}[-.\s]?)?"       # optional country code
+            r"\(?\d{1,4}\)?"               # area code
+            r"[-.\s]?\d{1,4}"              # first group
+            r"[-.\s]?\d{1,4}"              # second group
+            r"(?:[-.\s]?\d{1,4})?"         # optional third group
+        ),
         label="phone",
     ),
     PIIPattern(
         pii_type=PIIType.CREDIT_CARD,
-        pattern=re.compile(r"\b(?:\d[ -]*?){13,19}\b"),
+        pattern=re.compile(
+            r"\b"
+            r"\d{4}[- ]?\d{4}[- ]?\d{4}[- ]?\d{1,7}"
+            r"\b"
+        ),
         label="credit_card",
     ),
     PIIPattern(
@@ -161,9 +175,12 @@ class PIIDetector:
         Returns:
             List of PIIMatch objects.
         """
+        # Truncate extremely long strings to prevent ReDoS
+        scan_text = text[:MAX_SCAN_LENGTH] if len(text) > MAX_SCAN_LENGTH else text
+
         matches: list[PIIMatch] = []
         for pii_pattern in self._patterns:
-            for m in pii_pattern.pattern.finditer(text):
+            for m in pii_pattern.pattern.finditer(scan_text):
                 matched_text = m.group()
                 # Extra validation for credit cards via Luhn
                 if pii_pattern.pii_type == PIIType.CREDIT_CARD:
@@ -267,7 +284,7 @@ class PIIDetector:
         for match in all_matches:
             field_matches.setdefault(match.field, []).append(match)
 
-        redacted = dict(data)
+        redacted = copy.deepcopy(data)
         for field_name, matches in field_matches.items():
             # Simple top-level field redaction
             if field_name in redacted and isinstance(redacted[field_name], str):

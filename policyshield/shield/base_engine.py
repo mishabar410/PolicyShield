@@ -150,9 +150,14 @@ class BaseShieldEngine:
         # Session state for condition matching
         session_state = self._build_session_state(session_id)
 
+        # Snapshot matcher + rule_set atomically to avoid race with hot-reload
+        with self._lock:
+            matcher = self._matcher
+            rule_set = self._rule_set
+
         # Find best matching rule
         try:
-            match = self._matcher.find_best_match(
+            match = matcher.find_best_match(
                 tool_name=tool_name,
                 args=args,
                 session_state=session_state,
@@ -169,7 +174,7 @@ class BaseShieldEngine:
             )
 
         if match is None:
-            default = self._rule_set.default_verdict
+            default = rule_set.default_verdict
             if default == Verdict.BLOCK:
                 return ShieldResult(
                     verdict=Verdict.BLOCK,
@@ -463,6 +468,11 @@ class BaseShieldEngine:
     def session_manager(self) -> SessionManager:
         """Return the session manager."""
         return self._session_mgr
+
+    @property
+    def approval_backend(self):
+        """Return the approval backend (or None if not configured)."""
+        return self._approval_backend
 
     def get_policy_summary(self) -> str:
         """Return human-readable summary of active rules for LLM context."""

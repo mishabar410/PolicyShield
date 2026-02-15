@@ -112,7 +112,9 @@ class TelegramApprovalBackend(ApprovalBackend):
         if not signaled:
             return None
         with self._lock:
-            return self._responses.get(request_id)
+            # Clean up after consuming the response
+            self._events.pop(request_id, None)
+            return self._responses.pop(request_id, None)
 
     def respond(
         self,
@@ -130,6 +132,7 @@ class TelegramApprovalBackend(ApprovalBackend):
         with self._lock:
             self._responses[request_id] = response
             self._pending.pop(request_id, None)
+            self._message_ids.pop(request_id, None)
             event = self._events.get(request_id)
         if event is not None:
             event.set()

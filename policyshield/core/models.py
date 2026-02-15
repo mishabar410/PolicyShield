@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from enum import Enum
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 # --- Enums ---
@@ -151,9 +151,9 @@ class SessionState(BaseModel):
 
     session_id: str
     created_at: datetime
-    tool_counts: dict[str, int] = {}
+    tool_counts: dict[str, int] = Field(default_factory=dict)
     total_calls: int = 0
-    taints: set[PIIType] = set()
+    taints: set[PIIType] = Field(default_factory=set)
     pii_tainted: bool = False
     taint_details: str | None = None
 
