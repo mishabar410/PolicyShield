@@ -1,7 +1,5 @@
 """Tests for playground CLI command."""
 
-import json
-
 import pytest
 
 from policyshield.cli.main import app
@@ -48,7 +46,7 @@ class TestSingleCheck:
         assert "exec blocked" in out
 
     def test_redact_verdict(self, rules_yaml, capsys):
-        code = run_single_check(rules_yaml, "send_email", '{"to": "test@example.com"}')
+        run_single_check(rules_yaml, "send_email", '{"to": "test@example.com"}')
         # REDACT is non-ALLOW → exit code 1
         captured = capsys.readouterr().out
         assert "REDACT" in captured

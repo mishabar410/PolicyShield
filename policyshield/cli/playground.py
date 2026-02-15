@@ -60,7 +60,7 @@ def cmd_playground(rules_path: str) -> int:
 
     engine = ShieldEngine(ruleset)
 
-    print(f"🛡️  PolicyShield Playground")
+    print("🛡️  PolicyShield Playground")
     print(f"   Rules: {ruleset.shield_name} v{ruleset.version} ({engine.rule_count} rules)")
     print()
     print("   Enter tool calls to test against your rules.")
