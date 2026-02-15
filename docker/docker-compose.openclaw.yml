@@ -1,0 +1,14 @@
+version: "3.8"
+services:
+  policyshield:
+    image: ghcr.io/policyshield/policyshield:latest
+    ports:
+      - "8100:8100"
+    volumes:
+      - ./rules.yaml:/app/rules.yaml
+    command: ["policyshield", "server", "--rules", "/app/rules.yaml", "--host", "0.0.0.0"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8100/api/v1/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 5

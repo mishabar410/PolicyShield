@@ -29,6 +29,10 @@ def app(args: list[str] | None = None) -> int:
 
     subparsers = parser.add_subparsers(dest="command")
 
+    # openclaw subcommands (setup / teardown / status)
+    from policyshield.cli.openclaw import add_openclaw_subcommands
+    add_openclaw_subcommands(subparsers)
+
     # validate command
     validate_parser = subparsers.add_parser("validate", help="Validate rule files")
     validate_parser.add_argument("path", help="Path to YAML rule file or directory")
@@ -188,6 +192,9 @@ def app(args: list[str] | None = None) -> int:
             return 1
     elif parsed.command == "server":
         return _cmd_server(parsed)
+    elif parsed.command == "openclaw":
+        from policyshield.cli.openclaw import cmd_openclaw
+        return cmd_openclaw(parsed)
     else:
         parser.print_help()
         return 1
