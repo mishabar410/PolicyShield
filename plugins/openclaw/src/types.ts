@@ -4,6 +4,8 @@ export type PluginConfig = {
     mode?: "enforce" | "disabled";
     fail_open?: boolean;
     timeout_ms?: number;
+    /** Bearer token for PolicyShield server authentication. If set, all API requests include this token. */
+    api_token?: string;
     /** Max time to wait for human approval (ms). Default: 60000 */
     approve_timeout_ms?: number;
     /** Polling interval for approval status (ms). Default: 2000 */

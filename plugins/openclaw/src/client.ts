@@ -14,6 +14,7 @@ export class PolicyShieldClient {
     private readonly timeout: number;
     private readonly enabled: boolean;
     private readonly failOpen: boolean;
+    private readonly apiToken?: string;
     private readonly logger?: PluginLogger;
 
     constructor(config: PluginConfig = {}, logger?: PluginLogger) {
@@ -21,7 +22,18 @@ export class PolicyShieldClient {
         this.timeout = config.timeout_ms ?? 5000;
         this.enabled = (config.mode ?? "enforce") !== "disabled";
         this.failOpen = config.fail_open ?? true;
+        this.apiToken = config.api_token;
         this.logger = logger;
+    }
+
+    private getHeaders(): Record<string, string> {
+        const headers: Record<string, string> = {
+            "Content-Type": "application/json",
+        };
+        if (this.apiToken) {
+            headers["Authorization"] = `Bearer ${this.apiToken}`;
+        }
+        return headers;
     }
 
     async check(req: CheckRequest): Promise<CheckResponse> {
@@ -31,7 +43,7 @@ export class PolicyShieldClient {
         try {
             const res = await fetch(`${this.url}/api/v1/check`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: this.getHeaders(),
                 body: JSON.stringify(req),
                 signal: AbortSignal.timeout(this.timeout),
             });
@@ -60,7 +72,7 @@ export class PolicyShieldClient {
         try {
             const res = await fetch(`${this.url}/api/v1/post-check`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: this.getHeaders(),
                 body: JSON.stringify(req),
                 signal: AbortSignal.timeout(this.timeout),
             });
@@ -81,6 +93,7 @@ export class PolicyShieldClient {
     async getConstraints(): Promise<string | undefined> {
         try {
             const res = await fetch(`${this.url}/api/v1/constraints`, {
+                headers: this.getHeaders(),
                 signal: AbortSignal.timeout(2000),
             });
             if (res.ok) {
@@ -98,6 +111,7 @@ export class PolicyShieldClient {
     async healthCheck(): Promise<boolean> {
         try {
             const res = await fetch(`${this.url}/api/v1/health`, {
+                headers: this.getHeaders(),
                 signal: AbortSignal.timeout(2000),
             });
             return res.ok;
@@ -110,7 +124,7 @@ export class PolicyShieldClient {
         try {
             const res = await fetch(`${this.url}/api/v1/check-approval`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: this.getHeaders(),
                 body: JSON.stringify({ approval_id: approvalId }),
                 signal: AbortSignal.timeout(this.timeout),
             });

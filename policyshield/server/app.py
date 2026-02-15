@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import hashlib
+import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI, HTTPException, Request
 
 from policyshield import __version__
 
@@ -32,6 +33,27 @@ def _rules_hash(engine: AsyncShieldEngine) -> str:
     return hashlib.sha256(raw.encode()).hexdigest()[:16]
 
 
+def _get_api_token() -> str | None:
+    """Read API token from environment. Returns None if not configured."""
+    return os.environ.get("POLICYSHIELD_API_TOKEN") or None
+
+
+async def verify_token(request: Request) -> None:
+    """Verify Bearer token if POLICYSHIELD_API_TOKEN is set.
+
+    Health endpoint is always public (for Docker/K8s healthchecks).
+    When no token is configured, all endpoints are open (dev mode).
+    """
+    token = _get_api_token()
+    if token is None:
+        return  # No auth configured — allow all
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing Bearer token")
+    if auth_header[7:] != token:
+        raise HTTPException(status_code=403, detail="Invalid token")
+
+
 def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastAPI:
     """Create a FastAPI application wired to the given AsyncShieldEngine.
 
@@ -54,7 +76,9 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
 
     app = FastAPI(title="PolicyShield", version=__version__, lifespan=lifespan)
 
-    @app.post("/api/v1/check", response_model=CheckResponse)
+    auth = [Depends(verify_token)]
+
+    @app.post("/api/v1/check", response_model=CheckResponse, dependencies=auth)
     async def check(req: CheckRequest) -> CheckResponse:
         result = await engine.check(
             tool_name=req.tool_name,
@@ -71,7 +95,7 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
             approval_id=result.approval_id,
         )
 
-    @app.post("/api/v1/post-check", response_model=PostCheckResponse)
+    @app.post("/api/v1/post-check", response_model=PostCheckResponse, dependencies=auth)
     async def post_check(req: PostCheckRequest) -> PostCheckResponse:
         result = await engine.post_check(
             tool_name=req.tool_name,
@@ -83,7 +107,7 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
             redacted_output=result.redacted_output,
         )
 
-    @app.get("/api/v1/constraints", response_model=ConstraintsResponse)
+    @app.get("/api/v1/constraints", response_model=ConstraintsResponse, dependencies=auth)
     async def constraints() -> ConstraintsResponse:
         return ConstraintsResponse(summary=engine.get_policy_summary())
 
@@ -98,7 +122,7 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
             rules_hash=_rules_hash(engine),
         )
 
-    @app.post("/api/v1/reload", response_model=ReloadResponse)
+    @app.post("/api/v1/reload", response_model=ReloadResponse, dependencies=auth)
     async def reload() -> ReloadResponse:
         """Reload rules from disk."""
         engine.reload_rules()
@@ -107,7 +131,7 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
             rules_hash=_rules_hash(engine),
         )
 
-    @app.post("/api/v1/check-approval", response_model=ApprovalStatusResponse)
+    @app.post("/api/v1/check-approval", response_model=ApprovalStatusResponse, dependencies=auth)
     async def check_approval(req: ApprovalStatusRequest) -> ApprovalStatusResponse:
         """Check the status of a pending approval request."""
         result = engine.get_approval_status(req.approval_id)

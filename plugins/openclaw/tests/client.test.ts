@@ -222,4 +222,27 @@ describe("PolicyShieldClient", () => {
         expect(res.status).toBe("pending");
         expect(res.approval_id).toBe("apr-3");
     });
+
+    it("sends Authorization header when api_token is set", async () => {
+        const spy = mockFetch({ verdict: "ALLOW", message: "" });
+        const client = new PolicyShieldClient({ api_token: "mytoken-123" });
+        await client.check({ tool_name: "test", args: {}, session_id: "s1" });
+        expect(spy).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.objectContaining({
+                headers: expect.objectContaining({
+                    Authorization: "Bearer mytoken-123",
+                }),
+            }),
+        );
+    });
+
+    it("does not send Authorization header when api_token is not set", async () => {
+        const spy = mockFetch({ verdict: "ALLOW", message: "" });
+        const client = new PolicyShieldClient({});
+        await client.check({ tool_name: "test", args: {}, session_id: "s1" });
+        const callArgs = spy.mock.calls[0][1] as RequestInit;
+        const headers = callArgs.headers as Record<string, string>;
+        expect(headers["Authorization"]).toBeUndefined();
+    });
 });

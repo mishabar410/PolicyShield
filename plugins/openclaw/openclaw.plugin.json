@@ -40,6 +40,11 @@
                 "type": "number",
                 "default": 10000,
                 "description": "Max bytes of tool result to send for PII scan"
+            },
+            "api_token": {
+                "type": "string",
+                "default": "",
+                "description": "Bearer token for PolicyShield server authentication. Must match POLICYSHIELD_API_TOKEN on the server."
             }
         }
     }
