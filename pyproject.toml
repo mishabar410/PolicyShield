@@ -50,6 +50,10 @@ server = [
 prometheus = [
     "prometheus-client>=0.17",
 ]
+ai = [
+    "openai>=1.0",
+    "anthropic>=0.20",
+]
 docs = [
     "mkdocs-material>=9.0",
     "mkdocstrings[python]>=0.24",

@@ -166,6 +166,30 @@ def app(args: list[str] | None = None) -> int:
     sp_replay.add_argument("--only-changed", action="store_true", help="Show only changed verdicts")
     sp_replay.add_argument("--format", choices=["table", "json"], default="table", help="Output format")
 
+    # generate command
+    sp_gen = subparsers.add_parser("generate", help="Generate rules from description")
+    sp_gen.add_argument("description", nargs="?", help="Natural language description of rules")
+    sp_gen.add_argument("--tools", nargs="+", help="List of tool names for context")
+    sp_gen.add_argument("--output", "-o", default=None, help="Output YAML file (default: stdout)")
+    sp_gen.add_argument(
+        "--provider",
+        choices=["openai", "anthropic"],
+        default="openai",
+        help="LLM provider",
+    )
+    sp_gen.add_argument("--model", default=None, help="Specific LLM model")
+    sp_gen.add_argument(
+        "--template",
+        action="store_true",
+        help="Use offline template mode (no LLM). Requires --tools",
+    )
+    sp_gen.add_argument(
+        "--interactive",
+        "-i",
+        action="store_true",
+        help="Interactive mode: ask follow-up questions",
+    )
+
     parsed = parser.parse_args(args)
 
     if parsed.command == "validate":
@@ -216,6 +240,8 @@ def app(args: list[str] | None = None) -> int:
         return _cmd_server(parsed)
     elif parsed.command == "replay":
         return _cmd_replay(parsed)
+    elif parsed.command == "generate":
+        return _cmd_generate(parsed)
     elif parsed.command == "openclaw":
         from policyshield.cli.openclaw import cmd_openclaw
 
@@ -855,3 +881,112 @@ def _display_trace(
     except (json.JSONDecodeError, OSError) as e:
         print(f"✗ Error reading trace file: {e}", file=sys.stderr)
         return 1
+
+
+# ─── generate command ────────────────────────────────────────────────
+
+
+def _cmd_generate(args: argparse.Namespace) -> int:
+    """Generate PolicyShield rules."""
+    import asyncio
+
+    # Template mode (offline, no LLM)
+    if args.template:
+        return _generate_template(args)
+
+    # AI mode (requires LLM)
+    if not args.description:
+        print("Error: description is required for AI generation.")
+        print("Usage: policyshield generate 'Block all file deletions' --tools delete_file read_file")
+        return 1
+
+    return asyncio.run(_generate_ai(args))
+
+
+def _generate_template(args: argparse.Namespace) -> int:
+    """Generate rules from templates (offline mode)."""
+    from policyshield.ai.templates import recommend_rules
+
+    if not args.tools:
+        print("Error: --tools is required for template mode.")
+        print("Usage: policyshield generate --template --tools delete_file send_email -o rules.yaml")
+        return 1
+
+    recs = recommend_rules(args.tools)
+    if not recs:
+        print("No rule recommendations for the given tools (all classified as safe).")
+        return 0
+
+    # Build YAML
+    lines = ['version: "1"', "default_verdict: allow", "", "rules:"]
+    for rec in recs:
+        lines.append(f"  # {rec.tool_name} ({rec.danger_level.value})")
+        for yaml_line in rec.yaml_snippet.split("\n"):
+            lines.append(yaml_line)
+        lines.append("")
+
+    yaml_text = "\n".join(lines)
+
+    return _output_yaml(yaml_text, args.output, recs=recs)
+
+
+async def _generate_ai(args: argparse.Namespace) -> int:
+    """Generate rules using LLM."""
+    from policyshield.ai.generator import generate_rules
+
+    print(f"🧠 Generating rules with {args.provider}...")
+    if args.tools:
+        print(f"   Tools: {', '.join(args.tools)}")
+
+    try:
+        result = await generate_rules(
+            args.description,
+            tool_names=args.tools,
+            provider=args.provider,
+            model=args.model,
+        )
+    except RuntimeError as e:
+        print(f"Error: {e}")
+        return 1
+
+    if not result.validation_ok:
+        print(f"⚠️  Generated YAML has validation errors: {result.validation_error}")
+        print("─" * 60)
+        print(result.yaml_text)
+        print("─" * 60)
+        print("\nYou can save this YAML and fix it manually with: policyshield lint <file>")
+
+        if args.output:
+            _write_file(args.output, result.yaml_text)
+            print(f"\nSaved (with warnings) to: {args.output}")
+        return 1
+
+    return _output_yaml(result.yaml_text, args.output, model=result.model)
+
+
+def _output_yaml(yaml_text: str, output_path: str | None, **info: object) -> int:
+    """Output YAML to file or stdout."""
+    if output_path:
+        _write_file(str(output_path), yaml_text)
+        print(f"✅ Rules saved to: {output_path}")
+        if info.get("model"):
+            print(f"   Model: {info['model']}")
+        if info.get("recs"):
+            recs = info["recs"]
+            print(f"   Generated {len(recs)} rule(s) from templates")  # type: ignore[arg-type]
+    else:
+        print(yaml_text)
+
+    # Validate output
+    from policyshield.core.parser import parse_rules_from_string
+
+    rule_set = parse_rules_from_string(yaml_text)
+    print(f"\n✅ Valid: {len(rule_set.rules)} rule(s) parsed successfully")
+    return 0
+
+
+def _write_file(path: str, content: str) -> None:
+    from pathlib import Path
+
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    Path(path).write_text(content, encoding="utf-8")

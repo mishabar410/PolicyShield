@@ -59,7 +59,7 @@ class EventRingBuffer:
         for event in self._buffer:
             if event.tool != tool:
                 continue
-            if verdict and event.verdict != verdict:
+            if verdict is not None and event.verdict != verdict:
                 continue
             if within_seconds is not None:
                 age = (now - event.timestamp).total_seconds()
