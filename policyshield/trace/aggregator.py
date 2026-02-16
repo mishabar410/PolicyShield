@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from policyshield.trace.search import SearchQuery, TraceSearchEngine
@@ -300,7 +300,7 @@ class TraceAggregator:
             vb = self._compute_verdict_breakdown(recs)
             points.append(
                 TimeSeriesPoint(
-                    timestamp=datetime.fromtimestamp(bk),
+                    timestamp=datetime.fromtimestamp(bk, tz=timezone.utc),
                     count=len(recs),
                     verdict_breakdown=vb,
                 )

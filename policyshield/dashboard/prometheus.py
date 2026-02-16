@@ -67,7 +67,9 @@ class PrometheusExporter:
 
     @staticmethod
     def _label(key: str, value: str) -> str:
-        return f'{key}="{value}"'
+        # Escape per Prometheus exposition format: \ → \\, " → \", \n → \\n
+        escaped = value.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+        return f'{key}="{escaped}"'
 
 
 def add_prometheus_endpoint(app, trace_dir: str | Path = "./traces") -> None:

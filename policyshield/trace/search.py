@@ -128,15 +128,17 @@ class TraceSearchEngine:
 
         return False
 
-    def _search_in_value(self, value: Any, text: str) -> bool:
+    def _search_in_value(self, value: Any, text: str, _depth: int = 0) -> bool:
         """Recursively search for text in a value (dict, list, or scalar)."""
+        if _depth > 20:
+            return False
         if isinstance(value, dict):
             for v in value.values():
-                if self._search_in_value(v, text):
+                if self._search_in_value(v, text, _depth + 1):
                     return True
         elif isinstance(value, list):
             for item in value:
-                if self._search_in_value(item, text):
+                if self._search_in_value(item, text, _depth + 1):
                     return True
         else:
             if text in str(value).lower():

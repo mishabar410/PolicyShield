@@ -13,10 +13,11 @@ from policyshield.shield.matcher import MatcherEngine
 
 class ChangeType(Enum):
     """Type of verdict change in replay."""
+
     UNCHANGED = "unchanged"
-    RELAXED = "relaxed"      # e.g. BLOCK → ALLOW (less restrictive)
+    RELAXED = "relaxed"  # e.g. BLOCK → ALLOW (less restrictive)
     TIGHTENED = "tightened"  # e.g. ALLOW → BLOCK (more restrictive)
-    MODIFIED = "modified"    # e.g. BLOCK → REDACT (different, same level)
+    MODIFIED = "modified"  # e.g. BLOCK → REDACT (different, same level)
 
 
 @dataclass(frozen=True)

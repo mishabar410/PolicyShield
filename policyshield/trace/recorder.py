@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import threading
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -55,7 +55,7 @@ class TraceRecorder:
 
     def _generate_file_path(self) -> Path:
         """Generate a timestamped trace file path."""
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
         return self._output_dir / f"trace_{timestamp}.jsonl"
 
     def record(
@@ -80,7 +80,7 @@ class TraceRecorder:
             args: Original arguments (hashed in privacy mode).
         """
         entry: dict[str, Any] = {
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "session_id": session_id,
             "tool": tool,
             "verdict": verdict.value,

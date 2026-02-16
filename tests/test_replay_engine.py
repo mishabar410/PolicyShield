@@ -8,9 +8,11 @@ def _make_ruleset(rules, default=Verdict.ALLOW):
 
 
 def test_replay_unchanged():
-    rules = _make_ruleset([
-        RuleConfig(id="r1", when={"tool": "read_file"}, then=Verdict.ALLOW),
-    ])
+    rules = _make_ruleset(
+        [
+            RuleConfig(id="r1", when={"tool": "read_file"}, then=Verdict.ALLOW),
+        ]
+    )
     engine = ReplayEngine(rules)
     entry = TraceEntry(timestamp="2026-01-01T00:00:00+00:00", session_id="s1", tool="read_file", verdict="allow")
     result = engine.replay_one(entry)
@@ -19,9 +21,11 @@ def test_replay_unchanged():
 
 
 def test_replay_tightened():
-    rules = _make_ruleset([
-        RuleConfig(id="r1", when={"tool": "read_file"}, then=Verdict.BLOCK),
-    ])
+    rules = _make_ruleset(
+        [
+            RuleConfig(id="r1", when={"tool": "read_file"}, then=Verdict.BLOCK),
+        ]
+    )
     engine = ReplayEngine(rules)
     entry = TraceEntry(timestamp="2026-01-01T00:00:00+00:00", session_id="s1", tool="read_file", verdict="allow")
     result = engine.replay_one(entry)
@@ -31,9 +35,11 @@ def test_replay_tightened():
 
 
 def test_replay_relaxed():
-    rules = _make_ruleset([
-        RuleConfig(id="r1", when={"tool": "delete_file"}, then=Verdict.ALLOW),
-    ])
+    rules = _make_ruleset(
+        [
+            RuleConfig(id="r1", when={"tool": "delete_file"}, then=Verdict.ALLOW),
+        ]
+    )
     engine = ReplayEngine(rules)
     entry = TraceEntry(timestamp="2026-01-01T00:00:00+00:00", session_id="s1", tool="delete_file", verdict="block")
     result = engine.replay_one(entry)
@@ -42,10 +48,12 @@ def test_replay_relaxed():
 
 
 def test_replay_all_with_summary():
-    rules = _make_ruleset([
-        RuleConfig(id="r1", when={"tool": "read_file"}, then=Verdict.ALLOW),
-        RuleConfig(id="r2", when={"tool": "delete_file"}, then=Verdict.BLOCK),
-    ])
+    rules = _make_ruleset(
+        [
+            RuleConfig(id="r1", when={"tool": "read_file"}, then=Verdict.ALLOW),
+            RuleConfig(id="r2", when={"tool": "delete_file"}, then=Verdict.BLOCK),
+        ]
+    )
     engine = ReplayEngine(rules)
     entries = [
         TraceEntry(timestamp="2026-01-01T00:00:00+00:00", session_id="s1", tool="read_file", verdict="allow"),

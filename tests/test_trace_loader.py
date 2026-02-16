@@ -12,10 +12,13 @@ def _write_traces(path: Path, entries: list[dict]):
 
 def test_load_single_file(tmp_path):
     trace_file = tmp_path / "trace.jsonl"
-    _write_traces(trace_file, [
-        {"timestamp": "2026-01-01T00:00:00+00:00", "session_id": "s1", "tool": "read_file", "verdict": "allow"},
-        {"timestamp": "2026-01-01T00:01:00+00:00", "session_id": "s1", "tool": "write_file", "verdict": "block"},
-    ])
+    _write_traces(
+        trace_file,
+        [
+            {"timestamp": "2026-01-01T00:00:00+00:00", "session_id": "s1", "tool": "read_file", "verdict": "allow"},
+            {"timestamp": "2026-01-01T00:01:00+00:00", "session_id": "s1", "tool": "write_file", "verdict": "block"},
+        ],
+    )
 
     loader = TraceLoader.from_path(trace_file)
     entries = loader.load()
@@ -25,12 +28,18 @@ def test_load_single_file(tmp_path):
 
 
 def test_load_directory(tmp_path):
-    _write_traces(tmp_path / "a.jsonl", [
-        {"timestamp": "2026-01-01T00:00:00+00:00", "session_id": "s1", "tool": "t1", "verdict": "allow"},
-    ])
-    _write_traces(tmp_path / "b.jsonl", [
-        {"timestamp": "2026-01-01T00:01:00+00:00", "session_id": "s2", "tool": "t2", "verdict": "block"},
-    ])
+    _write_traces(
+        tmp_path / "a.jsonl",
+        [
+            {"timestamp": "2026-01-01T00:00:00+00:00", "session_id": "s1", "tool": "t1", "verdict": "allow"},
+        ],
+    )
+    _write_traces(
+        tmp_path / "b.jsonl",
+        [
+            {"timestamp": "2026-01-01T00:01:00+00:00", "session_id": "s2", "tool": "t2", "verdict": "block"},
+        ],
+    )
 
     loader = TraceLoader.from_path(tmp_path)
     entries = loader.load()
@@ -39,10 +48,13 @@ def test_load_directory(tmp_path):
 
 def test_filter_by_session(tmp_path):
     trace_file = tmp_path / "trace.jsonl"
-    _write_traces(trace_file, [
-        {"timestamp": "2026-01-01T00:00:00+00:00", "session_id": "s1", "tool": "t1", "verdict": "allow"},
-        {"timestamp": "2026-01-01T00:01:00+00:00", "session_id": "s2", "tool": "t2", "verdict": "allow"},
-    ])
+    _write_traces(
+        trace_file,
+        [
+            {"timestamp": "2026-01-01T00:00:00+00:00", "session_id": "s1", "tool": "t1", "verdict": "allow"},
+            {"timestamp": "2026-01-01T00:01:00+00:00", "session_id": "s2", "tool": "t2", "verdict": "allow"},
+        ],
+    )
 
     loader = TraceLoader.from_path(trace_file)
     entries = loader.load(session_id="s1")
@@ -52,10 +64,13 @@ def test_filter_by_session(tmp_path):
 
 def test_filter_by_verdict(tmp_path):
     trace_file = tmp_path / "trace.jsonl"
-    _write_traces(trace_file, [
-        {"timestamp": "2026-01-01T00:00:00+00:00", "session_id": "s1", "tool": "t1", "verdict": "allow"},
-        {"timestamp": "2026-01-01T00:01:00+00:00", "session_id": "s1", "tool": "t2", "verdict": "block"},
-    ])
+    _write_traces(
+        trace_file,
+        [
+            {"timestamp": "2026-01-01T00:00:00+00:00", "session_id": "s1", "tool": "t1", "verdict": "allow"},
+            {"timestamp": "2026-01-01T00:01:00+00:00", "session_id": "s1", "tool": "t2", "verdict": "block"},
+        ],
+    )
 
     loader = TraceLoader.from_path(trace_file)
     entries = loader.load(verdict="block")
@@ -76,10 +91,13 @@ def test_skip_malformed_lines(tmp_path):
 
 def test_stats(tmp_path):
     trace_file = tmp_path / "trace.jsonl"
-    _write_traces(trace_file, [
-        {"timestamp": "2026-01-01T00:00:00+00:00", "session_id": "s1", "tool": "t1", "verdict": "allow"},
-        {"timestamp": "2026-01-01T00:01:00+00:00", "session_id": "s2", "tool": "t2", "verdict": "block"},
-    ])
+    _write_traces(
+        trace_file,
+        [
+            {"timestamp": "2026-01-01T00:00:00+00:00", "session_id": "s1", "tool": "t1", "verdict": "allow"},
+            {"timestamp": "2026-01-01T00:01:00+00:00", "session_id": "s2", "tool": "t2", "verdict": "block"},
+        ],
+    )
 
     loader = TraceLoader.from_path(trace_file)
     s = loader.stats()
@@ -90,11 +108,13 @@ def test_stats(tmp_path):
 
 def test_file_not_found():
     import pytest
+
     with pytest.raises(FileNotFoundError):
         TraceLoader.from_path("/nonexistent/path")
 
 
 def test_empty_directory(tmp_path):
     import pytest
+
     with pytest.raises(ValueError, match="No .jsonl"):
         TraceLoader.from_path(tmp_path)

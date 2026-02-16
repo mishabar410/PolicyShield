@@ -763,9 +763,9 @@ def _cmd_replay(parsed: argparse.Namespace) -> int:
     }
     _CHANGE_COLORS = {
         ChangeType.UNCHANGED: "",
-        ChangeType.RELAXED: "\033[32m",    # green
+        ChangeType.RELAXED: "\033[32m",  # green
         ChangeType.TIGHTENED: "\033[31m",  # red
-        ChangeType.MODIFIED: "\033[33m",   # yellow
+        ChangeType.MODIFIED: "\033[33m",  # yellow
     }
     RESET = "\033[0m"
 
@@ -776,13 +776,17 @@ def _cmd_replay(parsed: argparse.Namespace) -> int:
         symbol = _CHANGE_SYMBOLS[r.change_type]
         color = _CHANGE_COLORS[r.change_type]
         rule = r.new_rule_id or "(default)"
-        print(f"{color}{r.entry.tool:<30} {r.old_verdict:<10} {r.new_verdict:<10} {symbol}{r.change_type.value:<10} {rule}{RESET}")
+        print(
+            f"{color}{r.entry.tool:<30} {r.old_verdict:<10} {r.new_verdict:<10} {symbol}{r.change_type.value:<10} {rule}{RESET}"
+        )
 
     print("─" * 80)
-    print(f"\nTotal: {summary['total']}  |  "
-          f"Unchanged: {summary['unchanged']}  |  "
-          f"\033[31m↑ Tightened: {summary['tightened']}\033[0m  |  "
-          f"\033[32m↓ Relaxed: {summary['relaxed']}\033[0m")
+    print(
+        f"\nTotal: {summary['total']}  |  "
+        f"Unchanged: {summary['unchanged']}  |  "
+        f"\033[31m↑ Tightened: {summary['tightened']}\033[0m  |  "
+        f"\033[32m↓ Relaxed: {summary['relaxed']}\033[0m"
+    )
 
     if summary["tightened"] > 0:
         print(f"\n⚠️  {summary['tightened']} tool call(s) would be MORE restricted with new rules.")

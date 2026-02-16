@@ -1,0 +1,47 @@
+# Chain Rules — Exfiltration Detection Examples
+# These rules demonstrate multi-step temporal analysis.
+# A chain rule fires only when prerequisite tool calls
+# appear in the session's event buffer within a time window.
+
+shield_name: chain-examples
+version: 1
+
+rules:
+  # ── Data exfiltration: read → send ────────────────────────────
+  - id: exfil-read-send
+    description: Block send if a read occurred in the last 5 min
+    when:
+      tool: send_email
+      chain:
+        - tool: read_file
+          within_seconds: 300
+    then: BLOCK
+    severity: HIGH
+    message: "Possible data exfiltration: read_file → send_email"
+
+  # ── DB dump + network: query → send ──────────────────────────
+  - id: exfil-db-send
+    description: Block outgoing network after bulk DB reads
+    when:
+      tool: http_post
+      chain:
+        - tool: query_db
+          within_seconds: 120
+          min_count: 3
+    then: BLOCK
+    severity: HIGH
+    message: "Possible exfiltration: query_db ×3 → http_post"
+
+  # ── Retry storm: repeated blocks ─────────────────────────────
+  - id: retry-storm
+    description: Block tool if it was already blocked recently
+    when:
+      tool: ".*"
+      chain:
+        - tool: ".*"
+          verdict: BLOCK
+          within_seconds: 60
+          min_count: 3
+    then: BLOCK
+    severity: MEDIUM
+    message: "Retry storm detected: 3+ blocks in 60s"

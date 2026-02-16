@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import csv
+import html as html_mod
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from io import StringIO
 from pathlib import Path
 
@@ -120,12 +121,12 @@ class TraceExporter:
                     val = rec.get("args_hash", "")
                 else:
                     val = str(rec.get(c, ""))
-                rows_html.write(f"<td>{val}</td>")
+                rows_html.write(f"<td>{html_mod.escape(val)}</td>")
             rows_html.write("</tr>\n")
 
         header_cells = "".join(f"<th>{c}</th>" for c in cols)
 
-        generated_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
 
         html = f"""<!DOCTYPE html>
 <html lang="en">

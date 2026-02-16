@@ -6,6 +6,7 @@ import threading
 from datetime import datetime, timedelta, timezone
 
 from policyshield.core.models import PIIType, SessionState
+from policyshield.shield.ring_buffer import EventRingBuffer
 
 
 class SessionManager:
@@ -46,6 +47,7 @@ class SessionManager:
             session = SessionState(
                 session_id=session_id,
                 created_at=datetime.now(timezone.utc),
+                event_buffer=EventRingBuffer(),
             )
             self._sessions[session_id] = session
             return session
@@ -80,6 +82,13 @@ class SessionManager:
         with self._lock:
             session.increment(tool_name)
         return session
+
+    def get_event_buffer(self, session_id: str) -> EventRingBuffer:
+        """Get the event buffer for a session (lazy-initializes if needed)."""
+        session = self.get_or_create(session_id)
+        if session.event_buffer is None:
+            session.event_buffer = EventRingBuffer()
+        return session.event_buffer  # type: ignore[return-value]
 
     def add_taint(self, session_id: str, pii_type: PIIType) -> None:
         """Mark a session as tainted with a PII type.

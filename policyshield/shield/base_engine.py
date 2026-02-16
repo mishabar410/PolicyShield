@@ -159,11 +159,14 @@ class BaseShieldEngine:
 
         # Find best matching rule
         try:
+            # Pass event buffer for chain rule evaluation
+            event_buffer = self._session_mgr.get_event_buffer(session_id)
             match = matcher.find_best_match(
                 tool_name=tool_name,
                 args=args,
                 session_state=session_state,
                 sender=sender,
+                event_buffer=event_buffer,
             )
         except Exception as e:
             logger.error("Matcher error: %s", e)
@@ -355,6 +358,10 @@ class BaseShieldEngine:
             self._session_mgr.increment(session_id, tool_name)
             if self._rate_limiter is not None:
                 self._rate_limiter.record(tool_name, session_id)
+
+        # Record event in ring buffer for chain rule tracking
+        buf = self._session_mgr.get_event_buffer(session_id)
+        buf.add(tool_name, result.verdict.value)
 
         # Record trace
         self._trace(result, session_id, tool_name, latency_ms, args)

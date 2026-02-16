@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from policyshield.core.models import RuleConfig, RuleSet, Severity, Verdict
+from policyshield.core.models import ChainCondition, RuleConfig, RuleSet, Severity, Verdict
 
 # Maximum length for regex patterns to prevent ReDoS
 MAX_PATTERN_LENGTH = 500
@@ -43,10 +43,7 @@ class CompiledRule:
                 compiled.tool_pattern = re.compile(f"^({'|'.join(escaped)})$")
             else:
                 if len(str(tool)) > MAX_PATTERN_LENGTH:
-                    raise ValueError(
-                        f"Tool pattern in rule '{rule.id}' exceeds "
-                        f"{MAX_PATTERN_LENGTH} characters"
-                    )
+                    raise ValueError(f"Tool pattern in rule '{rule.id}' exceeds {MAX_PATTERN_LENGTH} characters")
                 compiled.tool_pattern = re.compile(f"^{tool}$")
 
         # Compile argument matchers (support both 'args' and 'args_match')
@@ -84,10 +81,7 @@ class CompiledRule:
         sender = when.get("sender")
         if sender:
             if len(str(sender)) > MAX_PATTERN_LENGTH:
-                raise ValueError(
-                    f"Sender pattern in rule '{rule.id}' exceeds "
-                    f"{MAX_PATTERN_LENGTH} characters"
-                )
+                raise ValueError(f"Sender pattern in rule '{rule.id}' exceeds {MAX_PATTERN_LENGTH} characters")
             compiled.sender_pattern = re.compile(f"^{sender}$")
 
         return compiled
@@ -151,6 +145,7 @@ class MatcherEngine:
         args: dict | None = None,
         session_state: dict | None = None,
         sender: str | None = None,
+        event_buffer: object | None = None,
     ) -> list[CompiledRule]:
         """Find all rules matching a tool call.
 
@@ -159,6 +154,7 @@ class MatcherEngine:
             args: Arguments to the tool call.
             session_state: Current session state for session-based conditions.
             sender: Identity of the caller.
+            event_buffer: Optional EventRingBuffer for chain rule evaluation.
 
         Returns:
             List of matching CompiledRule objects, sorted by priority.
@@ -169,7 +165,7 @@ class MatcherEngine:
 
         matching: list[CompiledRule] = []
         for compiled in candidates:
-            if self._matches(compiled, tool_name, args, session_state, sender):
+            if self._matches(compiled, tool_name, args, session_state, sender, event_buffer):
                 matching.append(compiled)
 
         # Sort: most restrictive verdict first, then by severity
@@ -188,13 +184,14 @@ class MatcherEngine:
         args: dict | None = None,
         session_state: dict | None = None,
         sender: str | None = None,
+        event_buffer: object | None = None,
     ) -> CompiledRule | None:
         """Find the highest-priority matching rule.
 
         Returns:
             The most restrictive matching rule, or None.
         """
-        matches = self.find_matching_rules(tool_name, args, session_state, sender)
+        matches = self.find_matching_rules(tool_name, args, session_state, sender, event_buffer)
         return matches[0] if matches else None
 
     def _matches(
@@ -204,6 +201,7 @@ class MatcherEngine:
         args: dict,
         session_state: dict | None,
         sender: str | None,
+        event_buffer: object | None = None,
     ) -> bool:
         """Check if a compiled rule matches a tool call."""
         # Check tool name
@@ -262,6 +260,29 @@ class MatcherEngine:
             if not sender or not compiled.sender_pattern.match(sender):
                 return False
 
+        # Check chain conditions
+        if compiled.rule.chain and not self._check_chain(compiled.rule.chain, event_buffer):
+            return False
+
+        return True
+
+    def _check_chain(
+        self,
+        chain: list[dict],
+        event_buffer: object | None,
+    ) -> bool:
+        """Check whether all chain prerequisites are satified in the event buffer."""
+        if event_buffer is None:
+            return False
+        for step in chain:
+            cond = ChainCondition(**step)
+            matches = event_buffer.find_recent(  # type: ignore[union-attr]
+                cond.tool,
+                within_seconds=cond.within_seconds,
+                verdict=cond.verdict,
+            )
+            if len(matches) < cond.min_count:
+                return False
         return True
 
     @property

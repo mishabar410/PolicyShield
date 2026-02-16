@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 
@@ -47,7 +47,7 @@ class Alert:
     rule_name: str = ""
     severity: AlertSeverity = AlertSeverity.WARNING
     message: str = ""
-    timestamp: datetime = field(default_factory=datetime.now)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     context: dict = field(default_factory=dict)
 
     def to_dict(self) -> dict:
@@ -84,7 +84,7 @@ class AlertEngine:
     def evaluate(self, aggregation) -> list[Alert]:
         """Evaluate all enabled rules against an AggregationResult."""
         alerts: list[Alert] = []
-        now = datetime.now()
+        now = datetime.now(timezone.utc)
 
         for rule in self._rules:
             if not rule.enabled:

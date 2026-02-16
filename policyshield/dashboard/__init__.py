@@ -16,8 +16,10 @@ def create_dashboard_app(trace_dir: str | Path = "./traces"):
     except ImportError:
         raise ImportError("Dashboard requires 'fastapi'. Install with: pip install policyshield[dashboard]")
 
+    from policyshield import __version__
+
     trace_dir = Path(trace_dir)
-    app = FastAPI(title="PolicyShield Dashboard", version="0.6.0")
+    app = FastAPI(title="PolicyShield Dashboard", version=__version__)
 
     @app.get("/api/metrics")
     def get_metrics():
@@ -129,7 +131,9 @@ class LiveTraceWatcher:
     async def _check_new_entries(self) -> None:
         if not self._trace_dir.exists():
             return
+        current_files = set()
         for fp in sorted(self._trace_dir.glob("*.jsonl")):
+            current_files.add(fp)
             pos = self._positions.get(fp, 0)
             try:
                 with open(fp) as f:
@@ -145,3 +149,7 @@ class LiveTraceWatcher:
                     self._positions[fp] = f.tell()
             except OSError:
                 pass
+        # Prune positions for files that no longer exist (e.g. rotated/deleted)
+        stale = set(self._positions.keys()) - current_files
+        for fp in stale:
+            del self._positions[fp]

@@ -9,8 +9,23 @@ def _setup_replay(tmp_path):
     traces.mkdir()
     trace_file = traces / "test.jsonl"
     with open(trace_file, "w") as f:
-        f.write(json.dumps({"timestamp": "2026-01-01T00:00:00+00:00", "session_id": "s1", "tool": "read_file", "verdict": "allow"}) + "\n")
-        f.write(json.dumps({"timestamp": "2026-01-01T00:01:00+00:00", "session_id": "s1", "tool": "delete_file", "verdict": "allow"}) + "\n")
+        f.write(
+            json.dumps(
+                {"timestamp": "2026-01-01T00:00:00+00:00", "session_id": "s1", "tool": "read_file", "verdict": "allow"}
+            )
+            + "\n"
+        )
+        f.write(
+            json.dumps(
+                {
+                    "timestamp": "2026-01-01T00:01:00+00:00",
+                    "session_id": "s1",
+                    "tool": "delete_file",
+                    "verdict": "allow",
+                }
+            )
+            + "\n"
+        )
 
     rules_file = tmp_path / "rules.yaml"
     rules_file.write_text("""

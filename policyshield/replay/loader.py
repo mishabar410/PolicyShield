@@ -124,9 +124,12 @@ class TraceLoader:
                     except (json.JSONDecodeError, KeyError) as exc:
                         # Skip malformed lines, log warning
                         import logging
+
                         logging.getLogger(__name__).warning(
                             "Skipping malformed line %d in %s: %s",
-                            line_num, path, exc,
+                            line_num,
+                            path,
+                            exc,
                         )
 
     def stats(self) -> dict:

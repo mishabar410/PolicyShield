@@ -82,6 +82,7 @@ class RuleConfig(BaseModel):
     severity: Severity = Severity.LOW
     enabled: bool = True
     approval_strategy: str | None = None  # "once", "per_session", "per_rule", "per_tool"
+    chain: list[dict] | None = None  # Chain conditions for multi-step rules
 
 
 class TaintChainConfig(BaseModel):
@@ -91,6 +92,17 @@ class TaintChainConfig(BaseModel):
 
     enabled: bool = False
     outgoing_tools: list[str] = []
+
+
+class ChainCondition(BaseModel):
+    """A single step in a chain rule — requires a tool to have been called recently."""
+
+    model_config = ConfigDict(frozen=True)
+
+    tool: str
+    within_seconds: float = 300.0  # Default 5 min lookback
+    min_count: int = 1
+    verdict: str | None = None  # Optional filter by verdict
 
 
 class RuleSet(BaseModel):
@@ -147,7 +159,7 @@ class ShieldResult(BaseModel):
 class SessionState(BaseModel):
     """Mutable session state."""
 
-    model_config = ConfigDict(frozen=False)
+    model_config = ConfigDict(frozen=False, arbitrary_types_allowed=True)
 
     session_id: str
     created_at: datetime
@@ -156,6 +168,7 @@ class SessionState(BaseModel):
     taints: set[PIIType] = Field(default_factory=set)
     pii_tainted: bool = False
     taint_details: str | None = None
+    event_buffer: object = Field(default=None, exclude=True)  # EventRingBuffer, lazy-init
 
     def increment(self, tool_name: str) -> None:
         """Increment tool call counters."""

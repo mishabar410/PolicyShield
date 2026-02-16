@@ -10,7 +10,7 @@ from policyshield.core.exceptions import PolicyShieldParseError
 from policyshield.core.models import RuleConfig, RuleSet, TaintChainConfig, Verdict
 
 # Valid keys for the 'when' clause — anything else is likely a typo
-_VALID_WHEN_KEYS = {"tool", "args", "args_match", "sender", "session"}
+_VALID_WHEN_KEYS = {"tool", "args", "args_match", "sender", "session", "chain"}
 
 
 def parse_sanitizer_config(data: dict) -> dict | None:
@@ -91,16 +91,34 @@ def _parse_rule(raw: dict, file_path: str | None = None) -> RuleConfig:
     if isinstance(severity_value, str):
         severity_value = severity_value.upper()
 
+    when = _validated_when(raw.get("when", {}), raw["id"], file_path)
+
+    # Extract chain from 'when' clause (YAML: when.chain) or top-level
+    chain = None
+    if isinstance(when, dict) and "chain" in when:
+        chain = when.pop("chain")
+    if chain is None:
+        chain = raw.get("chain")
+
     return RuleConfig(
         id=raw["id"],
         description=raw.get("description", ""),
-        when=_validated_when(raw.get("when", {}), raw["id"], file_path),
+        when=when,
         then=then_value,
         message=raw.get("message"),
         severity=severity_value,
         enabled=raw.get("enabled", True),
         approval_strategy=raw.get("approval_strategy"),
+        chain=chain,
     )
+
+
+def parse_rules_from_string(yaml_text: str) -> RuleSet:
+    """Parse rules from a YAML string (useful for testing)."""
+    data = yaml.safe_load(yaml_text)
+    if not isinstance(data, dict):
+        raise PolicyShieldParseError("YAML root must be a mapping")
+    return _build_ruleset(data, "<string>")
 
 
 def load_rules(path: str | Path) -> RuleSet:
@@ -240,8 +258,11 @@ def _validated_when(when: dict, rule_id: str, file_path: str | None) -> dict:
     unknown = set(when.keys()) - _VALID_WHEN_KEYS
     if unknown:
         import logging
+
         logging.getLogger("policyshield").warning(
             "Unknown 'when' keys %s in rule '%s'%s — ignored",
-            unknown, rule_id, f" ({file_path})" if file_path else "",
+            unknown,
+            rule_id,
+            f" ({file_path})" if file_path else "",
         )
     return when

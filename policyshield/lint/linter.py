@@ -40,6 +40,7 @@ class RuleLinter:
         warnings.extend(self.check_missing_message(ruleset))
         warnings.extend(self.check_conflicting_verdicts(ruleset))
         warnings.extend(self.check_disabled_rules(ruleset))
+        warnings.extend(self.check_chain_rules(ruleset))
         return warnings
 
     def check_duplicate_ids(self, ruleset: RuleSet) -> list[LintWarning]:
@@ -169,18 +170,32 @@ class RuleLinter:
         """Heuristic: check if two args_match patterns could overlap.
 
         If both are empty, they overlap (both match everything).
-        If they share the same field with the same or similar regex, they overlap.
-        This is a conservative heuristic — it may report false positives.
+        If only one is empty, it matches everything so overlap is possible.
+        If they share fields with identical patterns, they overlap.
+        If they share fields with different patterns, they likely don't.
+        If they have no shared fields, conservatively assume overlap.
         """
         if not am1 or not am2:
             return True  # One or both match everything
-        # Check for shared fields with similar patterns
+
         fields1 = set(am1.keys()) if isinstance(am1, dict) else set()
         fields2 = set(am2.keys()) if isinstance(am2, dict) else set()
         shared = fields1 & fields2
+
         if not shared:
             return True  # Different fields — could still overlap
-        return True  # Conservative: assume overlap
+
+        # For shared fields, check if patterns are identical
+        for f in shared:
+            v1 = am1[f]
+            v2 = am2[f]
+            # Normalize to comparable form
+            p1 = v1.get("regex", v1) if isinstance(v1, dict) else v1
+            p2 = v2.get("regex", v2) if isinstance(v2, dict) else v2
+            if p1 != p2:
+                return False  # Different patterns on same field — unlikely overlap
+
+        return True  # Same patterns on shared fields — overlap
 
     def check_disabled_rules(self, ruleset: RuleSet) -> list[LintWarning]:
         """Report disabled rules as INFO."""
@@ -195,4 +210,47 @@ class RuleLinter:
                         message="Rule is disabled",
                     )
                 )
+        return warnings
+
+    def check_chain_rules(self, ruleset: RuleSet) -> list[LintWarning]:
+        """Lint chain rule definitions for common mistakes."""
+        from policyshield.core.models import Verdict
+
+        warnings: list[LintWarning] = []
+        for rule in ruleset.rules:
+            if not rule.chain:
+                continue
+
+            # ALLOW verdict on chain rule is suspicious
+            if rule.then == Verdict.ALLOW:
+                warnings.append(
+                    LintWarning(
+                        level="WARNING",
+                        rule_id=rule.id,
+                        check="chain_allow_verdict",
+                        message="Chain rule has 'then: ALLOW' — chain rules usually BLOCK or ESCALATE",
+                    )
+                )
+
+            for i, step in enumerate(rule.chain):
+                if not isinstance(step, dict):
+                    warnings.append(
+                        LintWarning(
+                            level="ERROR",
+                            rule_id=rule.id,
+                            check="chain_invalid_step",
+                            message=f"Chain step #{i + 1} is not a mapping",
+                        )
+                    )
+                    continue
+
+                if "tool" not in step:
+                    warnings.append(
+                        LintWarning(
+                            level="ERROR",
+                            rule_id=rule.id,
+                            check="chain_missing_tool",
+                            message=f"Chain step #{i + 1} missing required 'tool' field",
+                        )
+                    )
         return warnings
