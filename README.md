@@ -6,7 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![CI](https://github.com/mishabar410/PolicyShield/actions/workflows/ci.yml/badge.svg)](https://github.com/mishabar410/PolicyShield/actions/workflows/ci.yml)
 [![Docs](https://img.shields.io/badge/docs-mkdocs-blue.svg)](https://mishabar410.github.io/PolicyShield/)
-[![Coverage: 85%](https://img.shields.io/badge/coverage-85%25-brightgreen.svg)](#development)
+[![Coverage](https://img.shields.io/badge/coverage-%E2%89%A585%25-brightgreen.svg)](#development)
 [![npm](https://img.shields.io/npm/v/@policyshield/openclaw-plugin?color=CB3837&label=npm%20plugin)](https://www.npmjs.com/package/@policyshield/openclaw-plugin)
 [![Security Policy](https://img.shields.io/badge/security-policy-blueviolet.svg)](SECURITY.md)
 
@@ -120,7 +120,7 @@ PolicyShield works as a sidecar to [OpenClaw](https://github.com/AgenturAI/OpenC
                                 └──────────────────┘
 ```
 
-Verified with **OpenClaw 2026.2.13** and **PolicyShield 0.9.0**.
+Verified with **OpenClaw 2026.2.13** and **PolicyShield 0.10.0**.
 
 ### Quick Setup (one command)
 

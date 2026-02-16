@@ -11,7 +11,8 @@ ROOT = Path(__file__).resolve().parent.parent
 
 class TestVersioning:
     def test_version_is_0_6_0(self):
-        assert policyshield.__version__ >= "0.6.0"
+        version = tuple(int(x) for x in policyshield.__version__.split("."))
+        assert version >= (0, 6, 0)
 
     def test_pyproject_version_matches(self):
         pyproject = (ROOT / "pyproject.toml").read_text()

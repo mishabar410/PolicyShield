@@ -10,7 +10,8 @@ def test_import_policyshield():
 def test_version():
     import policyshield
 
-    assert policyshield.__version__ >= "0.6.0"
+    version = tuple(int(x) for x in policyshield.__version__.split("."))
+    assert version >= (0, 6, 0)
 
 
 def test_import_core():

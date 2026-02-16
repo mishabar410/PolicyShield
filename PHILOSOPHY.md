@@ -46,10 +46,12 @@ Rules are YAML, not code. Security policy is separated from application logic. A
 
 ```yaml
 rules:
-  - name: block-destructive-shell
-    tool: exec
-    args_match:
-      command: { regex: "rm\\s+-rf|sudo|mkfs|dd\\s+if=" }
+  - id: block-destructive-shell
+    when:
+      tool: exec
+      args:
+        - key: command
+          pattern: "rm\\s+-rf|sudo|mkfs|dd\\s+if="
     then: block
     message: "Destructive shell command blocked"
 ```
@@ -179,43 +181,75 @@ This enables:
 
 ---
 
-## Capabilities: What PolicyShield SHOULD Do
+## Capabilities
 
-### Must Have (Core)
+### Implemented (Core)
 
-| Capability | Description | Status |
+| Capability | Description | Module |
 |---|---|---|
-| **Rule matching** | Match tool calls against YAML rules by tool name, argument patterns (regex, contains, eq), session state, and sender identity | ✅ Implemented |
-| **Verdict enforcement** | Four verdicts: ALLOW, BLOCK, REDACT, APPROVE | ✅ Implemented |
-| **PII detection** | Detect common PII types (email, phone, credit card, SSN, passport, etc.) in tool arguments using regex patterns | ✅ Implemented (L0 regex) |
-| **PII redaction** | Automatically mask PII in tool arguments before the tool executes | ✅ Implemented |
-| **Rate limiting** | Per-tool, per-session sliding window rate limits | ✅ Implemented |
-| **Session management** | Track call counts, tool usage, PII taints per session | ✅ Implemented |
-| **Audit trail** | JSONL trace of every tool call with verdict, rule, timing, PII types | ✅ Implemented |
-| **Human approval flow** | APPROVE verdict pauses execution until a human confirms (CLI, Telegram, Webhook) | ✅ Implemented |
-| **Hot reload** | Rules can be updated without restarting the agent | ✅ Implemented |
-| **System prompt enrichment** | Inject policy summaries into the LLM's context to reduce wasted blocked calls | ✅ Implemented |
-| **Tool filtering** | Remove unconditionally blocked tools from LLM's view entirely | ✅ Implemented |
-| **Zero-trust mode** | Explicit allow-list mode where unmatched tool calls are blocked by default (`default_verdict: BLOCK`) | ✅ Implemented |
-| **Output scanning** | Full PII scan on tool return values via post-check endpoint (not just arguments) | ✅ Implemented |
+| **Rule matching** | Match tool calls against YAML rules by tool name (exact or regex), argument patterns, session state, and sender identity | `shield.matcher` |
+| **Verdict enforcement** | Four verdicts: ALLOW, BLOCK, REDACT, APPROVE | `shield.verdict` |
+| **PII detection** | Regex-based detection of EMAIL, PHONE, CREDIT_CARD, SSN, IBAN, IP, PASSPORT, DOB, INN, SNILS | `shield.pii` |
+| **PII redaction** | Automatically mask PII in tool arguments before the tool executes | `shield.pii` |
+| **Rate limiting** | Per-tool, per-session sliding window rate limits | `shield.rate_limiter` |
+| **Session management** | Track call counts, tool usage, PII taints per session | `shield.session` |
+| **Audit trail** | JSONL trace recording, search, aggregation, export (CSV/HTML) | `trace.*` |
+| **Human approval flow** | APPROVE verdict pauses execution until a human confirms via CLI, Telegram, or Webhook | `approval.*` |
+| **Hot reload** | Polling-based file watcher reloads rules without restart | `shield.watcher` |
+| **System prompt enrichment** | Inject policy summaries into the LLM's context to reduce wasted blocked calls | `shield.engine` |
+| **Tool filtering** | Remove unconditionally blocked tools from LLM's view entirely | `shield.engine` |
+| **Zero-trust mode** | Explicit allow-list via `default_verdict: BLOCK` | `core.models` |
+| **Output scanning** | PII scan on tool return values via post-check endpoint | `server.app` |
+| **Input sanitizer** | Normalize and sanitize tool arguments before rule evaluation | `shield.sanitizer` |
+| **Chain rules** | Temporal conditions: rules that depend on previous tool calls in the same session (e.g., "block send_email if read_file was called on a sensitive path within 60 seconds") | `shield.ring_buffer`, `core.models.ChainCondition` |
+| **Replay & Simulation** | Replay recorded traces against different rule sets to test policy changes before deployment | `replay.loader`, `replay.engine` |
+| **AI rule generation** | Generate YAML rules from natural language descriptions via LLM (OpenAI/Anthropic) or from built-in templates | `ai.generator`, `ai.templates` |
+| **Rule linting** | 7 automatic checks: duplicate IDs, overly broad patterns, missing messages, conflicts, chain rule validation, shadowed rules, regex syntax | `lint.linter` |
+| **Rule diffing** | Compare two rule sets and show added/removed/modified rules | `lint.differ` |
+| **OpenTelemetry** | Export traces to OTel-compatible backends | `trace.otel` |
+| **Cost estimation** | Estimate token/dollar cost of tool calls from traces | `trace.cost` |
+| **Alert engine** | Route verdicts to alert backends (configurable) | `alerts.backends` |
+| **Dashboard** | Live web dashboard with WebSocket verdict streaming, REST API, and embedded SPA | `dashboard` |
+| **Prometheus** | Export metrics in Prometheus format | `dashboard.prometheus` |
 
-### Should Have (Roadmap)
+### Implemented (Integrations)
+
+| Integration | Type | Module |
+|---|---|---|
+| **LangChain** | Python adapter — wraps tool execution with policy checks | `integrations.langchain` |
+| **CrewAI** | Python adapter — wraps tool execution with policy checks | `integrations.crewai` |
+| **OpenClaw** | TypeScript plugin — hooks into OpenClaw's plugin API | `plugins/openclaw/` |
+| **HTTP server** | Standalone FastAPI server with check/post-check/approve endpoints | `server.app` |
+
+### Implemented (CLI)
+
+12 subcommands: `validate`, `lint`, `test`, `diff`, `trace` (show, violations, stats, search, cost, export, dashboard), `init`, `config`, `playground`, `server`, `replay`, `generate`, `openclaw`.
+
+### Implemented (DevOps)
+
+| Asset | Description |
+|---|---|
+| `Dockerfile` | Minimal image for the PolicyShield CLI |
+| `Dockerfile.server` | Production-ready image for the HTTP server |
+| `docker-compose.yml` | Full stack with server + Prometheus |
+| `community-rules/` | GDPR, HIPAA, PCI-DSS preset rule packs |
+| `examples/github-actions/` | CI policy-check workflow |
+| `.github/workflows/ci.yml` | Pytest + ruff + benchmarks with coverage ≥85% |
+
+### Roadmap
 
 | Capability | Description | Why |
 |---|---|---|
 | **Semantic PII detection (L1)** | NER-based PII detection using spaCy/transformers in addition to regex | Regex alone has too many false positives/negatives for production DLP |
 | **Rule composition** | Include/extend rule files, environment-specific overrides (dev/staging/prod) | Large deployments need rule modularity |
 | **Cross-session analytics** | Aggregate traces across sessions for organizational insights | Enterprise compliance needs |
-| **Conditional chaining** | Rules that depend on the result of previous tool calls in the same session | "Block `send_email` if `read_file` was called on a sensitive path" |
-| **Cost tracking** | Track estimated API cost per tool call and enforce budgets | LLM tool calls cost money; rate limiting alone isn't enough |
+| **Multi-agent coordination** | Enforce policies across agent-to-agent tool calls | Multi-agent systems need unified enforcement |
 
-### Could Have (Future)
+### Future Ideas
 
 | Capability | Description |
 |---|---|
 | **Anomaly detection** | ML-based detection of unusual tool call patterns |
-| **Policy simulation** | "What would happen if I deployed these rules?" dry-run engine |
-| **Multi-agent coordination** | Enforce policies across agent-to-agent tool calls |
 | **Temporal rules** | "Block `deploy` outside business hours" |
 | **Geo-aware rules** | Different policies based on user/data jurisdiction |
 
@@ -283,17 +317,19 @@ PolicyShield sits in the hot path of every tool call. Its overhead must be negli
 **Performance target:** < 5ms p99 per sync check, < 10ms p99 per async check
 (async includes `asyncio.to_thread` overhead for CPU-bound regex matching).
 
+Benchmarks consistently show < 0.1ms per check.
+
 ### Memory footprint
 
-Session state (call counts, PII taints) must be bounded. A session with 10,000 tool calls should not consume unbounded memory. Fixed-size sliding windows and periodic compaction are required.
+Session state (call counts, PII taints) must be bounded. A session with 10,000 tool calls should not consume unbounded memory. Fixed-size sliding windows (`EventRingBuffer` with configurable max size) and periodic compaction are required.
 
 ### No external dependencies in the core
 
-The core engine (`shield/`) must depend only on the Python standard library and Pydantic. No database, no network calls, no ML models in the critical path. Optional extensions (NER-based PII, OTel export, Telegram approval) may have additional dependencies, but the core must remain minimal and fast.
+The core engine (`shield/`) must depend only on the Python standard library and Pydantic. No database, no network calls, no ML models in the critical path. Optional extensions (NER-based PII, OTel export, Telegram approval, AI rule generation) may have additional dependencies, but the core must remain minimal and fast.
 
 ### Backward-compatible rule format
 
-Rules written for version N must continue to work in version N+1. New features may add optional fields, but existing rules must never break. This is a strong API contract — security policy should never be invalidated by an upgrade.
+Rules written for version N must continue to work in version N+1. New features add optional fields (`when.chain`, `severity`), but existing rules never break. This is a strong API contract — security policy should never be invalidated by an upgrade.
 
 ---
 
@@ -364,14 +400,14 @@ OpenClaw has its own security mechanisms:
 | System prompt constraints | Tells LLM about restrictions | Advisory only, bypassable via prompt injection |
 | Prompt injection: "Out of Scope" | Explicitly declared out of scope in SECURITY.md | PolicyShield provides enforcement-layer defense |
 
-PolicyShield in OpenClaw would:
+PolicyShield in OpenClaw:
 
-1. **Extend approval beyond exec** — apply APPROVE verdict to `send_message`, `discord_action`, `unlock_door`, `web_fetch`, etc.
-2. **Scan tool arguments for PII** — before data reaches `send_message`, `web_search`, or any external API
-3. **Rate-limit across all tools** — not just exec, and with per-session granularity
-4. **Provide a unified audit trail** — one log for all tool calls, not just exec
-5. **Enable declarative per-skill policies** — install a skill, drop a rule file, done
-6. **Address prompt injection at the enforcement layer** — where it actually matters, since OpenClaw explicitly declares it out of scope at the security policy level
+1. **Extends approval beyond exec** — apply APPROVE verdict to `send_message`, `discord_action`, `unlock_door`, `web_fetch`, etc.
+2. **Scans tool arguments for PII** — before data reaches `send_message`, `web_search`, or any external API
+3. **Rate-limits across all tools** — not just exec, and with per-session granularity
+4. **Provides a unified audit trail** — one log for all tool calls, not just exec
+5. **Enables declarative per-skill policies** — install a skill, drop a rule file, done
+6. **Addresses prompt injection at the enforcement layer** — where it actually matters, since OpenClaw explicitly declares it out of scope at the security policy level
 
 ---
 

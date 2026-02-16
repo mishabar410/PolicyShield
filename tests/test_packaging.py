@@ -98,13 +98,13 @@ class TestPackageFiles:
         assert any("Typed" in c for c in classifiers)
 
 
-class TestV07VersionSync:
-    """Tests for v0.7 release version consistency."""
+class TestVersionSync:
+    """Tests for release version consistency."""
 
-    def test_version_is_0_7_0(self):
+    def test_version_is_current(self):
         from policyshield import __version__
 
-        assert __version__ == "0.9.0"
+        assert __version__ == "0.10.0"
 
     def test_pyproject_version_matches_init(self):
         from policyshield import __version__
@@ -117,7 +117,7 @@ class TestV07VersionSync:
 
     def test_changelog_has_current_version(self):
         content = (ROOT / "CHANGELOG.md").read_text()
-        assert "[0.9.0]" in content
+        assert "[0.10.0]" in content
 
     def test_server_app_uses_dynamic_version(self):
         import importlib
@@ -154,4 +154,4 @@ class TestV07VersionSync:
             pytest.skip("plugin package.json not found")
 
         data = json.loads(pkg.read_text())
-        assert data["version"] == "0.9.0"
+        assert data["version"] == "0.10.0"

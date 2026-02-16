@@ -23,7 +23,8 @@ class TestV05VersionConsistency:
     def test_pyproject_version(self):
         data = tomllib.loads((ROOT / "pyproject.toml").read_text())
         # v0.5 features should still exist at v0.5+
-        assert data["project"]["version"] >= "0.5.0"
+        version = tuple(int(x) for x in data["project"]["version"].split("."))
+        assert version >= (0, 5, 0)
 
     def test_changelog_has_v05(self):
         content = (ROOT / "CHANGELOG.md").read_text()
