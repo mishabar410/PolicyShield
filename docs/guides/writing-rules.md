@@ -69,3 +69,42 @@ when:
   sender:
     name: "untrusted-agent"
 ```
+
+## Chain rules
+
+Chain rules let you define **temporal conditions** — blocking a tool call when a specific tool was called within a time window. Use `when.chain` to detect multi-step attack patterns like data exfiltration.
+
+```yaml
+- id: anti-exfiltration
+  when:
+    tool: send_email
+    chain:
+      - tool: read_database
+        within_seconds: 120
+  then: block
+  severity: critical
+  message: "Data exfiltration: read_database → send_email"
+```
+
+### Chain step fields
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `tool` | ✅ | Tool name that must have been called previously |
+| `within_seconds` | ✅ | Time window to search (seconds) |
+| `min_count` | ❌ | Minimum number of calls required (default: 1) |
+| `verdict` | ❌ | Filter previous calls by verdict (e.g., `allow`) |
+
+### Multi-step chains
+
+```yaml
+- id: retry-storm
+  when:
+    tool: exec
+    chain:
+      - tool: exec
+        within_seconds: 10
+        min_count: 5
+  then: block
+  message: "Retry storm detected: too many exec calls in 10 seconds"
+```

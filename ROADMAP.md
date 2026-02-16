@@ -72,7 +72,7 @@
 - Documentation consistency pass across README, plugin README, integration guide
 - 715+ tests
 
-### v0.9 — OpenClaw 10/10 ✅ (current)
+### v0.9 — OpenClaw 10/10 ✅
 - SDK type auto-sync script + CI (weekly cron)
 - E2E integration tests with real OpenClaw (Docker Compose, 5 scenarios)
 - E2E CI job on every PR
@@ -83,6 +83,15 @@
 - Quickstart: Option A (1 cmd), Option B (Docker), Option C (step-by-step)
 - Explicit limitations documentation (output blocking, PII detection)
 - 720+ tests
+
+### v0.10 — Tier 1 Features ✅ (current)
+- **Replay & Simulation**: `policyshield replay` re-runs JSONL traces against new rules
+- **Chain Rules**: `when.chain` temporal conditions with `EventRingBuffer`
+- **AI-Assisted Rule Writer**: `policyshield generate` from natural language (OpenAI/Anthropic)
+- Tool classifier with 4 danger levels
+- Rule template library (5 templates for few-shot prompting)
+- Chain linting check (7 lint checks total)
+- 816 tests
 
 ## Next
 
@@ -103,7 +112,6 @@
 | Item | Description |
 |------|-------------|
 | **Conditional rules** | `when.context` conditions: time of day, user role, session state |
-| **Chain rules** | "If tool A was called, then tool B is blocked for N seconds" |
 | **Dynamic rules** | Fetch rules from remote (HTTP/S3) with signature verification |
 | **Policy-as-Code SDK** | Python API to define rules programmatically alongside YAML |
 | **Rego/OPA bridge** | Optional: evaluate rules via Open Policy Agent |
@@ -113,9 +121,7 @@
 | **Agent sandbox** | OS-level isolation for tool execution (containers, seccomp) |
 | **Multi-language SDKs** | TypeScript, Go, Rust wrappers |
 | **Rule marketplace** | Community-contributed policy packs |
-| **AI-assisted rule writing** | "Describe what you want to protect" → YAML rules |
 | **Federated policies** | Central policy server for fleet of agents |
-| **Replay & simulation** | Re-run historical traces against new rules |
 
 ---
 

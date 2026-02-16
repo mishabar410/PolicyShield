@@ -4,6 +4,32 @@ All notable changes to PolicyShield will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.10.0] - 2026-02-16
+
+### Added
+- **Replay & Simulation**: `policyshield replay` CLI command to re-run recorded JSONL traces against new/modified rules
+  - Trace loader (`policyshield.replay.loader`) for JSONL parsing
+  - Replay engine (`policyshield.replay.engine`) with verdict comparison
+  - CLI options: `--filter`, `--format`, `--changed-only`
+- **Chain Rules**: temporal conditions (`when.chain`) for multi-step policy enforcement
+  - `EventRingBuffer` for fixed-size tool event history
+  - `ChainCondition` model with `tool`, `within_seconds`, `min_count`, `verdict` fields
+  - Chain matcher integrated into `MatcherEngine`
+  - Chain linting check added to `RuleLinter` (7 lint checks total)
+  - Example file: `examples/chain_rules.yaml`
+- **AI-Assisted Rule Writer**: generate YAML rules from natural language
+  - Tool classifier (`policyshield.ai.templates`) with 4 danger levels and regex patterns
+  - Rule template library with 5 templates for few-shot prompting
+  - LLM rule generator (`policyshield.ai.generator`) with OpenAI/Anthropic support
+  - YAML validation and retry logic
+  - `policyshield generate` CLI command with `--template` (offline) and AI modes
+  - `[ai]` optional dependency group in `pyproject.toml`
+
+### Fixed
+- `EventRingBuffer.find_recent()`: verdict filter used truthiness instead of `is not None`
+- `ChainCondition`: silently accepted extra/typo'd keys; added `extra='forbid'`
+- CLI `generate --template`: double indentation in generated YAML output
+
 ## [0.9.0] - 2026-02-15
 
 ### Added

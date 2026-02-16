@@ -219,3 +219,54 @@ policyshield playground --rules rules.yaml \
   --tool send_email \
   --args '{"body": "Contact john@example.com"}'
 ```
+
+---
+
+## Chain Rules
+
+### What are chain rules?
+
+Chain rules let you define **temporal conditions** that detect multi-step attack patterns. For example, you can block `send_email` if `read_database` was called within the last 2 minutes — catching data exfiltration.
+
+### How do chain rules work?
+
+PolicyShield maintains a per-session `EventRingBuffer` that records recent tool calls. When a chain rule is evaluated, the buffer is searched for matching prior events within the specified time window.
+
+### Can I chain multiple steps?
+
+Yes. Each chain step is an independent condition. All must match for the rule to trigger:
+
+```yaml
+chain:
+  - tool: read_database
+    within_seconds: 120
+  - tool: download_file
+    within_seconds: 60
+```
+
+---
+
+## AI Rule Generation
+
+### How do I generate rules with AI?
+
+```bash
+# Set your API key
+export OPENAI_API_KEY="sk-..."
+
+# Generate rules from natural language
+policyshield generate "Block all file deletions and require approval for deploys"
+```
+
+You can also use `--template` mode for offline generation without an API key.
+
+### Which LLM providers are supported?
+
+- **OpenAI** (default) — `gpt-4o`, `gpt-4o-mini`, etc.
+- **Anthropic** — `claude-sonnet-4-20250514`, etc.
+
+Install the AI extras: `pip install "policyshield[ai]"`
+
+### Can I generate rules without an API key?
+
+Yes, use template mode: `policyshield generate --template --tools <tool1> <tool2>`. This classifies tools by danger level and generates rules from built-in templates.

@@ -61,3 +61,22 @@ policyshield server --rules rules.yaml --port 8100
 # InMemory mode (default)
 policyshield server --rules rules.yaml --port 8100
 ```
+
+## AI Rule Generation
+
+The `policyshield generate` command can use LLMs to generate rules. Set the appropriate environment variable:
+
+| Env Var | Description |
+|---------|-------------|
+| `OPENAI_API_KEY` | OpenAI API key (for `--provider openai`, the default) |
+| `ANTHROPIC_API_KEY` | Anthropic API key (for `--provider anthropic`) |
+
+Install the AI extras: `pip install "policyshield[ai]"`
+
+```bash
+# Generate rules with OpenAI
+OPENAI_API_KEY="sk-..." policyshield generate "Block file deletions"
+
+# Generate rules with Anthropic
+ANTHROPIC_API_KEY="..." policyshield generate "Block file deletions" --provider anthropic
+```

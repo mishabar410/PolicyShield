@@ -34,6 +34,9 @@ pip install policyshield
 
 # With HTTP server (for OpenClaw and other integrations)
 pip install "policyshield[server]"
+
+# With AI rule generation (OpenAI / Anthropic)
+pip install "policyshield[ai]"
 ```
 
 Or from source:
@@ -276,6 +279,17 @@ rules:
     then: block
     message: "exec rate limit exceeded"
 
+  # Chain rule: detect data exfiltration
+  - id: anti-exfiltration
+    when:
+      tool: send_email
+      chain:
+        - tool: read_database
+          within_seconds: 120
+    then: block
+    severity: critical
+    message: "Potential data exfiltration: read_database → send_email"
+
 # Rate limiting
 rate_limits:
   - tool: web_fetch
@@ -298,6 +312,7 @@ pii_patterns:
 | Category | What you get |
 |----------|-------------|
 | **YAML DSL** | Declarative rules with regex, glob, exact match, session conditions |
+| **Chain Rules** | Temporal conditions (`when.chain`) — detect multi-step attack patterns |
 | **Verdicts** | `ALLOW` · `BLOCK` · `REDACT` · `APPROVE` (human-in-the-loop) |
 | **HTTP Server** | FastAPI server with check, post-check, health, and constraints endpoints |
 | **OpenClaw Plugin** | Native plugin with before/after hooks and policy injection |
@@ -309,12 +324,14 @@ pii_patterns:
 | **Input Sanitizer** | Normalize args, block prompt injection patterns |
 | **OpenTelemetry** | OTLP export to Jaeger/Grafana (spans + metrics) |
 | **Trace & Audit** | JSONL log, search, stats, violations, CSV/HTML export |
+| **Replay & Simulation** | Re-run JSONL traces against new rules (`policyshield replay`) |
+| **AI Rule Writer** | Generate YAML rules from natural language (`policyshield generate`) |
 | **Cost Estimator** | Token/dollar cost estimation per tool call and model |
 | **Alert Engine** | 5 condition types with Console, Webhook, Slack, Telegram backends |
 | **Dashboard** | FastAPI REST API + WebSocket live stream + dark-themed SPA |
 | **Prometheus** | `/metrics` endpoint with per-tool and PII labels + Grafana preset |
 | **Rule Testing** | YAML test cases for policies (`policyshield test`) |
-| **Rule Linter** | Static analysis: duplicates, broad patterns, missing messages, conflicts |
+| **Rule Linter** | Static analysis: 7 checks including chain rule validation |
 | **Docker** | Container-ready with Dockerfile.server and docker-compose |
 
 ---
@@ -344,7 +361,7 @@ safe_tools = shield_crewai_tools([tool1, tool2], engine)
 
 ```bash
 policyshield validate ./policies/          # Validate rules
-policyshield lint ./policies/rules.yaml    # Static analysis (6 checks)
+policyshield lint ./policies/rules.yaml    # Static analysis (7 checks)
 policyshield test ./policies/              # Run YAML test cases
 
 policyshield server --rules ./rules.yaml   # Start HTTP server
@@ -359,6 +376,15 @@ policyshield trace export ./traces/trace.jsonl -f html
 
 # Launch the live web dashboard
 policyshield trace dashboard --port 8000 --prometheus
+
+# Replay traces against new rules
+policyshield replay ./traces/trace.jsonl --rules ./new-rules.yaml --changed-only
+
+# Generate rules from templates (offline)
+policyshield generate --template --tools delete_file send_email -o rules.yaml
+
+# Generate rules with AI (requires OPENAI_API_KEY)
+policyshield generate "Block all file deletions and require approval for deploys"
 
 # Initialize a new project
 policyshield init --preset openclaw --no-interactive
@@ -392,6 +418,7 @@ docker compose run test
 | [`langchain_demo.py`](examples/langchain_demo.py) | LangChain tool wrapping |
 | [`async_demo.py`](examples/async_demo.py) | Async engine usage |
 | [`openclaw_rules.yaml`](examples/openclaw_rules.yaml) | OpenClaw preset rules (11 rules) |
+| [`chain_rules.yaml`](examples/chain_rules.yaml) | Chain rule examples (anti-exfiltration, retry storm) |
 | [`policies/`](examples/policies/) | Production-ready rule sets (security, compliance, full) |
 
 ### Community Rule Packs
@@ -447,7 +474,7 @@ cd PolicyShield
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev,server]"
 
-pytest tests/ -v                 # 715+ tests
+pytest tests/ -v                 # 810+ tests
 ruff check policyshield/ tests/  # Lint
 ruff format --check policyshield/ tests/  # Format check
 ```
