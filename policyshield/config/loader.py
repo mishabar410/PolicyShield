@@ -59,6 +59,9 @@ class PolicyShieldConfig:
     # approval
     approval_backend: str = "inmemory"
 
+    # rate limits (YAML list passed to RateLimiter.from_yaml_dict)
+    rate_limits: list[dict] = field(default_factory=list)
+
 
 # ────────────────────────────────────────────────────────────────────
 # Loaders
@@ -128,6 +131,12 @@ def load_config(
     return cfg
 
 
+def _get_section(data: dict, key: str, fallback: dict | None = None) -> dict:
+    """Return *data[key]* if it's a dict, otherwise *fallback* (empty dict)."""
+    v = data.get(key, fallback or {})
+    return v if isinstance(v, dict) else {}
+
+
 def _build_config(data: dict) -> PolicyShieldConfig:
     """Map raw dict to :class:`PolicyShieldConfig`."""
     mode_str = data.get("mode", "ENFORCE")
@@ -140,11 +149,16 @@ def _build_config(data: dict) -> PolicyShieldConfig:
     if isinstance(rules, str):
         rules = {"path": rules}
 
-    pii = data.get("pii", {})
-    san = data.get("sanitizer", {})
-    trace = data.get("trace", {})
-    otel = data.get("otel", {})
-    approval = data.get("approval", {})
+    pii = _get_section(data, "pii")
+    san = _get_section(data, "sanitizer")
+    trace = _get_section(data, "trace")
+    otel = _get_section(data, "otel")
+    approval = _get_section(data, "approval")
+
+    # rate_limits is a list, not a section dict
+    rate_limits_raw = data.get("rate_limits", [])
+    if not isinstance(rate_limits_raw, list):
+        rate_limits_raw = []
 
     return PolicyShieldConfig(
         mode=mode,
@@ -152,18 +166,19 @@ def _build_config(data: dict) -> PolicyShieldConfig:
         rules_path=rules.get("path", "./policies/"),
         watch=rules.get("watch", False),
         watch_interval=float(rules.get("watch_interval", 2.0)),
-        pii_enabled=pii.get("enabled", True) if isinstance(pii, dict) else True,
-        sanitizer_enabled=san.get("enabled", False) if isinstance(san, dict) else False,
-        sanitizer_max_string_length=san.get("max_string_length", 10_000) if isinstance(san, dict) else 10_000,
-        sanitizer_blocked_patterns=san.get("blocked_patterns", []) if isinstance(san, dict) else [],
-        trace_enabled=trace.get("enabled", True) if isinstance(trace, dict) else True,
-        trace_output_dir=trace.get("output_dir", "./traces/") if isinstance(trace, dict) else "./traces/",
-        trace_batch_size=int(trace.get("batch_size", 100)) if isinstance(trace, dict) else 100,
-        trace_privacy_mode=trace.get("privacy_mode", False) if isinstance(trace, dict) else False,
-        otel_enabled=otel.get("enabled", False) if isinstance(otel, dict) else False,
-        otel_service_name=otel.get("service_name", "policyshield") if isinstance(otel, dict) else "policyshield",
-        otel_endpoint=otel.get("endpoint") if isinstance(otel, dict) else None,
-        approval_backend=approval.get("backend", "inmemory") if isinstance(approval, dict) else "inmemory",
+        pii_enabled=pii.get("enabled", True),
+        sanitizer_enabled=san.get("enabled", False),
+        sanitizer_max_string_length=san.get("max_string_length", 10_000),
+        sanitizer_blocked_patterns=san.get("blocked_patterns", []),
+        trace_enabled=trace.get("enabled", True),
+        trace_output_dir=trace.get("output_dir", "./traces/"),
+        trace_batch_size=int(trace.get("batch_size", 100)),
+        trace_privacy_mode=trace.get("privacy_mode", False),
+        otel_enabled=otel.get("enabled", False),
+        otel_service_name=otel.get("service_name", "policyshield"),
+        otel_endpoint=otel.get("endpoint"),
+        approval_backend=approval.get("backend", "inmemory"),
+        rate_limits=rate_limits_raw,
     )
 
 
@@ -176,6 +191,7 @@ def build_engine_from_config(config: PolicyShieldConfig):  # noqa: ANN201
     """Create a fully configured :class:`ShieldEngine`."""
     from policyshield.shield.engine import ShieldEngine
     from policyshield.shield.pii import PIIDetector
+    from policyshield.shield.rate_limiter import RateLimiter
     from policyshield.shield.sanitizer import InputSanitizer, SanitizerConfig
     from policyshield.trace.recorder import TraceRecorder
 
@@ -193,6 +209,8 @@ def build_engine_from_config(config: PolicyShieldConfig):  # noqa: ANN201
         tracer = TraceRecorder(output_dir=config.trace_output_dir)
 
     pii = PIIDetector() if config.pii_enabled else None
+
+    rate_limiter = RateLimiter.from_yaml_dict(config.rate_limits) if config.rate_limits else None
 
     return ShieldEngine(
         rules=config.rules_path,
@@ -201,6 +219,7 @@ def build_engine_from_config(config: PolicyShieldConfig):  # noqa: ANN201
         trace_recorder=tracer,
         fail_open=config.fail_open,
         sanitizer=sanitizer,
+        rate_limiter=rate_limiter,
     )
 
 
@@ -208,6 +227,7 @@ def build_async_engine_from_config(config: PolicyShieldConfig):  # noqa: ANN201
     """Create a fully configured :class:`AsyncShieldEngine`."""
     from policyshield.shield.async_engine import AsyncShieldEngine
     from policyshield.shield.pii import PIIDetector
+    from policyshield.shield.rate_limiter import RateLimiter
     from policyshield.shield.sanitizer import InputSanitizer, SanitizerConfig
     from policyshield.trace.recorder import TraceRecorder
 
@@ -226,6 +246,8 @@ def build_async_engine_from_config(config: PolicyShieldConfig):  # noqa: ANN201
 
     pii = PIIDetector() if config.pii_enabled else None
 
+    rate_limiter = RateLimiter.from_yaml_dict(config.rate_limits) if config.rate_limits else None
+
     return AsyncShieldEngine(
         rules=config.rules_path,
         mode=config.mode,
@@ -233,6 +255,7 @@ def build_async_engine_from_config(config: PolicyShieldConfig):  # noqa: ANN201
         trace_recorder=tracer,
         fail_open=config.fail_open,
         sanitizer=sanitizer,
+        rate_limiter=rate_limiter,
     )
 
 

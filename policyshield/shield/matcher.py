@@ -22,7 +22,15 @@ class CompiledRule:
 
     @classmethod
     def from_rule(cls, rule: RuleConfig) -> CompiledRule:
-        """Create a CompiledRule from a RuleConfig."""
+        """Create a CompiledRule from a RuleConfig.
+
+        Tool matching behaviour:
+        - **list**: each entry is treated as an exact tool name
+          (``re.escape``-d, joined with ``|``).  ``["a", "b"]`` matches
+          only ``"a"`` and ``"b"``.
+        - **string**: treated as a regex pattern anchored with ``^...$``.
+          ``"file_.*"`` matches any tool starting with ``file_``.
+        """
         when = rule.when
         compiled = cls(rule=rule)
 
@@ -30,10 +38,15 @@ class CompiledRule:
         tool = when.get("tool")
         if tool:
             if isinstance(tool, list):
-                # List of tool names → alternation regex
+                # List of tool names → alternation regex (exact match)
                 escaped = [re.escape(t) for t in tool]
                 compiled.tool_pattern = re.compile(f"^({'|'.join(escaped)})$")
             else:
+                if len(str(tool)) > MAX_PATTERN_LENGTH:
+                    raise ValueError(
+                        f"Tool pattern in rule '{rule.id}' exceeds "
+                        f"{MAX_PATTERN_LENGTH} characters"
+                    )
                 compiled.tool_pattern = re.compile(f"^{tool}$")
 
         # Compile argument matchers (support both 'args' and 'args_match')
@@ -70,6 +83,11 @@ class CompiledRule:
         # Compile sender pattern
         sender = when.get("sender")
         if sender:
+            if len(str(sender)) > MAX_PATTERN_LENGTH:
+                raise ValueError(
+                    f"Sender pattern in rule '{rule.id}' exceeds "
+                    f"{MAX_PATTERN_LENGTH} characters"
+                )
             compiled.sender_pattern = re.compile(f"^{sender}$")
 
         return compiled

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import threading
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from policyshield.core.models import PIIType, SessionState
 
@@ -45,7 +45,7 @@ class SessionManager:
 
             session = SessionState(
                 session_id=session_id,
-                created_at=datetime.now(),
+                created_at=datetime.now(timezone.utc),
             )
             self._sessions[session_id] = session
             return session
@@ -123,7 +123,7 @@ class SessionManager:
 
     def _is_expired(self, session: SessionState) -> bool:
         """Check if a session has exceeded its TTL."""
-        return datetime.now() - session.created_at > timedelta(seconds=self._ttl_seconds)
+        return datetime.now(timezone.utc) - session.created_at > timedelta(seconds=self._ttl_seconds)
 
     def _evict_expired(self) -> None:
         """Remove all expired sessions. Must be called with lock held."""

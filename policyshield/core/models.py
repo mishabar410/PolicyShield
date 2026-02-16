@@ -76,7 +76,7 @@ class RuleConfig(BaseModel):
 
     id: str
     description: str = ""
-    when: dict = {}
+    when: dict = Field(default_factory=dict)
     then: Verdict = Verdict.ALLOW
     message: str | None = None
     severity: Severity = Severity.LOW

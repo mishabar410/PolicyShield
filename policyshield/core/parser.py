@@ -7,7 +7,10 @@ from pathlib import Path
 import yaml
 
 from policyshield.core.exceptions import PolicyShieldParseError
-from policyshield.core.models import RuleConfig, RuleSet, Verdict
+from policyshield.core.models import RuleConfig, RuleSet, TaintChainConfig, Verdict
+
+# Valid keys for the 'when' clause — anything else is likely a typo
+_VALID_WHEN_KEYS = {"tool", "args", "args_match", "sender", "session"}
 
 
 def parse_sanitizer_config(data: dict) -> dict | None:
@@ -91,7 +94,7 @@ def _parse_rule(raw: dict, file_path: str | None = None) -> RuleConfig:
     return RuleConfig(
         id=raw["id"],
         description=raw.get("description", ""),
-        when=raw.get("when", {}),
+        when=_validated_when(raw.get("when", {}), raw["id"], file_path),
         then=then_value,
         message=raw.get("message"),
         severity=severity_value,
@@ -158,11 +161,20 @@ def _load_rules_from_dir(dir_path: Path) -> RuleSet:
     if not shield_name:
         shield_name = dir_path.name
 
+    # Parse taint_chain config (use last file that defines it)
+    taint_chain = TaintChainConfig()
+    for f in yaml_files:
+        data = parse_rule_file(f)
+        tc_data = data.get("taint_chain")
+        if tc_data:
+            taint_chain = TaintChainConfig(**tc_data)
+
     ruleset = RuleSet(
         shield_name=shield_name,
         version=version,
         rules=all_rules,
         default_verdict=default_verdict,
+        taint_chain=taint_chain,
     )
     validate_rule_set(ruleset)
     return ruleset
@@ -219,3 +231,17 @@ def validate_rule_set(ruleset: RuleSet) -> None:
         if rule_id in seen:
             raise PolicyShieldParseError(f"Duplicate rule ID: '{rule_id}'")
         seen.add(rule_id)
+
+
+def _validated_when(when: dict, rule_id: str, file_path: str | None) -> dict:
+    """Validate 'when' keys and return the dict unchanged."""
+    if not isinstance(when, dict):
+        return when
+    unknown = set(when.keys()) - _VALID_WHEN_KEYS
+    if unknown:
+        import logging
+        logging.getLogger("policyshield").warning(
+            "Unknown 'when' keys %s in rule '%s'%s — ignored",
+            unknown, rule_id, f" ({file_path})" if file_path else "",
+        )
+    return when

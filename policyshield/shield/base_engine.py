@@ -87,6 +87,7 @@ class BaseShieldEngine:
         self._approval_meta: dict[str, dict] = {}
         # Resolved approval statuses for idempotent polling
         self._resolved_approvals: dict[str, dict] = {}
+        self._max_resolved_approvals = 10_000
 
         # Taint chain config
         tc = self._rule_set.taint_chain
@@ -186,19 +187,18 @@ class BaseShieldEngine:
 
         rule = match.rule
 
-        # PII detection on args
-        pii_matches = []
-        try:
-            pii_matches = self._pii.scan_dict(args)
-        except Exception as e:
-            logger.warning("PII detection error (fail-open): %s", e)
-
-        # Taint session with detected PII types
-        for pm in pii_matches:
-            self._session_mgr.add_taint(session_id, pm.pii_type)
-
         # Build verdict based on rule
         if rule.then == Verdict.BLOCK:
+            # PII detection on args (only for BLOCK to enrich the message)
+            pii_matches = []
+            try:
+                pii_matches = self._pii.scan_dict(args)
+            except Exception as e:
+                logger.warning("PII detection error (fail-open): %s", e)
+            # Taint session with detected PII types
+            for pm in pii_matches:
+                self._session_mgr.add_taint(session_id, pm.pii_type)
+
             return self._verdict_builder.block(
                 rule=rule,
                 tool_name=tool_name,
@@ -206,14 +206,16 @@ class BaseShieldEngine:
                 pii_matches=pii_matches,
             )
         elif rule.then == Verdict.REDACT:
-            redacted, scan_matches = self._pii.redact_dict(args)
-            all_pii = pii_matches if pii_matches else scan_matches
+            # redact_dict scans for PII internally — no need for a separate scan
+            redacted, pii_matches = self._pii.redact_dict(args)
+            for pm in pii_matches:
+                self._session_mgr.add_taint(session_id, pm.pii_type)
             return self._verdict_builder.redact(
                 rule=rule,
                 tool_name=tool_name,
                 args=args,
                 modified_args=redacted,
-                pii_matches=all_pii,
+                pii_matches=pii_matches,
             )
         elif rule.then == Verdict.APPROVE:
             return self._handle_approval_sync(rule, tool_name, args, session_id)
@@ -265,12 +267,13 @@ class BaseShieldEngine:
         self._approval_backend.submit(req)
 
         # Store metadata for cache population after resolution
-        self._approval_meta[req.request_id] = {
-            "tool_name": tool_name,
-            "rule_id": rule.id,
-            "session_id": session_id,
-            "strategy": strategy,
-        }
+        with self._lock:
+            self._approval_meta[req.request_id] = {
+                "tool_name": tool_name,
+                "rule_id": rule.id,
+                "session_id": session_id,
+                "strategy": strategy,
+            }
 
         # Return APPROVE verdict with the approval_id for async polling
         return ShieldResult(
@@ -286,9 +289,10 @@ class BaseShieldEngine:
         Returns:
             dict with 'status' ('pending', 'approved', 'denied') and optional 'responder'.
         """
-        # Return cached result for idempotent polling
-        if approval_id in self._resolved_approvals:
-            return self._resolved_approvals[approval_id]
+        with self._lock:
+            # Return cached result for idempotent polling
+            if approval_id in self._resolved_approvals:
+                return self._resolved_approvals[approval_id]
 
         if self._approval_backend is None:
             return {"status": "denied", "responder": None}
@@ -302,18 +306,25 @@ class BaseShieldEngine:
             result = {"status": "approved", "responder": resp.responder}
         else:
             result = {"status": "denied", "responder": resp.responder}
-        self._resolved_approvals[approval_id] = result
 
-        # Populate approval cache for batch strategies
-        if self._approval_cache is not None and approval_id in self._approval_meta:
-            meta = self._approval_meta.pop(approval_id)
-            self._approval_cache.put(
-                tool_name=meta["tool_name"],
-                rule_id=meta["rule_id"],
-                session_id=meta["session_id"],
-                response=resp,
-                strategy=meta["strategy"],
-            )
+        with self._lock:
+            # Evict oldest entries if cache is full
+            if len(self._resolved_approvals) >= self._max_resolved_approvals:
+                to_remove = list(self._resolved_approvals.keys())[: len(self._resolved_approvals) // 4]
+                for k in to_remove:
+                    del self._resolved_approvals[k]
+            self._resolved_approvals[approval_id] = result
+
+            # Populate approval cache for batch strategies
+            if self._approval_cache is not None and approval_id in self._approval_meta:
+                meta = self._approval_meta.pop(approval_id)
+                self._approval_cache.put(
+                    tool_name=meta["tool_name"],
+                    rule_id=meta["rule_id"],
+                    session_id=meta["session_id"],
+                    response=resp,
+                    strategy=meta["strategy"],
+                )
 
         return result
 

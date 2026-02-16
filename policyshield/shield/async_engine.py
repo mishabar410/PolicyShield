@@ -1,4 +1,9 @@
-"""AsyncShieldEngine — fully async orchestrator for PolicyShield."""
+"""AsyncShieldEngine — fully async orchestrator for PolicyShield.
+
+Note: ``_do_check`` intentionally duplicates most of
+``BaseShieldEngine._do_check_sync`` with ``await asyncio.to_thread()``
+wrappers.  Any logic change in the sync path must be mirrored here.
+"""
 
 from __future__ import annotations
 
@@ -148,19 +153,17 @@ class AsyncShieldEngine(BaseShieldEngine):
 
         rule = match.rule
 
-        # PII detection (CPU-bound regex) — offload to thread
-        pii_matches = []
-        try:
-            pii_matches = await asyncio.to_thread(self._pii.scan_dict, args)
-        except Exception as e:
-            logger.warning("PII detection error (fail-open): %s", e)
-
-        # Taint session with detected PII types
-        for pm in pii_matches:
-            self._session_mgr.add_taint(session_id, pm.pii_type)
-
         # Build verdict based on rule
         if rule.then == Verdict.BLOCK:
+            # PII detection on args (only for BLOCK to enrich the message)
+            pii_matches = []
+            try:
+                pii_matches = await asyncio.to_thread(self._pii.scan_dict, args)
+            except Exception as e:
+                logger.warning("PII detection error (fail-open): %s", e)
+            for pm in pii_matches:
+                self._session_mgr.add_taint(session_id, pm.pii_type)
+
             return self._verdict_builder.block(
                 rule=rule,
                 tool_name=tool_name,
@@ -168,14 +171,16 @@ class AsyncShieldEngine(BaseShieldEngine):
                 pii_matches=pii_matches,
             )
         elif rule.then == Verdict.REDACT:
-            redacted, scan_matches = await asyncio.to_thread(self._pii.redact_dict, args)
-            all_pii = pii_matches if pii_matches else scan_matches
+            # redact_dict scans for PII internally — no need for a separate scan
+            redacted, pii_matches = await asyncio.to_thread(self._pii.redact_dict, args)
+            for pm in pii_matches:
+                self._session_mgr.add_taint(session_id, pm.pii_type)
             return self._verdict_builder.redact(
                 rule=rule,
                 tool_name=tool_name,
                 args=args,
                 modified_args=redacted,
-                pii_matches=all_pii,
+                pii_matches=pii_matches,
             )
         elif rule.then == Verdict.APPROVE:
             return await self._handle_approval(rule, tool_name, args, session_id)
@@ -233,12 +238,13 @@ class AsyncShieldEngine(BaseShieldEngine):
         await asyncio.to_thread(self._approval_backend.submit, req)
 
         # Store metadata for cache population after resolution
-        self._approval_meta[req.request_id] = {
-            "tool_name": tool_name,
-            "rule_id": rule.id,
-            "session_id": session_id,
-            "strategy": strategy,
-        }
+        with self._lock:
+            self._approval_meta[req.request_id] = {
+                "tool_name": tool_name,
+                "rule_id": rule.id,
+                "session_id": session_id,
+                "strategy": strategy,
+            }
 
         # Return APPROVE verdict with the approval_id for async polling
         return ShieldResult(
