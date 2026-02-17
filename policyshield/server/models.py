@@ -23,6 +23,7 @@ class CheckResponse(BaseModel):
     modified_args: dict | None = None
     pii_types: list[str] = []
     approval_id: str | None = None
+    shield_version: str = ""
 
 
 class PostCheckRequest(BaseModel):

@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 from policyshield.core.models import Verdict
 
@@ -115,9 +118,13 @@ class TraceRecorder:
         if not self._buffer:
             return
 
-        with open(self._file_path, "a", encoding="utf-8") as f:
-            for entry in self._buffer:
-                f.write(json.dumps(entry, default=str) + "\n")
+        try:
+            with open(self._file_path, "a", encoding="utf-8") as f:
+                for entry in self._buffer:
+                    f.write(json.dumps(entry, default=str) + "\n")
+        except OSError as exc:
+            logger.error("Failed to write trace file %s: %s (dropping %d records)",
+                         self._file_path, exc, len(self._buffer))
 
         self._buffer.clear()
 

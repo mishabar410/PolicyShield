@@ -398,10 +398,23 @@ def _cmd_server(parsed: argparse.Namespace) -> int:
         )
     )
 
-    engine = AsyncShieldEngine(rules=rules_path, mode=mode, approval_backend=approval_backend, sanitizer=sanitizer)
+    # Audit trail — trace recorder
+    from policyshield.trace.recorder import TraceRecorder
+
+    trace_dir = os.environ.get("POLICYSHIELD_TRACE_DIR", "./traces")
+    trace_recorder = TraceRecorder(trace_dir)
+
+    engine = AsyncShieldEngine(
+        rules=rules_path,
+        mode=mode,
+        approval_backend=approval_backend,
+        sanitizer=sanitizer,
+        trace_recorder=trace_recorder,
+    )
     print("PolicyShield server starting...")
     print(f"  Rules: {rules_path} ({engine.rule_count} rules)")
     print(f"  Mode: {mode.value}")
+    print(f"  Traces: {trace_dir}")
     print(f"  Listen: http://{parsed.host}:{parsed.port}")
     print(f"  Health: http://{parsed.host}:{parsed.port}/api/v1/health")
 

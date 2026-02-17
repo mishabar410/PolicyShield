@@ -35,7 +35,9 @@ class InMemoryBackend(ApprovalBackend):
             return None
 
         with self._lock:
-            return self._responses.get(request_id)
+            # Clean up event after consuming the response
+            self._events.pop(request_id, None)
+            return self._responses.pop(request_id, None)
 
     def respond(
         self,
@@ -61,3 +63,13 @@ class InMemoryBackend(ApprovalBackend):
     def pending(self) -> list[ApprovalRequest]:
         with self._lock:
             return list(self._requests.values())
+
+    def stop(self) -> None:
+        """Clean up all pending state (called during shutdown)."""
+        with self._lock:
+            self._requests.clear()
+            self._responses.clear()
+            # Signal all waiting threads so they unblock
+            for event in self._events.values():
+                event.set()
+            self._events.clear()

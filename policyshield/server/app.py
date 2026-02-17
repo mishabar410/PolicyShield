@@ -103,6 +103,7 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
             modified_args=result.modified_args,
             pii_types=[m.pii_type.value for m in result.pii_matches],
             approval_id=result.approval_id,
+            shield_version=__version__,
         )
 
     @app.post("/api/v1/post-check", response_model=PostCheckResponse, dependencies=auth)
