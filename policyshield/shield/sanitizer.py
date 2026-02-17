@@ -75,10 +75,7 @@ class InputSanitizer:
                     warnings=[],
                     was_modified=False,
                     rejected=True,
-                    rejection_reason=(
-                        f"Built-in detector [{first.detector_name}] "
-                        f"matched: {first.matched_text!r}"
-                    ),
+                    rejection_reason=(f"Built-in detector [{first.detector_name}] matched: {first.matched_text!r}"),
                 )
 
         # 2) User-defined blocked patterns

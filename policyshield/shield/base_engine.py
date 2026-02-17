@@ -395,7 +395,11 @@ class BaseShieldEngine:
         """Apply audit-mode override, session update, and trace after a check."""
         # In AUDIT mode, always allow but record the would-be verdict
         # Exception: kill switch and honeypots override even AUDIT mode
-        if self._mode == ShieldMode.AUDIT and result.verdict != Verdict.ALLOW and result.rule_id not in ("__kill_switch__", "__honeypot__"):
+        if (
+            self._mode == ShieldMode.AUDIT
+            and result.verdict != Verdict.ALLOW
+            and result.rule_id not in ("__kill_switch__", "__honeypot__")
+        ):
             logger.info("AUDIT: would %s %s (rule=%s)", result.verdict.value, tool_name, result.rule_id)
             audit_result = ShieldResult(
                 verdict=Verdict.ALLOW,

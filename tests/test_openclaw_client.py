@@ -54,10 +54,12 @@ class TestFetchTools:
 
     def test_dict_tools(self, mock_server):
         url, handler = mock_server
-        handler.response_data = {"tools": [
-            {"name": "read_file", "description": "Read a file"},
-            {"name": "exec", "description": "Execute command"},
-        ]}
+        handler.response_data = {
+            "tools": [
+                {"name": "read_file", "description": "Read a file"},
+                {"name": "exec", "description": "Execute command"},
+            ]
+        }
         tools = fetch_tools(url)
         assert tools[0].name == "read_file"
         assert tools[0].description == "Read a file"

@@ -79,14 +79,16 @@ def generate_rules(
         if not include_safe and level in (DangerLevel.SAFE, DangerLevel.MODERATE):
             continue
 
-        rules.append(GeneratedRule(
-            rule_id=f"auto-{name.replace('_', '-')}",
-            tool_name=name,
-            verdict=verdict,
-            severity=severity,
-            danger_level=level,
-            message=message,
-        ))
+        rules.append(
+            GeneratedRule(
+                rule_id=f"auto-{name.replace('_', '-')}",
+                tool_name=name,
+                verdict=verdict,
+                severity=severity,
+                danger_level=level,
+                message=message,
+            )
+        )
 
     return rules
 
@@ -132,8 +134,6 @@ def rules_to_yaml(
     import yaml
 
     data = rules_to_yaml_dict(rules, shield_name, default_verdict)
-    return (
-        "# Auto-generated PolicyShield rules\n"
-        "# Review and adjust as needed before use\n"
-        + yaml.dump(data, default_flow_style=False, sort_keys=False)
+    return "# Auto-generated PolicyShield rules\n# Review and adjust as needed before use\n" + yaml.dump(
+        data, default_flow_style=False, sort_keys=False
     )

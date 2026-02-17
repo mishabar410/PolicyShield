@@ -20,8 +20,11 @@ def _base_config() -> dict:
         "trace": {"enabled": True},
         "sanitizer": {
             "builtin_detectors": [
-                "path_traversal", "shell_injection",
-                "sql_injection", "ssrf", "url_schemes",
+                "path_traversal",
+                "shell_injection",
+                "sql_injection",
+                "ssrf",
+                "url_schemes",
             ],
         },
     }
@@ -56,14 +59,21 @@ class TestDoctor:
         """Minimal preset should score poorly — missing many protections."""
         with tempfile.TemporaryDirectory() as tmpdir:
             td = Path(tmpdir)
-            _write_yaml(td / "policyshield.yaml", {
-                "mode": "ENFORCE", "fail_open": True,
-            })
-            _write_yaml(td / "policies" / "rules.yaml", {
-                "rules": [
-                    {"id": "r1", "when": {"tool": "read_file"}, "then": "allow"},
-                ],
-            })
+            _write_yaml(
+                td / "policyshield.yaml",
+                {
+                    "mode": "ENFORCE",
+                    "fail_open": True,
+                },
+            )
+            _write_yaml(
+                td / "policies" / "rules.yaml",
+                {
+                    "rules": [
+                        {"id": "r1", "when": {"tool": "read_file"}, "then": "allow"},
+                    ],
+                },
+            )
             report = run_doctor(
                 config_path=td / "policyshield.yaml",
                 rules_path=td / "policies" / "rules.yaml",
@@ -134,7 +144,10 @@ class TestDoctorChecksIsolated:
         with tempfile.TemporaryDirectory() as td:
             td = Path(td)
             _write_yaml(td / "cfg.yaml", {})
-            _write_yaml(td / "rules.yaml", {"default_verdict": "block", "rules": [{"id": "r", "when": {"tool": "x"}, "then": "allow"}]})
+            _write_yaml(
+                td / "rules.yaml",
+                {"default_verdict": "block", "rules": [{"id": "r", "when": {"tool": "x"}, "then": "allow"}]},
+            )
             report = run_doctor(config_path=td / "cfg.yaml", rules_path=td / "rules.yaml")
             verdict_check = next(c for c in report.checks if c.name == "Default verdict")
             assert verdict_check.passed
@@ -143,7 +156,10 @@ class TestDoctorChecksIsolated:
         with tempfile.TemporaryDirectory() as td:
             td = Path(td)
             _write_yaml(td / "cfg.yaml", {})
-            _write_yaml(td / "rules.yaml", {"default_verdict": "allow", "rules": [{"id": "r", "when": {"tool": "x"}, "then": "allow"}]})
+            _write_yaml(
+                td / "rules.yaml",
+                {"default_verdict": "allow", "rules": [{"id": "r", "when": {"tool": "x"}, "then": "allow"}]},
+            )
             report = run_doctor(config_path=td / "cfg.yaml", rules_path=td / "rules.yaml")
             verdict_check = next(c for c in report.checks if c.name == "Default verdict")
             assert not verdict_check.passed
@@ -151,9 +167,12 @@ class TestDoctorChecksIsolated:
     def test_partial_detectors(self):
         with tempfile.TemporaryDirectory() as td:
             td = Path(td)
-            _write_yaml(td / "cfg.yaml", {
-                "sanitizer": {"builtin_detectors": ["path_traversal", "ssrf"]},
-            })
+            _write_yaml(
+                td / "cfg.yaml",
+                {
+                    "sanitizer": {"builtin_detectors": ["path_traversal", "ssrf"]},
+                },
+            )
             _write_yaml(td / "rules.yaml", {"rules": [{"id": "r", "when": {"tool": "x"}, "then": "allow"}]})
             report = run_doctor(config_path=td / "cfg.yaml", rules_path=td / "rules.yaml")
             det_check = next(c for c in report.checks if c.name == "Builtin detectors")
@@ -165,9 +184,12 @@ class TestDoctorChecksIsolated:
         with tempfile.TemporaryDirectory() as td:
             td = Path(td)
             _write_yaml(td / "cfg.yaml", {})
-            _write_yaml(td / "rules.yaml", {
-                "rules": [{"id": "r", "when": {"tool": ["exec", "shell"]}, "then": "block"}],
-            })
+            _write_yaml(
+                td / "rules.yaml",
+                {
+                    "rules": [{"id": "r", "when": {"tool": ["exec", "shell"]}, "then": "block"}],
+                },
+            )
             report = run_doctor(config_path=td / "cfg.yaml", rules_path=td / "rules.yaml")
             exec_check = next(c for c in report.checks if c.name == "Exec protection")
             assert exec_check.passed

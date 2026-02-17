@@ -211,31 +211,43 @@ def app(args: list[str] | None = None) -> int:
         help="Auto-generate rules from tool list or OpenClaw",
     )
     genrules_parser.add_argument(
-        "--from-openclaw", action="store_true",
+        "--from-openclaw",
+        action="store_true",
         help="Fetch tools from running OpenClaw instance",
     )
     genrules_parser.add_argument(
-        "--url", type=str, default="http://localhost:3000",
+        "--url",
+        type=str,
+        default="http://localhost:3000",
         help="OpenClaw URL (default: http://localhost:3000)",
     )
     genrules_parser.add_argument(
-        "--tools", type=str, default=None,
+        "--tools",
+        type=str,
+        default=None,
         help="Comma-separated tool names (alternative to --from-openclaw)",
     )
     genrules_parser.add_argument(
-        "--output", "-o", type=str, default="policies/rules.yaml",
+        "--output",
+        "-o",
+        type=str,
+        default="policies/rules.yaml",
         help="Output file path",
     )
     genrules_parser.add_argument(
-        "--include-safe", action="store_true",
+        "--include-safe",
+        action="store_true",
         help="Include explicit ALLOW rules for safe tools",
     )
     genrules_parser.add_argument(
-        "--default-verdict", type=str, default="block",
+        "--default-verdict",
+        type=str,
+        default="block",
         help="Default verdict for unmatched tools (default: block)",
     )
     genrules_parser.add_argument(
-        "--force", action="store_true",
+        "--force",
+        action="store_true",
         help="Overwrite output file without asking",
     )
 
@@ -1060,7 +1072,10 @@ def _cmd_kill(parsed: argparse.Namespace) -> int:
     url = f"http://localhost:{parsed.port}/api/v1/kill"
     data = json.dumps({"reason": parsed.reason}).encode()
     req = urllib.request.Request(
-        url, data=data, headers={"Content-Type": "application/json"}, method="POST",
+        url,
+        data=data,
+        headers={"Content-Type": "application/json"},
+        method="POST",
     )
     try:
         with urllib.request.urlopen(req, timeout=5) as resp:
@@ -1080,7 +1095,10 @@ def _cmd_resume(parsed: argparse.Namespace) -> int:
 
     url = f"http://localhost:{parsed.port}/api/v1/resume"
     req = urllib.request.Request(
-        url, data=b"", headers={"Content-Type": "application/json"}, method="POST",
+        url,
+        data=b"",
+        headers={"Content-Type": "application/json"},
+        method="POST",
     )
     try:
         with urllib.request.urlopen(req, timeout=5) as resp:
@@ -1111,10 +1129,7 @@ def _cmd_doctor(parsed: argparse.Namespace) -> int:
             "score": report.score,
             "max_score": report.max_score,
             "grade": report.grade,
-            "checks": [
-                {"name": c.name, "passed": c.passed, "message": c.message}
-                for c in report.checks
-            ],
+            "checks": [{"name": c.name, "passed": c.passed, "message": c.message} for c in report.checks],
         }
         print(json_mod.dumps(out, indent=2))
     else:
@@ -1198,5 +1213,3 @@ def _cmd_generate_rules(parsed: argparse.Namespace) -> int:
     print(f"\n✓ Rules written to {output_path}")
     print(f"  Next: policyshield validate {output_path}")
     return 0
-
-

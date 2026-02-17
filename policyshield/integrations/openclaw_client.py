@@ -45,16 +45,17 @@ def fetch_tools(
     url = f"{base_url.rstrip('/')}/api/tools"
 
     try:
-        req = urllib.request.Request(url, headers={
-            "Accept": "application/json",
-            "User-Agent": "PolicyShield/auto-rules",
-        })
+        req = urllib.request.Request(
+            url,
+            headers={
+                "Accept": "application/json",
+                "User-Agent": "PolicyShield/auto-rules",
+            },
+        )
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             data = json.loads(resp.read())
     except urllib.error.URLError as e:
-        raise OpenClawConnectionError(
-            f"Cannot connect to OpenClaw at {base_url}: {e}"
-        ) from e
+        raise OpenClawConnectionError(f"Cannot connect to OpenClaw at {base_url}: {e}") from e
     except json.JSONDecodeError as e:
         raise OpenClawAPIError(f"Invalid JSON from OpenClaw: {e}") from e
 
@@ -70,11 +71,13 @@ def fetch_tools(
         if isinstance(item, str):
             result.append(ToolInfo(name=item))
         elif isinstance(item, dict):
-            result.append(ToolInfo(
-                name=item.get("name", item.get("tool_name", "")),
-                description=item.get("description", ""),
-                parameters=item.get("parameters", item.get("params")),
-            ))
+            result.append(
+                ToolInfo(
+                    name=item.get("name", item.get("tool_name", "")),
+                    description=item.get("description", ""),
+                    parameters=item.get("parameters", item.get("params")),
+                )
+            )
     return result
 
 

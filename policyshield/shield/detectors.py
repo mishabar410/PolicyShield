@@ -71,11 +71,11 @@ PATH_TRAVERSAL = Detector(
     name="path_traversal",
     description="Detects directory traversal sequences (../, ..\\, etc.)",
     patterns=_compile(
-        r"(?:\.\./){2,}",            # ../../  (2+ levels)
-        r"(?:\.\.\\){2,}",           # ..\..\  (Windows)
+        r"(?:\.\./){2,}",  # ../../  (2+ levels)
+        r"(?:\.\.\\){2,}",  # ..\..\  (Windows)
         r"\.\./etc/(?:passwd|shadow)",  # direct /etc/passwd
-        r"\.\./windows/",            # Windows system dir
-        r"%2e%2e[/\\]",              # URL-encoded traversal
+        r"\.\./windows/",  # Windows system dir
+        r"%2e%2e[/\\]",  # URL-encoded traversal
         flags=_I,
     ),
     severity="high",
@@ -87,9 +87,9 @@ SHELL_INJECTION = Detector(
     patterns=_compile(
         r";\s*(?:rm|cat|curl|wget|bash|sh|python|perl|ruby|nc|ncat)\b",
         r"\|\s*(?:sh|bash|zsh|cmd)\b",
-        r"`[^`]+`",                  # backtick command substitution
-        r"\$\([^)]+\)",              # $(cmd) substitution
-        r">\s*/(?:etc|dev|tmp)/",    # redirect to sensitive paths
+        r"`[^`]+`",  # backtick command substitution
+        r"\$\([^)]+\)",  # $(cmd) substitution
+        r">\s*/(?:etc|dev|tmp)/",  # redirect to sensitive paths
         flags=_I,
     ),
     severity="critical",
@@ -99,11 +99,11 @@ SQL_INJECTION = Detector(
     name="sql_injection",
     description="Detects common SQL injection patterns",
     patterns=_compile(
-        r"'\s*(?:OR|AND)\s+['\d].*?=",          # ' OR '1'='1
-        r"(?:UNION\s+(?:ALL\s+)?SELECT)\b",     # UNION SELECT
+        r"'\s*(?:OR|AND)\s+['\d].*?=",  # ' OR '1'='1
+        r"(?:UNION\s+(?:ALL\s+)?SELECT)\b",  # UNION SELECT
         r";\s*(?:DROP|DELETE|INSERT|UPDATE)\s",  # stacked queries
-        r"--\s*$",                               # SQL comment terminator
-        r"'\s*;\s*--",                           # quote-semicolon-comment
+        r"--\s*$",  # SQL comment terminator
+        r"'\s*;\s*--",  # quote-semicolon-comment
         flags=_I,
     ),
     severity="critical",
@@ -114,11 +114,11 @@ SSRF = Detector(
     description="Detects server-side request forgery via internal network URLs",
     patterns=_compile(
         r"https?://(?:127\.\d+\.\d+\.\d+|localhost)\b",  # localhost
-        r"https?://(?:10\.\d+\.\d+\.\d+)\b",             # 10.x.x.x
+        r"https?://(?:10\.\d+\.\d+\.\d+)\b",  # 10.x.x.x
         r"https?://(?:172\.(?:1[6-9]|2\d|3[01])\.\d+\.\d+)\b",  # 172.16-31
-        r"https?://(?:192\.168\.\d+\.\d+)\b",             # 192.168.x.x
-        r"https?://169\.254\.\d+\.\d+",                   # link-local / metadata
-        r"https?://\[::1\]",                               # IPv6 loopback
+        r"https?://(?:192\.168\.\d+\.\d+)\b",  # 192.168.x.x
+        r"https?://169\.254\.\d+\.\d+",  # link-local / metadata
+        r"https?://\[::1\]",  # IPv6 loopback
         flags=_I,
     ),
     severity="high",
@@ -144,8 +144,7 @@ URL_SCHEMES = Detector(
 # ────────────────────────────────────────────────────────────────────
 
 ALL_DETECTORS: dict[str, Detector] = {
-    d.name: d
-    for d in (PATH_TRAVERSAL, SHELL_INJECTION, SQL_INJECTION, SSRF, URL_SCHEMES)
+    d.name: d for d in (PATH_TRAVERSAL, SHELL_INJECTION, SQL_INJECTION, SSRF, URL_SCHEMES)
 }
 
 

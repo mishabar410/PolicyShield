@@ -28,9 +28,7 @@ def _engine_with_detectors(detector_names: list[str]) -> ShieldEngine:
             ),
         ],
     )
-    san = InputSanitizer(
-        SanitizerConfig(builtin_detectors=detector_names)
-    )
+    san = InputSanitizer(SanitizerConfig(builtin_detectors=detector_names))
     return ShieldEngine(rules=rules, sanitizer=san)
 
 

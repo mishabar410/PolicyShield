@@ -10,6 +10,7 @@ from typing import Any
 @dataclass
 class Check:
     """A single health check result."""
+
     name: str
     passed: bool
     points: int  # Points awarded if passed
@@ -20,6 +21,7 @@ class Check:
 @dataclass
 class DoctorReport:
     """Full doctor report."""
+
     checks: list[Check] = field(default_factory=list)
     score: int = 0
     max_score: int = 0
@@ -72,13 +74,17 @@ def run_doctor(
             config = yaml.safe_load(config_path.read_text()) or {}
             report.add(Check("Config file", True, 10, f"✓ {config_path} is valid"))
         except Exception as e:
-            report.add(Check("Config file", False, 10,
-                f"✗ {config_path} has errors: {e}",
-                f"Fix the YAML syntax in {config_path}"))
+            report.add(
+                Check(
+                    "Config file",
+                    False,
+                    10,
+                    f"✗ {config_path} has errors: {e}",
+                    f"Fix the YAML syntax in {config_path}",
+                )
+            )
     else:
-        report.add(Check("Config file", False, 10,
-            f"✗ {config_path} not found",
-            "Run: policyshield init"))
+        report.add(Check("Config file", False, 10, f"✗ {config_path} not found", "Run: policyshield init"))
 
     # --- Check 2: Rules file exists and parses ---
     rules: list[dict] = []
@@ -87,20 +93,29 @@ def run_doctor(
             data = yaml.safe_load(rules_path.read_text()) or {}
             rules = data.get("rules", [])
             if rules:
-                report.add(Check("Rules file", True, 10,
-                    f"✓ {rules_path}: {len(rules)} rules"))
+                report.add(Check("Rules file", True, 10, f"✓ {rules_path}: {len(rules)} rules"))
             else:
-                report.add(Check("Rules file", False, 10,
-                    f"✗ {rules_path} has 0 rules",
-                    "Add rules or use: policyshield init --preset secure"))
+                report.add(
+                    Check(
+                        "Rules file",
+                        False,
+                        10,
+                        f"✗ {rules_path} has 0 rules",
+                        "Add rules or use: policyshield init --preset secure",
+                    )
+                )
         except Exception as e:
-            report.add(Check("Rules file", False, 10,
-                f"✗ {rules_path} has errors: {e}",
-                f"Run: policyshield validate {rules_path}"))
+            report.add(
+                Check(
+                    "Rules file",
+                    False,
+                    10,
+                    f"✗ {rules_path} has errors: {e}",
+                    f"Run: policyshield validate {rules_path}",
+                )
+            )
     else:
-        report.add(Check("Rules file", False, 10,
-            f"✗ {rules_path} not found",
-            "Run: policyshield init"))
+        report.add(Check("Rules file", False, 10, f"✗ {rules_path} not found", "Run: policyshield init"))
 
     # --- Check 3: default_verdict ---
     rules_data: dict[str, Any] = {}
@@ -111,92 +126,119 @@ def run_doctor(
             pass
     default_v = rules_data.get("default_verdict", "allow")
     if default_v == "block":
-        report.add(Check("Default verdict", True, 15,
-            "✓ default_verdict: block (secure)"))
+        report.add(Check("Default verdict", True, 15, "✓ default_verdict: block (secure)"))
     else:
-        report.add(Check("Default verdict", False, 15,
-            f"⚠ default_verdict: {default_v}",
-            "Set default_verdict: block in rules.yaml for deny-by-default"))
+        report.add(
+            Check(
+                "Default verdict",
+                False,
+                15,
+                f"⚠ default_verdict: {default_v}",
+                "Set default_verdict: block in rules.yaml for deny-by-default",
+            )
+        )
 
     # --- Check 4: fail_open ---
     fail_open = config.get("fail_open", True)
     if not fail_open:
-        report.add(Check("Fail mode", True, 10,
-            "✓ fail_open: false (fail-closed)"))
+        report.add(Check("Fail mode", True, 10, "✓ fail_open: false (fail-closed)"))
     else:
-        report.add(Check("Fail mode", False, 10,
-            "⚠ fail_open: true (errors won't block tools)",
-            "Set fail_open: false in policyshield.yaml"))
+        report.add(
+            Check(
+                "Fail mode",
+                False,
+                10,
+                "⚠ fail_open: true (errors won't block tools)",
+                "Set fail_open: false in policyshield.yaml",
+            )
+        )
 
     # --- Check 5: Builtin detectors ---
     detectors = config.get("sanitizer", {}).get("builtin_detectors", [])
     all_detectors = {"path_traversal", "shell_injection", "sql_injection", "ssrf", "url_schemes"}
     enabled = set(detectors) & all_detectors
     if len(enabled) == len(all_detectors):
-        report.add(Check("Builtin detectors", True, 15,
-            f"✓ All {len(all_detectors)} detectors enabled"))
+        report.add(Check("Builtin detectors", True, 15, f"✓ All {len(all_detectors)} detectors enabled"))
     elif enabled:
-        report.add(Check("Builtin detectors", False, 15,
-            f"⚠ {len(enabled)}/{len(all_detectors)} detectors enabled",
-            f"Enable missing: {', '.join(all_detectors - enabled)}"))
+        report.add(
+            Check(
+                "Builtin detectors",
+                False,
+                15,
+                f"⚠ {len(enabled)}/{len(all_detectors)} detectors enabled",
+                f"Enable missing: {', '.join(all_detectors - enabled)}",
+            )
+        )
     else:
-        report.add(Check("Builtin detectors", False, 15,
-            "✗ No builtin detectors enabled",
-            "Add sanitizer.builtin_detectors in policyshield.yaml"))
+        report.add(
+            Check(
+                "Builtin detectors",
+                False,
+                15,
+                "✗ No builtin detectors enabled",
+                "Add sanitizer.builtin_detectors in policyshield.yaml",
+            )
+        )
 
     # --- Check 6: PII protection ---
     has_redact = any(r.get("then") == "redact" for r in rules)
     if has_redact:
-        report.add(Check("PII protection", True, 10,
-            "✓ PII redaction rules present"))
+        report.add(Check("PII protection", True, 10, "✓ PII redaction rules present"))
     else:
-        report.add(Check("PII protection", False, 10,
-            "⚠ No PII redaction rules",
-            "Add a rule with 'then: redact' for outgoing tools"))
+        report.add(
+            Check(
+                "PII protection",
+                False,
+                10,
+                "⚠ No PII redaction rules",
+                "Add a rule with 'then: redact' for outgoing tools",
+            )
+        )
 
     # --- Check 7: Exec/shell protection ---
     has_exec_block = any(
-        r.get("then") == "block" and
-        _tool_matches(r.get("when", {}), {"exec", "shell", "run_command", "system"})
+        r.get("then") == "block" and _tool_matches(r.get("when", {}), {"exec", "shell", "run_command", "system"})
         for r in rules
     )
     if has_exec_block:
-        report.add(Check("Exec protection", True, 10,
-            "✓ Shell/exec blocking rules present"))
+        report.add(Check("Exec protection", True, 10, "✓ Shell/exec blocking rules present"))
     else:
-        report.add(Check("Exec protection", False, 10,
-            "⚠ No exec/shell blocking rules",
-            "Add a block rule for exec/shell tools"))
+        report.add(
+            Check(
+                "Exec protection", False, 10, "⚠ No exec/shell blocking rules", "Add a block rule for exec/shell tools"
+            )
+        )
 
     # --- Check 8: Rate limiting ---
     has_rate = any("session" in r.get("when", {}) for r in rules)
     if has_rate:
-        report.add(Check("Rate limiting", True, 5,
-            "✓ Rate limiting rules present"))
+        report.add(Check("Rate limiting", True, 5, "✓ Rate limiting rules present"))
     else:
-        report.add(Check("Rate limiting", False, 5,
-            "⚠ No rate limiting rules",
-            "Add session-based rate limits for high-volume tools"))
+        report.add(
+            Check(
+                "Rate limiting",
+                False,
+                5,
+                "⚠ No rate limiting rules",
+                "Add session-based rate limits for high-volume tools",
+            )
+        )
 
     # --- Check 9: Approval flows ---
     has_approve = any(r.get("then") == "approve" for r in rules)
     if has_approve:
-        report.add(Check("Approval flows", True, 10,
-            "✓ Human-in-the-loop approval rules present"))
+        report.add(Check("Approval flows", True, 10, "✓ Human-in-the-loop approval rules present"))
     else:
-        report.add(Check("Approval flows", False, 10,
-            "⚠ No approval rules",
-            "Add 'then: approve' for sensitive operations"))
+        report.add(
+            Check("Approval flows", False, 10, "⚠ No approval rules", "Add 'then: approve' for sensitive operations")
+        )
 
     # --- Check 10: Tracing ---
     trace = config.get("trace", {})
     if trace.get("enabled", False):
-        report.add(Check("Tracing", True, 5,
-            "✓ Tracing enabled"))
+        report.add(Check("Tracing", True, 5, "✓ Tracing enabled"))
     else:
-        report.add(Check("Tracing", False, 5,
-            "⚠ Tracing disabled",
-            "Enable trace.enabled in policyshield.yaml"))
+        report.add(Check("Tracing", False, 5, "⚠ Tracing disabled", "Enable trace.enabled in policyshield.yaml"))
 
     report.finalize()
     return report

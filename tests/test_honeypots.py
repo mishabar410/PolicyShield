@@ -34,29 +34,35 @@ class TestHoneypotChecker:
         assert checker.check("read_file") is None
 
     def test_multiple_honeypots(self):
-        checker = HoneypotChecker([
-            HoneypotConfig(name="admin_panel"),
-            HoneypotConfig(name="export_all"),
-            HoneypotConfig(name="disable_security"),
-        ])
+        checker = HoneypotChecker(
+            [
+                HoneypotConfig(name="admin_panel"),
+                HoneypotConfig(name="export_all"),
+                HoneypotConfig(name="disable_security"),
+            ]
+        )
         assert checker.check("admin_panel") is not None
         assert checker.check("export_all") is not None
         assert checker.check("normal_tool") is None
         assert len(checker) == 3
 
     def test_from_config(self):
-        checker = HoneypotChecker.from_config([
-            {"name": "a", "alert": "Alert A"},
-            {"name": "b"},
-        ])
+        checker = HoneypotChecker.from_config(
+            [
+                {"name": "a", "alert": "Alert A"},
+                {"name": "b"},
+            ]
+        )
         assert len(checker) == 2
         assert checker.check("a") is not None
 
     def test_names(self):
-        checker = HoneypotChecker([
-            HoneypotConfig(name="a"),
-            HoneypotConfig(name="b"),
-        ])
+        checker = HoneypotChecker(
+            [
+                HoneypotConfig(name="a"),
+                HoneypotConfig(name="b"),
+            ]
+        )
         assert checker.names == {"a", "b"}
 
 
@@ -68,8 +74,10 @@ class TestHoneypotE2E:
         from policyshield.shield.engine import ShieldEngine
 
         ruleset = RuleSet(
-            shield_name="test", version=1,
-            rules=[], default_verdict=Verdict.ALLOW,
+            shield_name="test",
+            version=1,
+            rules=[],
+            default_verdict=Verdict.ALLOW,
             honeypots=[{"name": "internal_admin", "alert": "Admin access attempted!"}],
         )
         engine = ShieldEngine(rules=ruleset)
@@ -82,8 +90,10 @@ class TestHoneypotE2E:
         from policyshield.shield.engine import ShieldEngine
 
         ruleset = RuleSet(
-            shield_name="test", version=1,
-            rules=[], default_verdict=Verdict.ALLOW,
+            shield_name="test",
+            version=1,
+            rules=[],
+            default_verdict=Verdict.ALLOW,
             honeypots=[{"name": "internal_admin"}],
         )
         engine = ShieldEngine(rules=ruleset)
@@ -95,8 +105,10 @@ class TestHoneypotE2E:
         from policyshield.shield.engine import ShieldEngine
 
         ruleset = RuleSet(
-            shield_name="test", version=1,
-            rules=[], default_verdict=Verdict.ALLOW,
+            shield_name="test",
+            version=1,
+            rules=[],
+            default_verdict=Verdict.ALLOW,
             honeypots=[{"name": "bad_tool"}],
         )
         engine = ShieldEngine(rules=ruleset, mode=ShieldMode.AUDIT)
