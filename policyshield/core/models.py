@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -115,6 +116,7 @@ class RuleSet(BaseModel):
     rules: list[RuleConfig]
     default_verdict: Verdict = Verdict.ALLOW
     taint_chain: TaintChainConfig = TaintChainConfig()
+    honeypots: list[dict[str, Any]] | None = None
 
     def enabled_rules(self) -> list[RuleConfig]:
         """Return only rules with enabled=True."""

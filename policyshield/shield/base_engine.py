@@ -93,6 +93,15 @@ class BaseShieldEngine:
         self._killed = threading.Event()  # Not set = normal operation
         self._kill_reason: str = ""
 
+        # Honeypot checker (load from ruleset)
+        honeypot_config = self._rule_set.honeypots
+        if honeypot_config:
+            from policyshield.shield.honeypots import HoneypotChecker
+
+            self._honeypot_checker: object | None = HoneypotChecker.from_config(honeypot_config)
+        else:
+            self._honeypot_checker = None
+
         # Taint chain config
         tc = self._rule_set.taint_chain
         self._taint_enabled: bool = tc.enabled
@@ -152,6 +161,16 @@ class BaseShieldEngine:
                 rule_id="__kill_switch__",
                 message=self._kill_reason or "Kill switch activated",
             )
+
+        # Honeypot check — always block, regardless of mode
+        if self._honeypot_checker is not None:
+            honeypot_match = self._honeypot_checker.check(tool_name)
+            if honeypot_match:
+                return ShieldResult(
+                    verdict=Verdict.BLOCK,
+                    rule_id="__honeypot__",
+                    message=honeypot_match.message,
+                )
 
         # Sanitize args
         if self._sanitizer is not None:
@@ -375,8 +394,8 @@ class BaseShieldEngine:
     ) -> ShieldResult:
         """Apply audit-mode override, session update, and trace after a check."""
         # In AUDIT mode, always allow but record the would-be verdict
-        # Exception: kill switch overrides even AUDIT mode
-        if self._mode == ShieldMode.AUDIT and result.verdict != Verdict.ALLOW and result.rule_id != "__kill_switch__":
+        # Exception: kill switch and honeypots override even AUDIT mode
+        if self._mode == ShieldMode.AUDIT and result.verdict != Verdict.ALLOW and result.rule_id not in ("__kill_switch__", "__honeypot__"):
             logger.info("AUDIT: would %s %s (rule=%s)", result.verdict.value, tool_name, result.rule_id)
             audit_result = ShieldResult(
                 verdict=Verdict.ALLOW,

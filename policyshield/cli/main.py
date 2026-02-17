@@ -205,6 +205,40 @@ def app(args: list[str] | None = None) -> int:
     doctor_parser.add_argument("--rules", type=str, default=None, help="Path to rules.yaml")
     doctor_parser.add_argument("--json", action="store_true", help="Output as JSON")
 
+    # generate-rules command
+    genrules_parser = subparsers.add_parser(
+        "generate-rules",
+        help="Auto-generate rules from tool list or OpenClaw",
+    )
+    genrules_parser.add_argument(
+        "--from-openclaw", action="store_true",
+        help="Fetch tools from running OpenClaw instance",
+    )
+    genrules_parser.add_argument(
+        "--url", type=str, default="http://localhost:3000",
+        help="OpenClaw URL (default: http://localhost:3000)",
+    )
+    genrules_parser.add_argument(
+        "--tools", type=str, default=None,
+        help="Comma-separated tool names (alternative to --from-openclaw)",
+    )
+    genrules_parser.add_argument(
+        "--output", "-o", type=str, default="policies/rules.yaml",
+        help="Output file path",
+    )
+    genrules_parser.add_argument(
+        "--include-safe", action="store_true",
+        help="Include explicit ALLOW rules for safe tools",
+    )
+    genrules_parser.add_argument(
+        "--default-verdict", type=str, default="block",
+        help="Default verdict for unmatched tools (default: block)",
+    )
+    genrules_parser.add_argument(
+        "--force", action="store_true",
+        help="Overwrite output file without asking",
+    )
+
     parsed = parser.parse_args(args)
 
     if parsed.command == "validate":
@@ -263,6 +297,8 @@ def app(args: list[str] | None = None) -> int:
         return _cmd_resume(parsed)
     elif parsed.command == "doctor":
         return _cmd_doctor(parsed)
+    elif parsed.command == "generate-rules":
+        return _cmd_generate_rules(parsed)
     elif parsed.command == "openclaw":
         from policyshield.cli.openclaw import cmd_openclaw
 
@@ -1085,4 +1121,82 @@ def _cmd_doctor(parsed: argparse.Namespace) -> int:
         print(format_report(report))
 
     return 0
+
+
+# ─── generate-rules command ──────────────────────────────────────────
+
+
+def _cmd_generate_rules(parsed: argparse.Namespace) -> int:
+    """Generate rules from tool list or OpenClaw."""
+    from policyshield.ai.auto_rules import generate_rules, rules_to_yaml
+
+    # Get tool names
+    if parsed.from_openclaw:
+        from policyshield.integrations.openclaw_client import (
+            OpenClawConnectionError,
+            fetch_tool_names,
+        )
+
+        try:
+            print(f"Fetching tools from {parsed.url}...")
+            tool_names = fetch_tool_names(parsed.url)
+            print(f"  Found {len(tool_names)} tools")
+        except OpenClawConnectionError as e:
+            print(f"✗ {e}", file=sys.stderr)
+            return 1
+    elif parsed.tools:
+        tool_names = [t.strip() for t in parsed.tools.split(",") if t.strip()]
+        print(f"Using {len(tool_names)} provided tool names")
+    else:
+        print("✗ Specify --from-openclaw or --tools", file=sys.stderr)
+        print("  Example: policyshield generate-rules --tools exec,read_file,write_file", file=sys.stderr)
+        return 1
+
+    if not tool_names:
+        print("✗ No tools found", file=sys.stderr)
+        return 1
+
+    # Generate rules
+    rules = generate_rules(
+        tool_names,
+        include_safe=parsed.include_safe,
+        default_verdict=parsed.default_verdict,
+    )
+
+    if not rules:
+        print("⚠ No rules generated (all tools classified as safe)")
+        print("  Use --include-safe to generate explicit ALLOW rules for safe tools")
+        return 0
+
+    # Summary
+    verdicts: dict[str, int] = {}
+    for r in rules:
+        verdicts[r.verdict] = verdicts.get(r.verdict, 0) + 1
+    print(f"\nGenerated {len(rules)} rules:")
+    for v, count in sorted(verdicts.items()):
+        print(f"  {v.upper()}: {count}")
+
+    # Output
+    output_path = Path(parsed.output)
+    if output_path.exists() and not parsed.force:
+        try:
+            confirm = input(f"\n{output_path} already exists. Overwrite? [y/N]: ").strip().lower()
+            if confirm not in ("y", "yes"):
+                print("Aborted.")
+                return 0
+        except (EOFError, KeyboardInterrupt):
+            print("\nAborted.")
+            return 0
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    yaml_str = rules_to_yaml(
+        rules,
+        shield_name=f"auto-{parsed.default_verdict}-policy",
+        default_verdict=parsed.default_verdict,
+    )
+    output_path.write_text(yaml_str, encoding="utf-8")
+    print(f"\n✓ Rules written to {output_path}")
+    print(f"  Next: policyshield validate {output_path}")
+    return 0
+
 
