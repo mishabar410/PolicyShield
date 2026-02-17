@@ -5,8 +5,6 @@ Tests verify: YAML config → parser → SanitizerConfig → InputSanitizer → 
 
 from __future__ import annotations
 
-import pytest
-
 from policyshield.core.models import RuleConfig, RuleSet, Verdict
 from policyshield.core.parser import parse_sanitizer_config
 from policyshield.shield.engine import ShieldEngine

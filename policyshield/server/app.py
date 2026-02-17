@@ -20,7 +20,6 @@ from policyshield.server.models import (
     ClearTaintResponse,
     ConstraintsResponse,
     HealthResponse,
-    KillSwitchRequest,
     KillSwitchResponse,
     PendingApprovalItem,
     PendingApprovalsResponse,

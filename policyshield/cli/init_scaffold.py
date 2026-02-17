@@ -292,6 +292,84 @@ _OPENCLAW_RULES: list[dict[str, Any]] = [
     },
 ]
 
+_SECURE_RULES: list[dict[str, Any]] = [
+    # === Whitelist: safe read-only operations ===
+    {
+        "id": "allow-read-file",
+        "description": "Allow reading files",
+        "when": {"tool": "read_file"},
+        "then": "allow",
+    },
+    {
+        "id": "allow-list-dir",
+        "description": "Allow listing directories",
+        "when": {"tool": ["list_dir", "list_files", "ls"]},
+        "then": "allow",
+    },
+    {
+        "id": "allow-search",
+        "description": "Allow search operations",
+        "when": {"tool": ["search", "grep", "find", "search_files"]},
+        "then": "allow",
+    },
+    {
+        "id": "allow-info",
+        "description": "Allow info/status/help tools",
+        "when": {"tool": ["help", "status", "version", "info", "health"]},
+        "then": "allow",
+    },
+    # === Require approval for write operations ===
+    {
+        "id": "approve-write",
+        "description": "Require approval for all write operations",
+        "when": {"tool": ["write_file", "write", "edit", "edit_file", "patch"]},
+        "then": "approve",
+        "severity": "medium",
+        "message": "File write requires approval",
+    },
+    {
+        "id": "approve-create",
+        "description": "Require approval for creating files",
+        "when": {"tool": ["create_file", "create", "touch", "mkdir"]},
+        "then": "approve",
+        "severity": "medium",
+        "message": "File creation requires approval",
+    },
+    # === Hard block: destructive / network / exec ===
+    {
+        "id": "block-exec",
+        "description": "Block all command execution",
+        "when": {"tool": ["exec", "shell", "run_command", "system", "spawn"]},
+        "then": "block",
+        "severity": "critical",
+        "message": "Command execution is blocked in secure mode",
+    },
+    {
+        "id": "block-delete",
+        "description": "Block all delete operations",
+        "when": {"tool": ["delete_file", "delete", "remove", "rm", "unlink"]},
+        "then": "block",
+        "severity": "critical",
+        "message": "Deletion is blocked in secure mode",
+    },
+    {
+        "id": "block-network",
+        "description": "Block all network operations",
+        "when": {"tool": ["web_fetch", "http_request", "curl", "wget", "http_post", "api_call"]},
+        "then": "block",
+        "severity": "high",
+        "message": "Network access is blocked in secure mode",
+    },
+    {
+        "id": "redact-pii-all",
+        "description": "Redact PII from any outgoing tool",
+        "when": {"tool": ["send_message", "message", "reply", "send_email"]},
+        "then": "redact",
+        "severity": "high",
+        "message": "PII redacted from outgoing message",
+    },
+]
+
 
 def _get_preset_rules(preset: str) -> list[dict[str, Any]]:
     """Return rules for the given preset name."""
@@ -300,6 +378,7 @@ def _get_preset_rules(preset: str) -> list[dict[str, Any]]:
         "security": _SECURITY_RULES,
         "compliance": _COMPLIANCE_RULES,
         "openclaw": _OPENCLAW_RULES,
+        "secure": _SECURE_RULES,
     }
     if preset not in presets:
         raise ValueError(f"Unknown preset: {preset}. Choose from: {', '.join(presets)}")
@@ -409,6 +488,10 @@ def scaffold(
     if preset == "openclaw":
         rules_data["default_verdict"] = "allow"
 
+    # Secure preset: deny-by-default
+    if preset == "secure":
+        rules_data["default_verdict"] = "block"
+
     # Build test data
     test_cases = _generate_test_cases(rules)
     test_data = {
@@ -420,12 +503,24 @@ def scaffold(
     # Build config
     config_data: dict[str, Any] = {
         "mode": "ENFORCE",
-        "fail_open": True,
+        "fail_open": True if preset != "secure" else False,
         "trace": {
             "enabled": trace_enabled,
             "output_dir": "./traces",
         },
     }
+
+    # Secure preset: add builtin detectors
+    if preset == "secure":
+        config_data["sanitizer"] = {
+            "builtin_detectors": [
+                "path_traversal",
+                "shell_injection",
+                "sql_injection",
+                "ssrf",
+                "url_schemes",
+            ],
+        }
 
     # Create files
     created: list[str] = []
@@ -500,15 +595,16 @@ def _ask_preset(default: str) -> str:
     """Interactively ask for a preset."""
     try:
         print("Choose a preset:")
-        print("  1) minimal  — 3 rules (block, redact, allow)")
-        print("  2) security — 8 rules (shell, file, network, PII)")
+        print("  1) minimal    — 3 rules (block, redact, allow)")
+        print("  2) security   — 8 rules (shell, file, network, PII)")
         print("  3) compliance — 10 rules (GDPR, approval flows, audit)")
-        print("  4) openclaw — 11 rules (exec, PII, secrets, rate limits)")
+        print("  4) openclaw   — 11 rules (exec, PII, secrets, rate limits)")
+        print("  5) secure     — 10 rules (default BLOCK + whitelist + all detectors)")
         choice = input(f"Preset [{default}]: ").strip()
-        mapping = {"1": "minimal", "2": "security", "3": "compliance", "4": "openclaw"}
+        mapping = {"1": "minimal", "2": "security", "3": "compliance", "4": "openclaw", "5": "secure"}
         if choice in mapping:
             return mapping[choice]
-        if choice in ("minimal", "security", "compliance", "openclaw"):
+        if choice in mapping.values():
             return choice
         return default
     except (EOFError, KeyboardInterrupt):

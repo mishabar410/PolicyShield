@@ -5,8 +5,6 @@ from __future__ import annotations
 import threading
 import time
 
-import pytest
-
 from policyshield.core.models import RuleSet, ShieldMode, Verdict
 from policyshield.shield.engine import ShieldEngine
 

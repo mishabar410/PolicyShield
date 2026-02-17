@@ -199,6 +199,12 @@ def app(args: list[str] | None = None) -> int:
     resume_parser = subparsers.add_parser("resume", help="Deactivate kill switch on running server")
     resume_parser.add_argument("--port", type=int, default=8100, help="Server port (default: 8100)")
 
+    # doctor command
+    doctor_parser = subparsers.add_parser("doctor", help="Check configuration health and security score")
+    doctor_parser.add_argument("--config", type=str, default=None, help="Path to policyshield.yaml")
+    doctor_parser.add_argument("--rules", type=str, default=None, help="Path to rules.yaml")
+    doctor_parser.add_argument("--json", action="store_true", help="Output as JSON")
+
     parsed = parser.parse_args(args)
 
     if parsed.command == "validate":
@@ -255,6 +261,8 @@ def app(args: list[str] | None = None) -> int:
         return _cmd_kill(parsed)
     elif parsed.command == "resume":
         return _cmd_resume(parsed)
+    elif parsed.command == "doctor":
+        return _cmd_doctor(parsed)
     elif parsed.command == "openclaw":
         from policyshield.cli.openclaw import cmd_openclaw
 
@@ -1046,3 +1054,35 @@ def _cmd_resume(parsed: argparse.Namespace) -> int:
     except Exception as e:
         print(f"✗ Failed to deactivate kill switch: {e}", file=sys.stderr)
         return 1
+
+
+# ─── doctor command ──────────────────────────────────────────────────
+
+
+def _cmd_doctor(parsed: argparse.Namespace) -> int:
+    """Run configuration health check."""
+    import json as json_mod
+
+    from policyshield.cli.doctor import format_report, run_doctor
+
+    config_path = Path(parsed.config) if parsed.config else None
+    rules_path = Path(parsed.rules) if parsed.rules else None
+
+    report = run_doctor(config_path=config_path, rules_path=rules_path)
+
+    if parsed.json:
+        out = {
+            "score": report.score,
+            "max_score": report.max_score,
+            "grade": report.grade,
+            "checks": [
+                {"name": c.name, "passed": c.passed, "message": c.message}
+                for c in report.checks
+            ],
+        }
+        print(json_mod.dumps(out, indent=2))
+    else:
+        print(format_report(report))
+
+    return 0
+
