@@ -124,12 +124,15 @@ class AsyncShieldEngine(BaseShieldEngine):
 
         # Offload CPU-bound matching to thread
         try:
+            # Pass event buffer for chain rule evaluation
+            event_buffer = self._session_mgr.get_event_buffer(session_id)
             match = await asyncio.to_thread(
                 matcher.find_best_match,
                 tool_name=tool_name,
                 args=args,
                 session_state=session_state,
                 sender=sender,
+                event_buffer=event_buffer,
             )
         except Exception as e:
             logger.error("Matcher error: %s", e)

@@ -26,6 +26,7 @@ class SanitizerConfig:
     normalize_unicode: bool = True
     strip_control_chars: bool = True
     blocked_patterns: list[str] | None = None
+    builtin_detectors: list[str] | None = None
 
 
 @dataclass
@@ -48,14 +49,40 @@ class InputSanitizer:
         if self._config.blocked_patterns:
             self._compiled_patterns = [re.compile(p, re.IGNORECASE) for p in self._config.blocked_patterns]
 
+        # Load built-in detectors (if configured)
+        self._detectors: list | None = None
+        if self._config.builtin_detectors:
+            from policyshield.shield.detectors import get_detectors
+
+            self._detectors = get_detectors(self._config.builtin_detectors)
+
     def sanitize(self, args: dict) -> SanitizeResult:
         """Sanitize *args* according to the current config."""
         warnings: list[str] = []
         was_modified = False
 
-        # Check blocked patterns first (on raw args)
+        raw_str = _flatten_to_string(args)
+
+        # 1) Built-in detectors run FIRST (defence-in-depth)
+        if self._detectors:
+            from policyshield.shield.detectors import scan_all
+
+            matches = scan_all(raw_str, detectors=self._detectors)
+            if matches:
+                first = matches[0]
+                return SanitizeResult(
+                    sanitized_args=args,
+                    warnings=[],
+                    was_modified=False,
+                    rejected=True,
+                    rejection_reason=(
+                        f"Built-in detector [{first.detector_name}] "
+                        f"matched: {first.matched_text!r}"
+                    ),
+                )
+
+        # 2) User-defined blocked patterns
         if self._compiled_patterns:
-            raw_str = _flatten_to_string(args)
             for pat in self._compiled_patterns:
                 if pat.search(raw_str):
                     return SanitizeResult(

@@ -32,6 +32,7 @@ def parse_sanitizer_config(data: dict) -> dict | None:
         "normalize_unicode",
         "strip_control_chars",
         "blocked_patterns",
+        "builtin_detectors",
     }
     unknown = set(raw) - allowed_keys
     if unknown:

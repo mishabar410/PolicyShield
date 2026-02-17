@@ -44,6 +44,7 @@ class PolicyShieldConfig:
     sanitizer_enabled: bool = False
     sanitizer_max_string_length: int = 10_000
     sanitizer_blocked_patterns: list[str] = field(default_factory=list)
+    sanitizer_builtin_detectors: list[str] = field(default_factory=list)
 
     # trace
     trace_enabled: bool = True
@@ -170,6 +171,7 @@ def _build_config(data: dict) -> PolicyShieldConfig:
         sanitizer_enabled=san.get("enabled", False),
         sanitizer_max_string_length=san.get("max_string_length", 10_000),
         sanitizer_blocked_patterns=san.get("blocked_patterns", []),
+        sanitizer_builtin_detectors=san.get("builtin_detectors", []),
         trace_enabled=trace.get("enabled", True),
         trace_output_dir=trace.get("output_dir", "./traces/"),
         trace_batch_size=int(trace.get("batch_size", 100)),
@@ -201,6 +203,7 @@ def build_engine_from_config(config: PolicyShieldConfig):  # noqa: ANN201
             SanitizerConfig(
                 max_string_length=config.sanitizer_max_string_length,
                 blocked_patterns=config.sanitizer_blocked_patterns or None,
+                builtin_detectors=config.sanitizer_builtin_detectors or None,
             )
         )
 
@@ -237,6 +240,7 @@ def build_async_engine_from_config(config: PolicyShieldConfig):  # noqa: ANN201
             SanitizerConfig(
                 max_string_length=config.sanitizer_max_string_length,
                 blocked_patterns=config.sanitizer_blocked_patterns or None,
+                builtin_detectors=config.sanitizer_builtin_detectors or None,
             )
         )
 
@@ -316,6 +320,7 @@ def render_config(config: PolicyShieldConfig) -> str:
                 "enabled": config.sanitizer_enabled,
                 "max_string_length": config.sanitizer_max_string_length,
                 "blocked_patterns": config.sanitizer_blocked_patterns,
+                "builtin_detectors": config.sanitizer_builtin_detectors,
             },
             "trace": {
                 "enabled": config.trace_enabled,
