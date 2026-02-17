@@ -512,6 +512,14 @@ class BaseShieldEngine:
         with self._lock:
             self._rule_set = new_ruleset
             self._matcher = MatcherEngine(self._rule_set)
+            # Refresh honeypot checker from reloaded rules
+            honeypot_config = new_ruleset.honeypots
+            if honeypot_config:
+                from policyshield.shield.honeypots import HoneypotChecker
+
+                self._honeypot_checker = HoneypotChecker.from_config(honeypot_config)
+            else:
+                self._honeypot_checker = None
         logger.info("Rules reloaded from %s (%d rules)", reload_path, len(new_ruleset.rules))
 
     def start_watching(self, poll_interval: float = 2.0) -> None:

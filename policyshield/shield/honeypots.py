@@ -25,9 +25,13 @@ class HoneypotConfig:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> HoneypotConfig:
+        # Accept both 'tool' and 'name' keys for the honeypot tool name
+        tool_name = data.get("name") or data.get("tool")
+        if not tool_name:
+            raise ValueError("Honeypot config must have 'name' or 'tool' key")
         return cls(
-            name=data["name"],
-            alert=data.get("alert", f"Honeypot triggered: {data['name']}"),
+            name=tool_name,
+            alert=data.get("alert", f"Honeypot triggered: {tool_name}"),
             severity=data.get("severity", "critical"),
         )
 

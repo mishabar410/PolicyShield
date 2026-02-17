@@ -91,6 +91,16 @@ class AsyncShieldEngine(BaseShieldEngine):
                 message=self._kill_reason or "Kill switch is active",
             )
 
+        # Honeypot check — always block, regardless of mode
+        if self._honeypot_checker is not None:
+            honeypot_match = self._honeypot_checker.check(tool_name)
+            if honeypot_match:
+                return ShieldResult(
+                    verdict=Verdict.BLOCK,
+                    rule_id="__honeypot__",
+                    message=honeypot_match.message,
+                )
+
         # Sanitize args
         if self._sanitizer is not None:
             san_result = self._sanitizer.sanitize(args)

@@ -187,6 +187,13 @@ def _load_rules_from_dir(dir_path: Path) -> RuleSet:
         tc_data = data.get("taint_chain")
         if tc_data:
             taint_chain = TaintChainConfig(**tc_data)
+    # Parse honeypots config (use last file that defines it)
+    honeypots_data = None
+    for f in yaml_files:
+        data = parse_rule_file(f)
+        hp_data = data.get("honeypots")
+        if hp_data:
+            honeypots_data = hp_data
 
     ruleset = RuleSet(
         shield_name=shield_name,
@@ -194,6 +201,7 @@ def _load_rules_from_dir(dir_path: Path) -> RuleSet:
         rules=all_rules,
         default_verdict=default_verdict,
         taint_chain=taint_chain,
+        honeypots=honeypots_data,
     )
     validate_rule_set(ruleset)
     return ruleset
@@ -226,12 +234,16 @@ def _build_ruleset(data: dict, file_path: str) -> RuleSet:
     taint_chain_data = data.get("taint_chain", {})
     taint_chain = TaintChainConfig(**taint_chain_data) if taint_chain_data else TaintChainConfig()
 
+    # Parse honeypots config (optional)
+    honeypots_data = data.get("honeypots")
+
     ruleset = RuleSet(
         shield_name=shield_name,
         version=version,
         rules=rules,
         default_verdict=default_verdict,
         taint_chain=taint_chain,
+        honeypots=honeypots_data,
     )
     validate_rule_set(ruleset)
     return ruleset
