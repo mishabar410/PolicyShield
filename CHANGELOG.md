@@ -4,6 +4,16 @@ All notable changes to PolicyShield will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.11.1] - 2026-02-18
+
+### Fixed
+- **Rule parser**: support both `when/then` and legacy `tool/verdict` formats — previously `verdict:` at top level was silently ignored, defaulting to ALLOW
+- **README**: endpoint paths corrected from `/admin/kill` → `/api/v1/kill`, added `/api/v1/reload` and `/api/v1/status`
+- **Ruff**: formatting fix in `cli/main.py`
+
+### Added
+- **E2E test script** (`tests/e2e.sh`): 38 automated tests covering all Tier 0 features — verdicts, approval round-trip, honeypots, kill switch, sanitizer (5 detectors), post-check PII, and hot reload
+
 ## [0.11.0] - 2026-02-17
 
 ### Added

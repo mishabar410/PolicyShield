@@ -75,8 +75,8 @@ def _parse_rule(raw: dict, file_path: str | None = None) -> RuleConfig:
     if "id" not in raw:
         raise PolicyShieldParseError("Rule missing required field 'id'", file_path)
 
-    # Normalize verdict
-    then_value = raw.get("then", "ALLOW")
+    # Normalize verdict — support both 'then' and 'verdict' keys
+    then_value = raw.get("then") or raw.get("verdict", "ALLOW")
     if isinstance(then_value, str):
         then_value = then_value.upper()
         try:
@@ -92,7 +92,11 @@ def _parse_rule(raw: dict, file_path: str | None = None) -> RuleConfig:
     if isinstance(severity_value, str):
         severity_value = severity_value.upper()
 
-    when = _validated_when(raw.get("when", {}), raw["id"], file_path)
+    # Support both 'when' block and top-level 'tool' key
+    when = raw.get("when", {})
+    if not when and "tool" in raw:
+        when = {"tool": raw["tool"]}
+    when = _validated_when(when, raw["id"], file_path)
 
     # Extract chain from 'when' clause (YAML: when.chain) or top-level
     chain = None

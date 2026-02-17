@@ -398,9 +398,7 @@ def _cmd_server(parsed: argparse.Namespace) -> int:
         )
     )
 
-    engine = AsyncShieldEngine(
-        rules=rules_path, mode=mode, approval_backend=approval_backend, sanitizer=sanitizer
-    )
+    engine = AsyncShieldEngine(rules=rules_path, mode=mode, approval_backend=approval_backend, sanitizer=sanitizer)
     print("PolicyShield server starting...")
     print(f"  Rules: {rules_path} ({engine.rule_count} rules)")
     print(f"  Mode: {mode.value}")

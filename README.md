@@ -237,9 +237,11 @@ policyshield server --rules ./rules.yaml --port 8100 --mode enforce
 | `/api/v1/respond-approval` | POST | Approve or deny a pending request |
 | `/api/v1/pending-approvals` | GET | List all pending approval requests |
 | `/api/v1/health` | GET | Health check with rules count and mode |
+| `/api/v1/status` | GET | Server status (running, killed, mode, version) |
 | `/api/v1/constraints` | GET | Human-readable policy summary for LLM context |
-| `/admin/kill` | POST | Emergency kill switch — block ALL tool calls |
-| `/admin/resume` | POST | Deactivate kill switch — resume normal operation |
+| `/api/v1/reload` | POST | Hot-reload rules from disk |
+| `/api/v1/kill` | POST | Emergency kill switch — block ALL tool calls |
+| `/api/v1/resume` | POST | Deactivate kill switch — resume normal operation |
 
 ### Docker
 
@@ -320,7 +322,7 @@ pii_patterns:
 | **YAML DSL** | Declarative rules with regex, glob, exact match, session conditions |
 | **Chain Rules** | Temporal conditions (`when.chain`) — detect multi-step attack patterns |
 | **Verdicts** | `ALLOW` · `BLOCK` · `REDACT` · `APPROVE` (human-in-the-loop) |
-| **Kill Switch** | `policyshield kill` / `POST /admin/kill` — block ALL calls instantly |
+| **Kill Switch** | `policyshield kill` / `POST /api/v1/kill` — block ALL calls instantly |
 | **Honeypot Tools** | Decoy tools that trigger on prompt injection — always block, even in AUDIT mode |
 | **Doctor** | `policyshield doctor` — 10-check health scan with A-F security grading |
 | **Auto-Rules** | `policyshield generate-rules --from-openclaw` — zero-config rule generation |
