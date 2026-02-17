@@ -123,3 +123,32 @@ class PendingApprovalsResponse(BaseModel):
     """Response body for the /api/v1/pending-approvals endpoint."""
 
     approvals: list[PendingApprovalItem] = []
+
+
+class KillSwitchRequest(BaseModel):
+    """Request body for the /api/v1/kill endpoint."""
+
+    reason: str = "Kill switch activated via API"
+
+
+class KillSwitchResponse(BaseModel):
+    """Response body for the /api/v1/kill endpoint."""
+
+    status: str = "killed"
+    reason: str = ""
+
+
+class ResumeResponse(BaseModel):
+    """Response body for the /api/v1/resume endpoint."""
+
+    status: str = "resumed"
+
+
+class StatusResponse(BaseModel):
+    """Response body for the /api/v1/status endpoint."""
+
+    status: str = "running"
+    killed: bool = False
+    mode: str = ""
+    rules_count: int = 0
+    version: str = ""

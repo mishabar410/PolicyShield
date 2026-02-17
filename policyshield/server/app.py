@@ -20,6 +20,8 @@ from policyshield.server.models import (
     ClearTaintResponse,
     ConstraintsResponse,
     HealthResponse,
+    KillSwitchRequest,
+    KillSwitchResponse,
     PendingApprovalItem,
     PendingApprovalsResponse,
     PostCheckRequest,
@@ -27,6 +29,8 @@ from policyshield.server.models import (
     ReloadResponse,
     RespondApprovalRequest,
     RespondApprovalResponse,
+    ResumeResponse,
+    StatusResponse,
 )
 from policyshield.shield.async_engine import AsyncShieldEngine
 
@@ -188,5 +192,37 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
             for r in pending
         ]
         return PendingApprovalsResponse(approvals=items)
+
+    # ── Kill switch endpoints ─────────────────────────────────────
+
+    @app.post("/api/v1/kill", response_model=KillSwitchResponse, dependencies=auth)
+    async def kill_switch(request: Request) -> KillSwitchResponse:
+        """Activate kill switch — block all tool calls."""
+        reason = "Kill switch activated via API"
+        try:
+            body = await request.json()
+            if isinstance(body, dict) and "reason" in body:
+                reason = body["reason"]
+        except Exception:
+            pass  # No body or invalid JSON — use default reason
+        engine.kill(reason)
+        return KillSwitchResponse(status="killed", reason=reason)
+
+    @app.post("/api/v1/resume", response_model=ResumeResponse, dependencies=auth)
+    async def resume_switch() -> ResumeResponse:
+        """Deactivate kill switch — resume normal operation."""
+        engine.resume()
+        return ResumeResponse(status="resumed")
+
+    @app.get("/api/v1/status", response_model=StatusResponse, dependencies=auth)
+    async def server_status() -> StatusResponse:
+        """Get server and engine status."""
+        return StatusResponse(
+            status="running",
+            killed=engine.is_killed,
+            mode=engine.mode.value,
+            rules_count=engine.rule_count,
+            version=__version__,
+        )
 
     return app

@@ -83,6 +83,14 @@ class AsyncShieldEngine(BaseShieldEngine):
         sender: str | None,
     ) -> ShieldResult:
         """Internal check logic — offloads CPU-bound work to threads."""
+        # Kill switch — immediate block
+        if self._killed.is_set():
+            return ShieldResult(
+                verdict=Verdict.BLOCK,
+                rule_id="__kill_switch__",
+                message=self._kill_reason or "Kill switch is active",
+            )
+
         # Sanitize args
         if self._sanitizer is not None:
             san_result = self._sanitizer.sanitize(args)

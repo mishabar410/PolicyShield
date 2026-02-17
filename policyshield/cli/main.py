@@ -190,6 +190,15 @@ def app(args: list[str] | None = None) -> int:
         help="Interactive mode: ask follow-up questions",
     )
 
+    # kill command
+    kill_parser = subparsers.add_parser("kill", help="Activate kill switch on running server")
+    kill_parser.add_argument("--port", type=int, default=8100, help="Server port (default: 8100)")
+    kill_parser.add_argument("--reason", type=str, default="Kill switch activated via CLI")
+
+    # resume command
+    resume_parser = subparsers.add_parser("resume", help="Deactivate kill switch on running server")
+    resume_parser.add_argument("--port", type=int, default=8100, help="Server port (default: 8100)")
+
     parsed = parser.parse_args(args)
 
     if parsed.command == "validate":
@@ -242,6 +251,10 @@ def app(args: list[str] | None = None) -> int:
         return _cmd_replay(parsed)
     elif parsed.command == "generate":
         return _cmd_generate(parsed)
+    elif parsed.command == "kill":
+        return _cmd_kill(parsed)
+    elif parsed.command == "resume":
+        return _cmd_resume(parsed)
     elif parsed.command == "openclaw":
         from policyshield.cli.openclaw import cmd_openclaw
 
@@ -990,3 +1003,46 @@ def _write_file(path: str, content: str) -> None:
 
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     Path(path).write_text(content, encoding="utf-8")
+
+
+# ─── kill / resume commands ──────────────────────────────────────────
+
+
+def _cmd_kill(parsed: argparse.Namespace) -> int:
+    """Send kill switch activation to running server."""
+    import json
+    import urllib.request
+
+    url = f"http://localhost:{parsed.port}/api/v1/kill"
+    data = json.dumps({"reason": parsed.reason}).encode()
+    req = urllib.request.Request(
+        url, data=data, headers={"Content-Type": "application/json"}, method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            body = json.loads(resp.read())
+            print(f"🛑 Kill switch ACTIVATED: {body.get('reason', '')}")
+        return 0
+    except Exception as e:
+        print(f"✗ Failed to activate kill switch: {e}", file=sys.stderr)
+        print(f"  Is the server running on port {parsed.port}?", file=sys.stderr)
+        return 1
+
+
+def _cmd_resume(parsed: argparse.Namespace) -> int:
+    """Send kill switch deactivation to running server."""
+    import json
+    import urllib.request
+
+    url = f"http://localhost:{parsed.port}/api/v1/resume"
+    req = urllib.request.Request(
+        url, data=b"", headers={"Content-Type": "application/json"}, method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            json.loads(resp.read())
+            print("✅ Kill switch DEACTIVATED — normal operation resumed")
+        return 0
+    except Exception as e:
+        print(f"✗ Failed to deactivate kill switch: {e}", file=sys.stderr)
+        return 1

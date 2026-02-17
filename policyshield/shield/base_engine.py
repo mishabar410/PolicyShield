@@ -89,10 +89,37 @@ class BaseShieldEngine:
         self._resolved_approvals: dict[str, dict] = {}
         self._max_resolved_approvals = 10_000
 
+        # Kill switch — atomic, lock-free via threading.Event
+        self._killed = threading.Event()  # Not set = normal operation
+        self._kill_reason: str = ""
+
         # Taint chain config
         tc = self._rule_set.taint_chain
         self._taint_enabled: bool = tc.enabled
         self._outgoing_tools: set[str] = set(tc.outgoing_tools)
+
+    # ------------------------------------------------------------------ #
+    #  Kill switch                                                       #
+    # ------------------------------------------------------------------ #
+
+    def kill(self, reason: str = "Kill switch activated") -> None:
+        """Activate kill switch — block ALL tool calls immediately.
+
+        Args:
+            reason: Human-readable reason for the kill switch activation.
+        """
+        self._kill_reason = reason
+        self._killed.set()
+
+    def resume(self) -> None:
+        """Deactivate kill switch — resume normal operation."""
+        self._killed.clear()
+        self._kill_reason = ""
+
+    @property
+    def is_killed(self) -> bool:
+        """Whether kill switch is active."""
+        return self._killed.is_set()
 
     # ------------------------------------------------------------------ #
     #  Core check logic (sync)                                           #
@@ -117,7 +144,15 @@ class BaseShieldEngine:
         session_id: str,
         sender: str | None,
     ) -> ShieldResult:
-        """Synchronous check logic: sanitize → rate-limit → taint → match → PII → verdict."""
+        """Synchronous check logic: kill_switch → sanitize → rate-limit → taint → match → PII → verdict."""
+        # Kill switch — absolute first check, overrides everything
+        if self._killed.is_set():
+            return ShieldResult(
+                verdict=Verdict.BLOCK,
+                rule_id="__kill_switch__",
+                message=self._kill_reason or "Kill switch activated",
+            )
+
         # Sanitize args
         if self._sanitizer is not None:
             san_result = self._sanitizer.sanitize(args)
@@ -340,7 +375,8 @@ class BaseShieldEngine:
     ) -> ShieldResult:
         """Apply audit-mode override, session update, and trace after a check."""
         # In AUDIT mode, always allow but record the would-be verdict
-        if self._mode == ShieldMode.AUDIT and result.verdict != Verdict.ALLOW:
+        # Exception: kill switch overrides even AUDIT mode
+        if self._mode == ShieldMode.AUDIT and result.verdict != Verdict.ALLOW and result.rule_id != "__kill_switch__":
             logger.info("AUDIT: would %s %s (rule=%s)", result.verdict.value, tool_name, result.rule_id)
             audit_result = ShieldResult(
                 verdict=Verdict.ALLOW,
