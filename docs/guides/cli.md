@@ -67,6 +67,8 @@ policyshield server --rules <path> [--port PORT] [--host HOST] [--mode MODE] [--
 | `/api/v1/pending-approvals` | GET | List pending approvals |
 | `/api/v1/health` | GET | Health check |
 | `/api/v1/constraints` | GET | Human-readable policy summary |
+| `/admin/kill` | POST | Emergency kill switch — block all calls |
+| `/admin/resume` | POST | Deactivate kill switch |
 
 ### `policyshield trace`
 
@@ -137,4 +139,67 @@ policyshield generate "Block all file deletions" [--tools <tool1>] [--provider o
 | `--tools` | — | Tool names for classification and context |
 | `--provider` | `openai` | LLM provider (`openai` or `anthropic`) |
 | `--model` | per-provider | Specific model name |
+| `-o` | stdout | Output file path |
+
+### `policyshield kill`
+
+Emergency kill switch — immediately block ALL tool calls.
+
+```bash
+policyshield kill [--port PORT] [--host HOST] [--reason REASON]
+```
+
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `--port` | `8100` | Server port |
+| `--host` | `localhost` | Server host |
+| `--reason` | — | Human-readable reason for the kill |
+
+### `policyshield resume`
+
+Deactivate the kill switch and resume normal operation.
+
+```bash
+policyshield resume [--port PORT] [--host HOST]
+```
+
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `--port` | `8100` | Server port |
+| `--host` | `localhost` | Server host |
+
+### `policyshield doctor`
+
+Run 10 configuration health checks and produce a security grade (A–F).
+
+```bash
+policyshield doctor [--config PATH] [--rules PATH] [--json]
+```
+
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `--config` | `policyshield.yaml` | Path to config file |
+| `--rules` | auto-detected | Path to rules YAML file |
+| `--json` | — | Output results as JSON |
+
+### `policyshield generate-rules`
+
+Auto-generate rules from tool inventory or OpenClaw.
+
+```bash
+# From OpenClaw
+policyshield generate-rules --from-openclaw --url http://localhost:3000 [-o output.yaml]
+
+# From tool list
+policyshield generate-rules --tools exec,write_file,delete_file [-o output.yaml]
+```
+
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `--from-openclaw` | — | Fetch tools from OpenClaw instance |
+| `--url` | `http://localhost:3000` | OpenClaw URL |
+| `--tools` | — | Comma-separated tool names |
+| `--include-safe` | — | Include rules for safe tools too |
+| `--default-verdict` | `BLOCK` | Default verdict for unknown tools |
+| `--force` | — | Overwrite output file if it exists |
 | `-o` | stdout | Output file path |

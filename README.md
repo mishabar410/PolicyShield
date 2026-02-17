@@ -98,7 +98,11 @@ policyshield lint rules.yaml
 Or scaffold a full project:
 
 ```bash
-policyshield init --preset security --no-interactive
+# Secure preset: default BLOCK, fail-closed, 5 built-in detectors
+policyshield init --preset secure --no-interactive
+
+# Check your security posture
+policyshield doctor
 ```
 
 ---
@@ -234,6 +238,8 @@ policyshield server --rules ./rules.yaml --port 8100 --mode enforce
 | `/api/v1/pending-approvals` | GET | List all pending approval requests |
 | `/api/v1/health` | GET | Health check with rules count and mode |
 | `/api/v1/constraints` | GET | Human-readable policy summary for LLM context |
+| `/admin/kill` | POST | Emergency kill switch — block ALL tool calls |
+| `/admin/resume` | POST | Deactivate kill switch — resume normal operation |
 
 ### Docker
 
@@ -314,9 +320,14 @@ pii_patterns:
 | **YAML DSL** | Declarative rules with regex, glob, exact match, session conditions |
 | **Chain Rules** | Temporal conditions (`when.chain`) — detect multi-step attack patterns |
 | **Verdicts** | `ALLOW` · `BLOCK` · `REDACT` · `APPROVE` (human-in-the-loop) |
-| **HTTP Server** | FastAPI server with check, post-check, health, and constraints endpoints |
+| **Kill Switch** | `policyshield kill` / `POST /admin/kill` — block ALL calls instantly |
+| **Honeypot Tools** | Decoy tools that trigger on prompt injection — always block, even in AUDIT mode |
+| **Doctor** | `policyshield doctor` — 10-check health scan with A-F security grading |
+| **Auto-Rules** | `policyshield generate-rules --from-openclaw` — zero-config rule generation |
+| **HTTP Server** | FastAPI server with check, post-check, health, kill switch, and constraints endpoints |
 | **OpenClaw Plugin** | Native plugin with before/after hooks and policy injection |
 | **PII Detection** | EMAIL, PHONE, CREDIT_CARD, SSN, IBAN, IP, PASSPORT, DOB + custom patterns |
+| **Built-in Detectors** | Path traversal, shell injection, SQL injection, SSRF, URL schemes — zero-config |
 | **Async Engine** | Full `async`/`await` support for FastAPI, aiohttp, async agents |
 | **Approval Flow** | InMemory and Telegram backends (`POLICYSHIELD_TELEGRAM_TOKEN` / `POLICYSHIELD_TELEGRAM_CHAT_ID`) |
 | **Rate Limiting** | Sliding-window per tool/session, configurable in YAML |
@@ -386,8 +397,20 @@ policyshield generate --template --tools delete_file send_email -o rules.yaml
 # Generate rules with AI (requires OPENAI_API_KEY)
 policyshield generate "Block all file deletions and require approval for deploys"
 
+# Auto-generate rules from OpenClaw or tool list
+policyshield generate-rules --from-openclaw --url http://localhost:3000
+policyshield generate-rules --tools exec,write_file,delete_file -o policies/rules.yaml
+
+# Kill switch — emergency stop
+policyshield kill --port 8100 --reason "Incident response"
+policyshield resume --port 8100
+
+# Health check
+policyshield doctor --config policyshield.yaml --rules rules.yaml
+policyshield doctor --json
+
 # Initialize a new project
-policyshield init --preset openclaw --no-interactive
+policyshield init --preset secure --no-interactive
 ```
 
 ---
@@ -474,7 +497,7 @@ cd PolicyShield
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev,server]"
 
-pytest tests/ -v                 # 810+ tests
+pytest tests/ -v                 # 974+ tests
 ruff check policyshield/ tests/  # Lint
 ruff format --check policyshield/ tests/  # Format check
 ```

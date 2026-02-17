@@ -9,6 +9,10 @@ PolicyShield lets you define YAML rules that control what tools an AI agent can 
 - 🛡️ **Declarative rules** — YAML-based, no code changes needed
 - 🔗 **Chain rules** — Temporal conditions for multi-step attack detection
 - 🔍 **PII detection** — Built-in redaction for sensitive data
+- 🚨 **Kill switch** — `policyshield kill` for instant emergency stop
+- 🍯 **Honeypot tools** — Decoy tools that catch prompt injection
+- 🩺 **Doctor** — 10-check health scanner with A–F grading
+- ⚙️ **Auto-rules** — `policyshield generate-rules --from-openclaw`
 - ✅ **Approval flows** — Human-in-the-loop for risky operations
 - 📊 **Tracing** — Full audit trail of every tool call
 - 🔄 **Replay & Simulation** — Re-run traces against new rules
@@ -24,8 +28,11 @@ PolicyShield lets you define YAML rules that control what tools an AI agent can 
 ```bash
 pip install policyshield
 
-# Scaffold a new project
-policyshield init --preset security --no-interactive
+# Scaffold a new project with secure defaults
+policyshield init --preset secure --no-interactive
+
+# Check your security posture
+policyshield doctor
 
 # Validate your rules
 policyshield validate policies/

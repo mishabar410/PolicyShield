@@ -84,7 +84,7 @@
 - Explicit limitations documentation (output blocking, PII detection)
 - 720+ tests
 
-### v0.10 — Tier 1 Features ✅ (current)
+### v0.10 — Tier 1 Features ✅
 - **Replay & Simulation**: `policyshield replay` re-runs JSONL traces against new rules
 - **Chain Rules**: `when.chain` temporal conditions with `EventRingBuffer`
 - **AI-Assisted Rule Writer**: `policyshield generate` from natural language (OpenAI/Anthropic)
@@ -93,17 +93,25 @@
 - Chain linting check (7 lint checks total)
 - 816 tests
 
+### v0.11 — Tier 0: "Install and Protected" ✅ (current)
+- **Built-in Security Patterns**: 5 detectors (path traversal, shell injection, SQL injection, SSRF, URL schemes)
+- **Kill Switch**: `policyshield kill` / `POST /admin/kill` — instant emergency stop
+- **Secure Preset**: `--preset secure` with `default_verdict: BLOCK`, fail-closed, all 5 detectors
+- **Doctor**: `policyshield doctor` — 10-check health scanner with A-F grading
+- **OpenClaw Tool Fetcher**: HTTP client for `/api/tools` endpoint
+- **Auto-Rule Generator**: `policyshield generate-rules --from-openclaw` — zero-config rules
+- **Honeypot Tools**: decoy tool detection, always blocks (even in AUDIT mode)
+- 974 tests
+
 ## Next
 
 ### v1.0 — Production Release (planned)
-- E2E integration test suite (plugin ↔ server ↔ engine, real HTTP)
 - Bounded session storage (LRU eviction, TTL)
 - Rule composition (`include:` / `extends:` / `priority:`)
-- Server authentication (Bearer token for `/api/v1/reload`)
 - Mypy type checking in CI
 - Coverage gate raised to 90%
-- `SECURITY.md` with threat model
 - Production deployment guide
+- Shadow mode for safe rule rollouts
 
 ---
 

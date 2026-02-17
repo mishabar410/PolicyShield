@@ -4,6 +4,28 @@ All notable changes to PolicyShield will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.11.0] - 2026-02-17
+
+### Added
+- **Built-in Security Patterns**: 5 detectors (path traversal, shell injection, SQL injection, SSRF, URL schemes) in sanitizer
+- **Kill Switch**: engine-level emergency stop via `policyshield kill` CLI and `POST /admin/kill` REST endpoint
+  - `ShieldEngine.kill(reason)` / `.resume()` methods with atomic `threading.Event`
+  - Kill switch overrides AUDIT mode
+- **Secure Preset**: `policyshield init --preset secure` with `default_verdict: BLOCK`, fail-closed, all 5 detectors
+- **Doctor Command**: `policyshield doctor` — 10-check configuration health scanner with A-F security grading
+  - JSON output mode (`--json`), configurable paths (`--config`, `--rules`)
+- **OpenClaw Tool Fetcher**: `openclaw_client.py` HTTP client for `/api/tools` endpoint
+- **Auto-Rule Generator**: `policyshield generate-rules` — pattern-based tool classification → YAML rules
+  - `--from-openclaw` (fetch from running instance) or `--tools` (comma-separated names)
+  - `--include-safe`, `--default-verdict`, `--force`, `-o` options
+- **Honeypot Tools**: decoy tool detection — blocks always, even in AUDIT mode
+  - `honeypots` field in `RuleSet` YAML config
+  - Integrated into engine pipeline (after kill switch, before sanitizer)
+
+### Changed
+- `_apply_post_check`: honeypots and kill switch both bypass AUDIT mode override
+- `RuleSet` model: added optional `honeypots: list[dict]` field
+
 ## [0.10.0] - 2026-02-16
 
 ### Added

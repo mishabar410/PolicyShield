@@ -36,6 +36,20 @@ Compliance-focused rules including:
 policyshield init --preset compliance
 ```
 
+## Secure
+
+The recommended preset for maximum security. Uses `default_verdict: BLOCK` with an explicit whitelist, so unknown tools are blocked by default. Includes:
+
+- Default verdict: BLOCK (fail-closed)
+- All 5 built-in detectors enabled (path traversal, shell injection, SQL injection, SSRF, URL schemes)
+- Whitelist for safe tools (search, read_file, list_dir)
+- APPROVE verdict for dangerous tools (write_file, execute, send_email)
+- PII scanning enabled
+
+```bash
+policyshield init --preset secure
+```
+
 ## OpenClaw
 
 Rules specifically designed for [OpenClaw](https://github.com/AgenturAI/OpenClaw) integration. Includes 11 rules covering:
