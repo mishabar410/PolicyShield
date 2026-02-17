@@ -383,7 +383,24 @@ def _cmd_server(parsed: argparse.Namespace) -> int:
         approval_backend = InMemoryBackend()
         print("  Approval: InMemory (use REST API to respond)")
 
-    engine = AsyncShieldEngine(rules=rules_path, mode=mode, approval_backend=approval_backend)
+    # Built-in security detectors — always enabled
+    from policyshield.shield.sanitizer import InputSanitizer, SanitizerConfig
+
+    sanitizer = InputSanitizer(
+        SanitizerConfig(
+            builtin_detectors=[
+                "path_traversal",
+                "shell_injection",
+                "sql_injection",
+                "ssrf",
+                "url_schemes",
+            ]
+        )
+    )
+
+    engine = AsyncShieldEngine(
+        rules=rules_path, mode=mode, approval_backend=approval_backend, sanitizer=sanitizer
+    )
     print("PolicyShield server starting...")
     print(f"  Rules: {rules_path} ({engine.rule_count} rules)")
     print(f"  Mode: {mode.value}")
