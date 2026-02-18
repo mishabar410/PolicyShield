@@ -151,6 +151,8 @@ def load_rules(path: str | Path) -> RuleSet:
 def _load_rules_from_file(file_path: Path) -> RuleSet:
     """Load a RuleSet from a single YAML file."""
     data = parse_rule_file(file_path)
+    # Resolve include: directives
+    data = _resolve_includes(data, file_path.parent)
     return _build_ruleset(data, str(file_path))
 
 
@@ -211,6 +213,51 @@ def _load_rules_from_dir(dir_path: Path) -> RuleSet:
     return ruleset
 
 
+def _resolve_includes(data: dict, base_dir: Path) -> dict:
+    """Resolve ``include:`` directives, merging rules from included files."""
+    includes = data.pop("include", None)
+    if not includes:
+        return data
+
+    all_rules: list[dict] = []
+    for inc_path in includes:
+        resolved = base_dir / inc_path
+        if not resolved.exists():
+            raise PolicyShieldParseError(f"Include not found: {resolved}")
+        inc_data = parse_rule_file(resolved)
+        # Recursive includes
+        inc_data = _resolve_includes(inc_data, resolved.parent)
+        inc_rules = inc_data.get("rules", [])
+        all_rules.extend(inc_rules)
+
+    # Included rules come first, local rules can override
+    local_rules = data.get("rules", [])
+    data["rules"] = all_rules + local_rules
+    return data
+
+
+def _resolve_extends(rules: list[dict]) -> list[dict]:
+    """Resolve ``extends:`` — child rule inherits parent fields."""
+    rules_by_id = {r["id"]: r for r in rules if "id" in r}
+    resolved = []
+
+    for rule in rules:
+        extends = rule.get("extends")
+        if extends:
+            parent = rules_by_id.get(extends)
+            if parent is None:
+                raise PolicyShieldParseError(f"Rule extends unknown parent: {extends}")
+            # Merge: parent values as defaults, child overrides
+            merged = {**parent, **rule}
+            merged["id"] = rule["id"]  # Keep child's ID
+            merged.pop("extends", None)
+            resolved.append(merged)
+        else:
+            resolved.append(rule)
+
+    return resolved
+
+
 def _build_ruleset(data: dict, file_path: str) -> RuleSet:
     """Build a RuleSet from a parsed YAML dict."""
     raw_rules = data.get("rules", [])
@@ -219,6 +266,9 @@ def _build_ruleset(data: dict, file_path: str) -> RuleSet:
             "'rules' must be a list",
             file_path,
         )
+
+    # Resolve extends: directives
+    raw_rules = _resolve_extends(raw_rules)
 
     rules = [_parse_rule(r, file_path) for r in raw_rules]
     shield_name = data.get("shield_name", Path(file_path).stem)
