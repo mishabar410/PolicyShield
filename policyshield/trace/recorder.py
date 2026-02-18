@@ -123,8 +123,9 @@ class TraceRecorder:
                 for entry in self._buffer:
                     f.write(json.dumps(entry, default=str) + "\n")
         except OSError as exc:
-            logger.error("Failed to write trace file %s: %s (dropping %d records)",
-                         self._file_path, exc, len(self._buffer))
+            logger.error(
+                "Failed to write trace file %s: %s (dropping %d records)", self._file_path, exc, len(self._buffer)
+            )
 
         self._buffer.clear()
 
