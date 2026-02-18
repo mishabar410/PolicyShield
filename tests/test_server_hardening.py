@@ -121,3 +121,31 @@ class TestRequestId:
         resp = client.post("/api/v1/check", json={"tool_name": "test"})
         rid = resp.json()["request_id"]
         uuid.UUID(rid)  # Raises ValueError if not valid UUID
+
+
+# ── Prompt 303: CORS Middleware ───────────────────────────────────
+
+
+class TestCORS:
+    def test_cors_disabled_by_default(self, client: TestClient):
+        resp = client.options(
+            "/api/v1/check", headers={"Origin": "http://evil.com"}
+        )
+        assert "access-control-allow-origin" not in resp.headers
+
+    def test_cors_enabled_with_env(self, monkeypatch):
+        monkeypatch.setenv("POLICYSHIELD_CORS_ORIGINS", "http://localhost:3000")
+        engine = _make_engine()
+        app = create_app(engine)
+        c = TestClient(app)
+        resp = c.options(
+            "/api/v1/check",
+            headers={
+                "Origin": "http://localhost:3000",
+                "Access-Control-Request-Method": "POST",
+            },
+        )
+        assert (
+            resp.headers.get("access-control-allow-origin")
+            == "http://localhost:3000"
+        )

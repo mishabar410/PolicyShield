@@ -12,6 +12,7 @@ import logging
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
+from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import JSONResponse
 
 from policyshield import __version__
@@ -90,6 +91,18 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
             engine.stop_watching()
 
     app = FastAPI(title="PolicyShield", version=__version__, lifespan=lifespan)
+
+    # CORS middleware (env config, disabled by default)
+    cors_origins = os.environ.get("POLICYSHIELD_CORS_ORIGINS", "").split(",")
+    cors_origins = [o.strip() for o in cors_origins if o.strip()]
+    if cors_origins:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=cors_origins,
+            allow_methods=["GET", "POST"],
+            allow_headers=["Authorization", "Content-Type"],
+            max_age=3600,
+        )
 
     _logger = logging.getLogger("policyshield.server")
 
