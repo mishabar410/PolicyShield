@@ -222,6 +222,23 @@ class BaseShieldEngine:
                 )
             args = san_result.sanitized_args
 
+        # Plugin detectors
+        from policyshield.plugins import DetectorResult as _DR
+        from policyshield.plugins import get_detectors as _get_detectors
+
+        for pname, detector_fn in _get_detectors().items():
+            try:
+                det_result = detector_fn(tool_name=tool_name, args=args)
+                if isinstance(det_result, _DR) and det_result.detected:
+                    logger.warning("Plugin detector '%s' triggered: %s", pname, det_result.message)
+                    return ShieldResult(
+                        verdict=Verdict.BLOCK,
+                        rule_id=f"__plugin__{pname}",
+                        message=det_result.message,
+                    )
+            except Exception as e:
+                logger.warning("Plugin detector '%s' error: %s", pname, e)
+
         # Rate limit check
         if self._rate_limiter is not None:
             rl_result = self._rate_limiter.check(tool_name, session_id)
