@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import hmac
 import os
@@ -105,6 +106,83 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
         )
 
     _logger = logging.getLogger("policyshield.server")
+
+    # ── Middleware: Content-Type validation (304) ──
+    @app.middleware("http")
+    async def content_type_check(request: Request, call_next):
+        if request.method in ("POST", "PUT", "PATCH"):
+            ct = request.headers.get("content-type", "")
+            if ct and "application/json" not in ct and request.url.path.startswith("/api/"):
+                return JSONResponse(
+                    status_code=415,
+                    content={
+                        "error": "unsupported_media_type",
+                        "expected": "application/json",
+                    },
+                )
+        return await call_next(request)
+
+    # ── Middleware: Payload size limit (305) ──
+    _max_request_size = int(os.environ.get("POLICYSHIELD_MAX_REQUEST_SIZE", 1_048_576))
+
+    @app.middleware("http")
+    async def payload_size_limit(request: Request, call_next):
+        if request.method in ("POST", "PUT", "PATCH"):
+            content_length = request.headers.get("content-length")
+            if content_length and int(content_length) > _max_request_size:
+                return JSONResponse(
+                    status_code=413,
+                    content={
+                        "error": "payload_too_large",
+                        "message": f"Request body exceeds {_max_request_size} bytes",
+                        "max_bytes": _max_request_size,
+                    },
+                )
+        return await call_next(request)
+
+    # ── Middleware: Backpressure (307) ──
+    _max_concurrent = int(os.environ.get("POLICYSHIELD_MAX_CONCURRENT_CHECKS", 100))
+    _semaphore = asyncio.Semaphore(_max_concurrent)
+
+    @app.middleware("http")
+    async def backpressure_middleware(request: Request, call_next):
+        if request.url.path in ("/api/v1/check", "/api/v1/post-check"):
+            if _semaphore.locked():
+                return JSONResponse(
+                    status_code=503,
+                    content={
+                        "verdict": "BLOCK",
+                        "error": "server_overloaded",
+                        "message": "Too many concurrent requests",
+                    },
+                )
+            async with _semaphore:
+                return await call_next(request)
+        return await call_next(request)
+
+    # ── Middleware: Request timeout (308) ──
+    _request_timeout = float(os.environ.get("POLICYSHIELD_REQUEST_TIMEOUT", 30))
+
+    @app.middleware("http")
+    async def timeout_middleware(request: Request, call_next):
+        if request.url.path.startswith("/api/"):
+            try:
+                return await asyncio.wait_for(call_next(request), timeout=_request_timeout)
+            except asyncio.TimeoutError:
+                _logger.error(
+                    "Request timeout (%.1fs) for %s",
+                    _request_timeout,
+                    request.url.path,
+                )
+                return JSONResponse(
+                    status_code=504,
+                    content={
+                        "verdict": "BLOCK",
+                        "error": "request_timeout",
+                        "message": f"Request exceeded {_request_timeout}s",
+                    },
+                )
+        return await call_next(request)
 
     @app.exception_handler(Exception)
     async def shield_error_handler(request: Request, exc: Exception):

@@ -2,17 +2,35 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
+
+
+def _check_depth(obj: object, max_depth: int = 10, current: int = 0) -> None:
+    """Reject deeply nested structures (bomb prevention)."""
+    if current > max_depth:
+        raise ValueError(f"Nesting exceeds max depth ({max_depth})")
+    if isinstance(obj, dict):
+        for val in obj.values():
+            _check_depth(val, max_depth, current + 1)
+    elif isinstance(obj, (list, tuple)):
+        for item in obj:
+            _check_depth(item, max_depth, current + 1)
 
 
 class CheckRequest(BaseModel):
     """Request body for the /api/v1/check endpoint."""
 
-    tool_name: str
+    tool_name: str = Field(..., min_length=1, max_length=256, pattern=r"^[\w.\-:]+$")
     args: dict = {}
-    session_id: str = "default"
-    sender: str | None = None
-    request_id: str | None = None
+    session_id: str = Field(default="default", min_length=1, max_length=256)
+    sender: str | None = Field(default=None, max_length=256)
+    request_id: str | None = Field(default=None, max_length=128)
+
+    @field_validator("args")
+    @classmethod
+    def validate_args_depth(cls, v: dict) -> dict:
+        _check_depth(v)
+        return v
 
 
 class CheckResponse(BaseModel):
@@ -31,10 +49,10 @@ class CheckResponse(BaseModel):
 class PostCheckRequest(BaseModel):
     """Request body for the /api/v1/post-check endpoint."""
 
-    tool_name: str
+    tool_name: str = Field(..., min_length=1, max_length=256, pattern=r"^[\w.\-:]+$")
     args: dict = {}
-    result: str = ""
-    session_id: str = "default"
+    result: str = Field(default="", max_length=1_000_000)
+    session_id: str = Field(default="default", min_length=1, max_length=256)
 
 
 class PostCheckResponse(BaseModel):

@@ -149,3 +149,136 @@ class TestCORS:
             resp.headers.get("access-control-allow-origin")
             == "http://localhost:3000"
         )
+
+
+# ── Prompt 304: Content-Type Validation ──────────────────────────
+
+
+class TestContentType:
+    def test_json_accepted(self, client: TestClient):
+        resp = client.post("/api/v1/check", json={"tool_name": "test"})
+        assert resp.status_code != 415
+
+    def test_plain_text_rejected(self, client: TestClient):
+        resp = client.post(
+            "/api/v1/check",
+            content="not json",
+            headers={"content-type": "text/plain"},
+        )
+        assert resp.status_code == 415
+
+    def test_form_data_rejected(self, client: TestClient):
+        resp = client.post(
+            "/api/v1/check",
+            content="data",
+            headers={"content-type": "application/x-www-form-urlencoded"},
+        )
+        assert resp.status_code == 415
+
+    def test_no_content_type_allowed(self, client: TestClient):
+        """Missing Content-Type should still work (FastAPI handles it)."""
+        resp = client.post("/api/v1/check", json={"tool_name": "test"})
+        assert resp.status_code != 415
+
+
+# ── Prompt 305: Payload Size Limit ───────────────────────────────
+
+
+class TestPayloadSize:
+    def test_normal_payload_accepted(self, client: TestClient):
+        resp = client.post(
+            "/api/v1/check",
+            json={"tool_name": "test", "args": {"x": "a" * 100}},
+        )
+        assert resp.status_code != 413
+
+    def test_oversized_payload_rejected(self, monkeypatch):
+        monkeypatch.setenv("POLICYSHIELD_MAX_REQUEST_SIZE", "50")
+        engine = _make_engine()
+        app = create_app(engine)
+        c = TestClient(app, raise_server_exceptions=False)
+        resp = c.post(
+            "/api/v1/check",
+            json={"tool_name": "test", "args": {"data": "x" * 200}},
+        )
+        assert resp.status_code == 413
+        assert resp.json()["error"] == "payload_too_large"
+
+
+# ── Prompt 306: Input Validation ─────────────────────────────────
+
+
+class TestInputValidation:
+    def test_valid_tool_name(self, client: TestClient):
+        resp = client.post("/api/v1/check", json={"tool_name": "send_email"})
+        assert resp.status_code != 422
+
+    def test_empty_tool_name_rejected(self, client: TestClient):
+        resp = client.post("/api/v1/check", json={"tool_name": ""})
+        assert resp.status_code == 422
+
+    def test_too_long_tool_name_rejected(self, client: TestClient):
+        resp = client.post("/api/v1/check", json={"tool_name": "a" * 300})
+        assert resp.status_code == 422
+
+    def test_special_chars_rejected(self, client: TestClient):
+        resp = client.post("/api/v1/check", json={"tool_name": "rm -rf /"})
+        assert resp.status_code == 422
+
+    def test_dots_colons_allowed(self, client: TestClient):
+        resp = client.post(
+            "/api/v1/check", json={"tool_name": "my.tool:v2-beta"}
+        )
+        assert resp.status_code != 422
+
+    def test_deeply_nested_args_rejected(self, client: TestClient):
+        nested: dict = {"a": {}}
+        current = nested["a"]
+        for _ in range(15):
+            current["b"] = {}
+            current = current["b"]
+        resp = client.post(
+            "/api/v1/check", json={"tool_name": "test", "args": nested}
+        )
+        assert resp.status_code == 422
+
+    def test_normal_depth_accepted(self, client: TestClient):
+        resp = client.post(
+            "/api/v1/check",
+            json={"tool_name": "test", "args": {"a": {"b": {"c": 1}}}},
+        )
+        assert resp.status_code != 422
+
+
+# ── Prompt 307: Backpressure ─────────────────────────────────────
+
+
+class TestBackpressure:
+    def test_overload_returns_503_with_verdict(self, monkeypatch):
+        """When semaphore is at 1, concurrent check should get 503."""
+        monkeypatch.setenv("POLICYSHIELD_MAX_CONCURRENT_CHECKS", "0")
+        engine = _make_engine()
+        app = create_app(engine)
+        c = TestClient(app, raise_server_exceptions=False)
+        resp = c.post("/api/v1/check", json={"tool_name": "test"})
+        assert resp.status_code == 503
+        body = resp.json()
+        assert body["verdict"] == "BLOCK"
+        assert body["error"] == "server_overloaded"
+
+    def test_non_check_endpoints_not_limited(self, client: TestClient):
+        resp = client.get("/api/v1/health")
+        assert resp.status_code == 200
+
+
+# ── Prompt 308: Request Timeout ──────────────────────────────────
+
+
+class TestRequestTimeout:
+    def test_fast_request_succeeds(self, client: TestClient):
+        resp = client.post("/api/v1/check", json={"tool_name": "test"})
+        assert resp.status_code != 504
+
+    def test_health_not_affected(self, client: TestClient):
+        resp = client.get("/api/v1/health")
+        assert resp.status_code == 200
