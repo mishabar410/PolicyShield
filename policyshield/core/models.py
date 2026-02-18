@@ -106,6 +106,19 @@ class ChainCondition(BaseModel):
     verdict: str | None = None  # Optional filter by verdict
 
 
+class OutputRule(BaseModel):
+    """Rule for checking tool output."""
+
+    model_config = ConfigDict(frozen=True)
+
+    id: str
+    tool: str = ".*"
+    max_size: int | None = None  # bytes
+    block_patterns: list[str] = []
+    then: Verdict = Verdict.REDACT
+    message: str = ""
+
+
 class RuleSet(BaseModel):
     """A set of rules loaded from YAML files."""
 
@@ -117,6 +130,7 @@ class RuleSet(BaseModel):
     default_verdict: Verdict = Verdict.ALLOW
     taint_chain: TaintChainConfig = TaintChainConfig()
     honeypots: list[dict[str, Any]] | None = None
+    output_rules: list[OutputRule] = []
 
     def enabled_rules(self) -> list[RuleConfig]:
         """Return only rules with enabled=True."""
@@ -142,6 +156,8 @@ class PostCheckResult(BaseModel):
     pii_matches: list[PIIMatch] = []
     redacted_output: str | None = None
     session_tainted: bool = False
+    blocked: bool = False
+    block_reason: str | None = None
 
 
 class ShieldResult(BaseModel):

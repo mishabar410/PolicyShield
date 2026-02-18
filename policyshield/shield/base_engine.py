@@ -555,9 +555,41 @@ class BaseShieldEngine:
         result: Any,
         session_id: str = "default",
     ) -> PostCheckResult:
-        """Post-call check on tool output (PII scan on results)."""
+        """Post-call check on tool output (output rules + PII scan on results)."""
         if self._mode == ShieldMode.DISABLED:
             return PostCheckResult()
+
+        # Output rules check
+        import re as _re
+
+        output_str = str(result) if not isinstance(result, str) else result
+        with self._lock:
+            output_rules = getattr(self._rule_set, "output_rules", [])
+
+        for orule in output_rules:
+            # Tool pattern match
+            if orule.tool != ".*" and not _re.match(f"^{orule.tool}$", tool_name):
+                continue
+            # Max size check
+            if orule.max_size and len(output_str.encode()) > orule.max_size:
+                logger.warning(
+                    "Output too large for %s (%d bytes, max %d)",
+                    tool_name,
+                    len(output_str.encode()),
+                    orule.max_size,
+                )
+                return PostCheckResult(
+                    blocked=True,
+                    block_reason=orule.message or f"Output exceeds max_size ({orule.max_size} bytes)",
+                )
+            # Pattern blocking
+            for pattern in orule.block_patterns:
+                if _re.search(pattern, output_str):
+                    logger.warning("Output blocked by pattern '%s' for %s", pattern, tool_name)
+                    return PostCheckResult(
+                        blocked=True,
+                        block_reason=orule.message or f"Output matches blocked pattern: {pattern}",
+                    )
 
         pii_matches: list = []
         redacted_output: str | None = None
