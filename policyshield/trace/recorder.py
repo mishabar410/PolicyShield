@@ -10,9 +10,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-logger = logging.getLogger(__name__)
-
 from policyshield.core.models import Verdict
+
+logger = logging.getLogger(__name__)
 
 
 def compute_args_hash(args: dict) -> str:
