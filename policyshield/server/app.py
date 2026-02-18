@@ -17,6 +17,8 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import JSONResponse
 
 from policyshield import __version__
+from policyshield.server.idempotency import IdempotencyCache
+from policyshield.server.metrics import MetricsCollector
 
 from policyshield.server.models import (
     ApprovalStatusRequest,
@@ -277,9 +279,17 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
 
     auth = [Depends(verify_token)]
 
+    _idem_cache = IdempotencyCache()
+
     @app.post("/api/v1/check", response_model=CheckResponse, dependencies=auth)
-    async def check(req: CheckRequest) -> CheckResponse:
+    async def check(req: CheckRequest, request: Request) -> CheckResponse:
         req_id = req.request_id or str(uuid.uuid4())
+        # Idempotency key support
+        idem_key = request.headers.get("x-idempotency-key")
+        if idem_key:
+            cached = _idem_cache.get(idem_key)
+            if cached:
+                return JSONResponse(content=cached)
         result = await engine.check(
             tool_name=req.tool_name,
             args=req.args,
@@ -292,7 +302,7 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
             req.tool_name,
             result.verdict.value,
         )
-        return CheckResponse(
+        response = CheckResponse(
             verdict=result.verdict.value,
             message=result.message,
             rule_id=result.rule_id,
@@ -302,6 +312,9 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
             shield_version=__version__,
             request_id=req_id,
         )
+        if idem_key:
+            _idem_cache.set(idem_key, response.model_dump())
+        return response
 
     @app.post("/api/v1/post-check", response_model=PostCheckResponse, dependencies=auth)
     async def post_check(req: PostCheckRequest) -> PostCheckResponse:
@@ -329,6 +342,30 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
             mode=engine.mode.value,
             rules_hash=_rules_hash(engine),
         )
+
+    # K8s probes (no auth required)
+    @app.get("/healthz")
+    async def liveness():
+        """Kubernetes liveness probe — always OK if process is running."""
+        return {"status": "alive"}
+
+    @app.get("/readyz")
+    async def readiness():
+        """Kubernetes readiness probe — OK if engine is loaded and not shutting down."""
+        if _shutting_down.is_set():
+            return JSONResponse(status_code=503, content={"status": "shutting_down"})
+        if engine.rule_count == 0:
+            return JSONResponse(status_code=503, content={"status": "no_rules_loaded"})
+        return {"status": "ready", "rules": engine.rule_count}
+
+    _metrics_collector = MetricsCollector()
+
+    @app.get("/metrics")
+    async def metrics():
+        """Prometheus-format metrics endpoint."""
+        from starlette.responses import PlainTextResponse
+
+        return PlainTextResponse(_metrics_collector.to_prometheus(), media_type="text/plain")
 
     @app.post("/api/v1/reload", response_model=ReloadResponse, dependencies=auth)
     async def reload() -> ReloadResponse:

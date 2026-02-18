@@ -1,0 +1,24 @@
+shield_name: strict
+version: "1"
+default_verdict: BLOCK
+rules:
+  - id: allow-safe-reads
+    tool_name: "read_*"
+    then: ALLOW
+    message: "Read operations allowed"
+  - id: block-file-ops
+    tool_name: "write_file"
+    then: BLOCK
+    message: "File write blocked by strict preset"
+  - id: block-shell
+    tool_name: "run_command"
+    then: BLOCK
+    message: "Shell commands blocked by strict preset"
+  - id: block-network
+    tool_name: "http_request"
+    then: BLOCK
+    message: "Network requests blocked by strict preset"
+  - id: block-db
+    tool_name: "execute_sql"
+    then: BLOCK
+    message: "SQL execution blocked by strict preset"

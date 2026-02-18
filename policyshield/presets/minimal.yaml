@@ -1,0 +1,4 @@
+shield_name: minimal
+version: "1"
+default_verdict: ALLOW
+rules: []

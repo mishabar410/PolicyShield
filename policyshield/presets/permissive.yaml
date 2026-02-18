@@ -1,0 +1,14 @@
+shield_name: permissive
+version: "1"
+default_verdict: ALLOW
+rules:
+  - id: block-shell-injection
+    tool_name: "run_command"
+    then: BLOCK
+    message: "Shell commands blocked"
+  - id: block-path-traversal
+    tool_name: "read_file"
+    blocked_args_patterns:
+      path: "\\.\\./"
+    then: BLOCK
+    message: "Path traversal detected"
