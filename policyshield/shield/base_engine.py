@@ -122,6 +122,30 @@ class BaseShieldEngine:
         self._taint_enabled: bool = tc.enabled
         self._outgoing_tools: set[str] = set(tc.outgoing_tools)
 
+        # Shadow mode — parallel evaluation, log-only
+        self._shadow_ruleset: RuleSet | None = None
+        self._shadow_matcher: MatcherEngine | None = None
+
+    # ------------------------------------------------------------------ #
+    #  Shadow mode                                                        #
+    # ------------------------------------------------------------------ #
+
+    def set_shadow_rules(self, rules: RuleSet | str | Path) -> None:
+        """Set shadow ruleset for parallel evaluation (log-only, non-blocking)."""
+        if isinstance(rules, (str, Path)):
+            rules = load_rules(rules)
+        with self._lock:
+            self._shadow_ruleset = rules
+            self._shadow_matcher = MatcherEngine(rules)
+        logger.info("Shadow rules loaded (%d rules)", len(rules.rules))
+
+    def clear_shadow_rules(self) -> None:
+        """Remove shadow ruleset."""
+        with self._lock:
+            self._shadow_ruleset = None
+            self._shadow_matcher = None
+        logger.info("Shadow rules cleared")
+
     # ------------------------------------------------------------------ #
     #  Kill switch                                                       #
     # ------------------------------------------------------------------ #
@@ -271,7 +295,7 @@ class BaseShieldEngine:
             for pm in pii_matches:
                 self._session_mgr.add_taint(session_id, pm.pii_type)
 
-            return self._verdict_builder.block(
+            result = self._verdict_builder.block(
                 rule=rule,
                 tool_name=tool_name,
                 args=args,
@@ -282,7 +306,7 @@ class BaseShieldEngine:
             redacted, pii_matches = self._pii.redact_dict(args)
             for pm in pii_matches:
                 self._session_mgr.add_taint(session_id, pm.pii_type)
-            return self._verdict_builder.redact(
+            result = self._verdict_builder.redact(
                 rule=rule,
                 tool_name=tool_name,
                 args=args,
@@ -290,9 +314,43 @@ class BaseShieldEngine:
                 pii_matches=pii_matches,
             )
         elif rule.then == Verdict.APPROVE:
-            return self._handle_approval_sync(rule, tool_name, args, session_id)
+            result = self._handle_approval_sync(rule, tool_name, args, session_id)
         else:
-            return self._verdict_builder.allow(rule=rule, args=args)
+            result = self._verdict_builder.allow(rule=rule, args=args)
+
+        # Shadow evaluation (non-blocking, log-only)
+        with self._lock:
+            shadow_matcher = self._shadow_matcher
+
+        if shadow_matcher is not None:
+            try:
+                shadow_match = shadow_matcher.find_best_match(
+                    tool_name=tool_name,
+                    args=args,
+                    session_state=session_state,
+                    sender=sender,
+                    event_buffer=event_buffer,
+                )
+                shadow_verdict = shadow_match.rule.then if shadow_match else Verdict.ALLOW
+                if shadow_match and shadow_match.rule.then != result.verdict:
+                    logger.info(
+                        "SHADOW: tool=%s verdict_diff: current=%s shadow=%s (rule=%s)",
+                        tool_name,
+                        result.verdict.value,
+                        shadow_verdict.value,
+                        shadow_match.rule.id,
+                    )
+                if self._tracer:
+                    self._tracer.record(
+                        session_id=session_id,
+                        tool=tool_name,
+                        verdict=shadow_verdict if shadow_match else Verdict.ALLOW,
+                        rule_id=f"__shadow__{shadow_match.rule.id}" if shadow_match else "__shadow__",
+                    )
+            except Exception as e:
+                logger.warning("Shadow evaluation error: %s", e)
+
+        return result
 
     def _handle_approval_sync(
         self,
