@@ -57,3 +57,6 @@ plugins/openclaw/dist/
 plugins/openclaw/node_modules/
 tests/e2e-openclaw/node_modules/
 .venv312/
+
+# Prompts (internal development only)
+prompts/
