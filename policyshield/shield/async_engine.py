@@ -59,7 +59,18 @@ class AsyncShieldEngine(BaseShieldEngine):
             span_ctx = self._otel.on_check_start(tool_name, session_id, args)
 
         try:
-            result = await self._do_check(tool_name, args, session_id, sender)
+            result = await asyncio.wait_for(
+                self._do_check(tool_name, args, session_id, sender),
+                timeout=self._engine_timeout,
+            )
+        except asyncio.TimeoutError:
+            logger.error(
+                "Engine check timeout (%.1fs) for tool=%s",
+                self._engine_timeout,
+                tool_name,
+            )
+            verdict = Verdict.ALLOW if self._fail_open else Verdict.BLOCK
+            result = ShieldResult(verdict=verdict, message="Check timed out")
         except Exception as e:
             if self._fail_open:
                 logger.warning("Shield error (fail-open): %s", e)

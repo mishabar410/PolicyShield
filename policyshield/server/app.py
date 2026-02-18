@@ -93,14 +93,41 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
         A FastAPI app with /check, /post-check, /health, /constraints, /reload endpoints.
     """
 
+    _shutting_down = asyncio.Event()
+
+    async def _startup_self_test() -> None:
+        """Run a quick self-test to verify engine is operational."""
+        try:
+            result = await engine.check("__self_test__", {})
+            _logger.info("Startup self-test passed: verdict=%s", result.verdict.value)
+        except Exception as e:
+            _logger.critical("Startup self-test FAILED: %s", e)
+            raise RuntimeError(f"Engine self-test failed: {e}") from e
+
+    _logger = logging.getLogger("policyshield.server")
+
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        """Manage engine watcher lifecycle."""
+        """Manage engine lifecycle: self-test on startup, drain on shutdown."""
         if enable_watcher:
             engine.start_watching()
+        await _startup_self_test()
         yield
+        # Graceful shutdown
+        _shutting_down.set()
+        _logger.info("Shutting down — draining in-flight requests...")
+        await asyncio.sleep(1)  # Brief drain window
+        if engine._tracer:
+            engine._tracer.flush()
+        if (
+            hasattr(engine, "_approval_backend")
+            and engine._approval_backend
+            and hasattr(engine._approval_backend, "stop")
+        ):
+            engine._approval_backend.stop()
         if enable_watcher:
             engine.stop_watching()
+        _logger.info("PolicyShield server stopped")
 
     app = FastAPI(title="PolicyShield", version=__version__, lifespan=lifespan)
 
@@ -116,7 +143,15 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
             max_age=3600,
         )
 
-    _logger = logging.getLogger("policyshield.server")
+    # ── Middleware: Reject new requests during shutdown (331) ──
+    @app.middleware("http")
+    async def reject_during_shutdown(request: Request, call_next):
+        if _shutting_down.is_set() and request.url.path != "/api/v1/health":
+            return JSONResponse(
+                status_code=503,
+                content={"error": "shutting_down", "verdict": "BLOCK"},
+            )
+        return await call_next(request)
 
     # ── Middleware: Content-Type validation (304) ──
     @app.middleware("http")

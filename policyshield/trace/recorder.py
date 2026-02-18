@@ -45,6 +45,8 @@ class TraceRecorder:
         batch_size: int = 100,
         privacy_mode: bool = False,
     ):
+        import atexit
+
         self._output_dir = Path(output_dir)
         self._batch_size = batch_size
         self._privacy_mode = privacy_mode
@@ -56,6 +58,16 @@ class TraceRecorder:
         # Ensure output directory exists
         self._output_dir.mkdir(parents=True, exist_ok=True)
         self._file_path = self._generate_file_path()
+
+        # Register atexit handler for crash safety
+        atexit.register(self._atexit_flush)
+
+    def _atexit_flush(self) -> None:
+        """Flush remaining buffer on process exit (best effort)."""
+        try:
+            self.flush()
+        except Exception:
+            pass
 
     def _generate_file_path(self) -> Path:
         """Generate a timestamped trace file path."""

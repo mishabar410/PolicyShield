@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import threading
 from pathlib import Path
 from time import monotonic
@@ -79,7 +80,17 @@ class BaseShieldEngine:
         self._rate_limiter = rate_limiter
         self._approval_backend = approval_backend
         self._approval_cache = approval_cache
-        self._fail_open = fail_open
+        # Fail mode: env override takes precedence over constructor arg
+        fail_mode_env = os.environ.get("POLICYSHIELD_FAIL_MODE", "").lower()
+        if fail_mode_env in ("open", "closed"):
+            self._fail_open = fail_mode_env == "open"
+        else:
+            self._fail_open = fail_open
+        logger.info(
+            "Fail mode: %s",
+            "open (ALLOW on error)" if self._fail_open else "closed (BLOCK on error)",
+        )
+        self._engine_timeout = float(os.environ.get("POLICYSHIELD_ENGINE_TIMEOUT", 5.0))
         self._otel = otel_exporter
         self._sanitizer = sanitizer
         self._lock = threading.Lock()
