@@ -309,6 +309,17 @@ class BaseShieldEngine:
                 message="No approval backend configured",
             )
 
+        # Circuit breaker — fail fast if backend is unhealthy
+        if hasattr(self._approval_backend, "_circuit_breaker"):
+            cb = self._approval_backend._circuit_breaker
+            if not cb.is_available():
+                verdict = Verdict.BLOCK if cb.fallback_verdict == "BLOCK" else Verdict.ALLOW
+                return ShieldResult(
+                    verdict=verdict,
+                    rule_id=rule.id,
+                    message=f"Approval backend circuit breaker OPEN (fallback: {cb.fallback_verdict})",
+                )
+
         # Determine strategy
         strategy = None
         if rule.approval_strategy:
