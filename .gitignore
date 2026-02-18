@@ -44,7 +44,6 @@ INTEGRATION_SPEC.md
 *.docx
 *.doc
 /nanobot/
-prompts/
 demo.py
 demo_traces/
 .gemini/
