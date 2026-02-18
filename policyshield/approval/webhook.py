@@ -130,6 +130,25 @@ class WebhookApprovalBackend(ApprovalBackend):
         """Return requests with no response yet."""
         return [r for rid, r in self._requests.items() if rid not in self._responses]
 
+    def health(self) -> dict:
+        """Check webhook URL availability via HEAD request."""
+        from time import monotonic
+
+        start = monotonic()
+        try:
+            with httpx.Client(timeout=5.0) as client:
+                resp = client.head(self._url)
+            latency = (monotonic() - start) * 1000
+            healthy = resp.status_code < 500
+            return {
+                "healthy": healthy,
+                "latency_ms": round(latency, 1),
+                "error": None if healthy else f"HTTP {resp.status_code}",
+            }
+        except Exception as e:
+            latency = (monotonic() - start) * 1000
+            return {"healthy": False, "latency_ms": round(latency, 1), "error": str(e)}
+
     # ── Internal helpers ─────────────────────────────────────────────
 
     def _build_payload(self, request: ApprovalRequest) -> dict[str, Any]:

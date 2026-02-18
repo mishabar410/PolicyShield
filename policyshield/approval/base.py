@@ -78,3 +78,11 @@ class ApprovalBackend(ABC):
     @abstractmethod
     def pending(self) -> list[ApprovalRequest]:
         """Return all pending (unanswered) requests."""
+
+    def health(self) -> dict:
+        """Check backend health. Override in subclasses.
+
+        Returns:
+            dict with 'healthy' (bool), 'latency_ms' (float), 'error' (str|None)
+        """
+        return {"healthy": True, "latency_ms": 0, "error": None}

@@ -141,6 +141,22 @@ class TelegramApprovalBackend(ApprovalBackend):
         with self._lock:
             return list(self._pending.values())
 
+    def health(self) -> dict:
+        """Check Telegram Bot API health via getMe."""
+        from time import monotonic
+
+        start = monotonic()
+        try:
+            resp = self._client.get(f"{self._base_url}/getMe", timeout=5.0)
+            latency = (monotonic() - start) * 1000
+            data = resp.json()
+            if data.get("ok"):
+                return {"healthy": True, "latency_ms": round(latency, 1), "error": None}
+            return {"healthy": False, "latency_ms": round(latency, 1), "error": "getMe returned ok=false"}
+        except Exception as e:
+            latency = (monotonic() - start) * 1000
+            return {"healthy": False, "latency_ms": round(latency, 1), "error": str(e)}
+
     def stop(self) -> None:
         """Stop the polling thread."""
         self._stop_event.set()

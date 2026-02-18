@@ -251,6 +251,34 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
                 )
         return await call_next(request)
 
+    # ── Middleware: API rate limiting (406) ──
+    from policyshield.server.rate_limiter import APIRateLimiter as _APIRL
+
+    _api_rate_limit = int(os.environ.get("POLICYSHIELD_API_RATE_LIMIT", "100"))
+    _api_rate_window = float(os.environ.get("POLICYSHIELD_API_RATE_WINDOW", "60"))
+    _api_limiter = _APIRL(max_requests=_api_rate_limit, window_seconds=_api_rate_window)
+
+    @app.middleware("http")
+    async def api_rate_limit(request: Request, call_next):
+        check_paths = ("/api/v1/check", "/api/v1/post-check")
+        if request.url.path in check_paths:
+            client_key = request.client.host if request.client else "unknown"
+            # Use API token prefix as key if available
+            auth = request.headers.get("Authorization", "")
+            if auth.startswith("Bearer "):
+                client_key = f"token:{auth[7:][:8]}"
+            if not _api_limiter.is_allowed(client_key):
+                return JSONResponse(
+                    status_code=429,
+                    content={
+                        "verdict": "BLOCK",
+                        "error": "rate_limited",
+                        "message": f"Rate limit exceeded ({_api_rate_limit}/{_api_rate_window}s)",
+                    },
+                    headers={"Retry-After": str(int(_api_rate_window))},
+                )
+        return await call_next(request)
+
     # ── Debug mode (323) ──
     _debug = os.environ.get("POLICYSHIELD_DEBUG", "").lower() in ("1", "true", "yes")
 
@@ -358,7 +386,19 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
             return JSONResponse(status_code=503, content={"status": "shutting_down"})
         if engine.rule_count == 0:
             return JSONResponse(status_code=503, content={"status": "no_rules_loaded"})
-        return {"status": "ready", "rules": engine.rule_count}
+
+        result: dict = {"status": "ready", "rules": engine.rule_count}
+        # Check approval backend health
+        backend = engine.approval_backend
+        if backend is not None:
+            health = backend.health()
+            result["approval_backend"] = health
+            if not health["healthy"]:
+                return JSONResponse(
+                    status_code=503,
+                    content={**result, "status": "approval_backend_unhealthy"},
+                )
+        return result
 
     _metrics_collector = MetricsCollector()
 
