@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
@@ -117,18 +118,36 @@ class TraceRecorder:
         with self._lock:
             self._flush_unlocked()
 
+    def _open_file(self, path: Path):
+        """Open trace file with restricted permissions (0o600)."""
+        if not path.exists():
+            path.touch(mode=0o600)
+        else:
+            current = path.stat().st_mode & 0o777
+            if current != 0o600:
+                os.chmod(path, 0o600)
+                logger.warning(
+                    "Fixed trace file permissions: %s (%o → 600)",
+                    path,
+                    current,
+                )
+        return open(path, "a", encoding="utf-8")  # noqa: SIM115
+
     def _flush_unlocked(self) -> None:
         """Flush buffer without acquiring the lock (caller must hold it)."""
         if not self._buffer:
             return
 
         try:
-            with open(self._file_path, "a", encoding="utf-8") as f:
+            with self._open_file(self._file_path) as f:
                 for entry in self._buffer:
                     f.write(json.dumps(entry, default=str) + "\n")
         except OSError as exc:
             logger.error(
-                "Failed to write trace file %s: %s (dropping %d records)", self._file_path, exc, len(self._buffer)
+                "Failed to write trace file %s: %s (dropping %d records)",
+                self._file_path,
+                exc,
+                len(self._buffer),
             )
 
         self._buffer.clear()

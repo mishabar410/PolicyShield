@@ -138,13 +138,27 @@ URL_SCHEMES = Detector(
     severity="high",
 )
 
+SECRET_DETECTION = Detector(
+    name="secret_detection",
+    description="Detects credentials and secrets (AWS keys, API tokens, JWTs, etc.)",
+    patterns=_compile(
+        r"(?:AKIA|ASIA)[0-9A-Z]{16}",  # AWS access key
+        r"sk-[A-Za-z0-9]{20,}",  # OpenAI API key
+        r"ghp_[A-Za-z0-9]{36}",  # GitHub PAT
+        r"xox[bpoas]-[A-Za-z0-9\-]+",  # Slack token
+        r"-----BEGIN (?:RSA |EC |DSA )?PRIVATE KEY-----",  # Private key
+        r"(?:eyJ[A-Za-z0-9_-]{10,}\.){2}[A-Za-z0-9_-]+",  # JWT
+    ),
+    severity="critical",
+)
+
 
 # ────────────────────────────────────────────────────────────────────
 # Registry
 # ────────────────────────────────────────────────────────────────────
 
 ALL_DETECTORS: dict[str, Detector] = {
-    d.name: d for d in (PATH_TRAVERSAL, SHELL_INJECTION, SQL_INJECTION, SSRF, URL_SCHEMES)
+    d.name: d for d in (PATH_TRAVERSAL, SHELL_INJECTION, SQL_INJECTION, SSRF, URL_SCHEMES, SECRET_DETECTION)
 }
 
 

@@ -18,7 +18,7 @@ from policyshield.shield.detectors import (
 
 
 def test_all_detectors_populated():
-    assert len(ALL_DETECTORS) == 5
+    assert len(ALL_DETECTORS) == 6
     for name in ("path_traversal", "shell_injection", "sql_injection", "ssrf", "url_schemes"):
         assert name in ALL_DETECTORS
 

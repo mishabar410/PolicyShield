@@ -59,15 +59,26 @@ async def verify_token(request: Request) -> None:
     """Verify Bearer token if POLICYSHIELD_API_TOKEN is set.
 
     Health endpoint is always public (for Docker/K8s healthchecks).
+    Admin endpoints (/reload, /kill-switch) require ADMIN_TOKEN if set.
     When no token is configured, all endpoints are open (dev mode).
     """
-    token = _get_api_token()
-    if token is None:
-        return  # No auth configured — allow all
+    api_token = _get_api_token()
+    admin_token = os.environ.get("POLICYSHIELD_ADMIN_TOKEN") or None
+
+    admin_paths = ("/api/v1/reload", "/api/v1/kill")
+    is_admin = any(request.url.path.startswith(p) for p in admin_paths)
+
+    if is_admin:
+        required = admin_token or api_token  # Fallback to API token
+    else:
+        required = api_token
+
+    if required is None:
+        return  # No auth configured
     auth_header = request.headers.get("Authorization", "")
     if not auth_header.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing Bearer token")
-    if not hmac.compare_digest(auth_header[7:], token):
+    if not hmac.compare_digest(auth_header[7:], required):
         raise HTTPException(status_code=403, detail="Invalid token")
 
 
@@ -184,30 +195,50 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
                 )
         return await call_next(request)
 
+    # ── Middleware: Admin rate limiting (326) ──
+    from policyshield.server.rate_limiter import InMemoryRateLimiter as _AdminRL
+
+    _admin_limiter = _AdminRL(max_requests=10, window_seconds=60)
+
+    @app.middleware("http")
+    async def rate_limit_admin(request: Request, call_next):
+        admin_paths = ("/api/v1/reload", "/api/v1/kill")
+        if any(request.url.path.startswith(p) for p in admin_paths):
+            client_ip = request.client.host if request.client else "unknown"
+            if not _admin_limiter.is_allowed(client_ip):
+                return JSONResponse(
+                    status_code=429,
+                    content={"error": "rate_limited", "message": "Too many requests"},
+                )
+        return await call_next(request)
+
+    # ── Debug mode (323) ──
+    _debug = os.environ.get("POLICYSHIELD_DEBUG", "").lower() in ("1", "true", "yes")
+
     @app.exception_handler(Exception)
     async def shield_error_handler(request: Request, exc: Exception):
         """Return machine-readable verdict even on internal errors."""
         _logger.error("Unhandled exception in %s: %s", request.url.path, exc, exc_info=True)
         verdict = "ALLOW" if getattr(engine, "_fail_open", False) else "BLOCK"
-        return JSONResponse(
-            status_code=500,
-            content={
-                "verdict": verdict,
-                "error": "internal_error",
-                "message": "Internal server error",
-            },
-        )
+        detail: dict = {
+            "verdict": verdict,
+            "error": "internal_error",
+            "message": "Internal server error",
+        }
+        if _debug:
+            detail["debug"] = {"type": type(exc).__name__, "detail": str(exc)}
+        return JSONResponse(status_code=500, content=detail)
 
     @app.exception_handler(RequestValidationError)
     async def validation_error_handler(request: Request, exc: RequestValidationError):
         """Return clean validation error without leaking internals."""
-        return JSONResponse(
-            status_code=422,
-            content={
-                "error": "validation_error",
-                "message": "Invalid request format",
-            },
-        )
+        detail: dict = {
+            "error": "validation_error",
+            "message": "Invalid request format",
+        }
+        if _debug:
+            detail["debug"] = {"errors": exc.errors()}
+        return JSONResponse(status_code=422, content=detail)
 
     auth = [Depends(verify_token)]
 
