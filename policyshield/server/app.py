@@ -146,9 +146,11 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
         )
 
     # ── Middleware: Reject new requests during shutdown (331) ──
+    _shutdown_allowed_paths = {"/api/v1/health", "/healthz", "/readyz", "/metrics"}
+
     @app.middleware("http")
     async def reject_during_shutdown(request: Request, call_next):
-        if _shutting_down.is_set() and request.url.path != "/api/v1/health":
+        if _shutting_down.is_set() and request.url.path not in _shutdown_allowed_paths:
             return JSONResponse(
                 status_code=503,
                 content={"error": "shutting_down", "verdict": "BLOCK"},
@@ -363,9 +365,9 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
     @app.get("/metrics")
     async def metrics():
         """Prometheus-format metrics endpoint."""
-        from starlette.responses import PlainTextResponse
+        from starlette.responses import PlainTextResponse as _PT
 
-        return PlainTextResponse(_metrics_collector.to_prometheus(), media_type="text/plain")
+        return _PT(_metrics_collector.to_prometheus(), media_type="text/plain")
 
     @app.post("/api/v1/reload", response_model=ReloadResponse, dependencies=auth)
     async def reload() -> ReloadResponse:

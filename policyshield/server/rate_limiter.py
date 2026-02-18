@@ -23,4 +23,8 @@ class InMemoryRateLimiter:
             if len(self._requests[key]) >= self._max:
                 return False
             self._requests[key].append(now)
+            # Prune stale keys to prevent unbounded memory growth
+            stale = [k for k, v in self._requests.items() if k != key and not v]
+            for k in stale:
+                del self._requests[k]
             return True

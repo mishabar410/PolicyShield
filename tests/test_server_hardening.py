@@ -128,9 +128,7 @@ class TestRequestId:
 
 class TestCORS:
     def test_cors_disabled_by_default(self, client: TestClient):
-        resp = client.options(
-            "/api/v1/check", headers={"Origin": "http://evil.com"}
-        )
+        resp = client.options("/api/v1/check", headers={"Origin": "http://evil.com"})
         assert "access-control-allow-origin" not in resp.headers
 
     def test_cors_enabled_with_env(self, monkeypatch):
@@ -145,10 +143,7 @@ class TestCORS:
                 "Access-Control-Request-Method": "POST",
             },
         )
-        assert (
-            resp.headers.get("access-control-allow-origin")
-            == "http://localhost:3000"
-        )
+        assert resp.headers.get("access-control-allow-origin") == "http://localhost:3000"
 
 
 # ── Prompt 304: Content-Type Validation ──────────────────────────
@@ -226,9 +221,7 @@ class TestInputValidation:
         assert resp.status_code == 422
 
     def test_dots_colons_allowed(self, client: TestClient):
-        resp = client.post(
-            "/api/v1/check", json={"tool_name": "my.tool:v2-beta"}
-        )
+        resp = client.post("/api/v1/check", json={"tool_name": "my.tool:v2-beta"})
         assert resp.status_code != 422
 
     def test_deeply_nested_args_rejected(self, client: TestClient):
@@ -237,9 +230,7 @@ class TestInputValidation:
         for _ in range(15):
             current["b"] = {}
             current = current["b"]
-        resp = client.post(
-            "/api/v1/check", json={"tool_name": "test", "args": nested}
-        )
+        resp = client.post("/api/v1/check", json={"tool_name": "test", "args": nested})
         assert resp.status_code == 422
 
     def test_normal_depth_accepted(self, client: TestClient):
