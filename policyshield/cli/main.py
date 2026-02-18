@@ -156,6 +156,8 @@ def app(args: list[str] | None = None) -> int:
     )
     server_parser.add_argument("--reload", action="store_true", help="Enable hot reload of rules")
     server_parser.add_argument("--workers", type=int, default=1, help="Number of uvicorn workers")
+    server_parser.add_argument("--tls-cert", help="Path to TLS certificate (PEM)")
+    server_parser.add_argument("--tls-key", help="Path to TLS private key (PEM)")
 
     # replay command
     sp_replay = subparsers.add_parser("replay", help="Replay traces against different rules")
@@ -251,6 +253,14 @@ def app(args: list[str] | None = None) -> int:
         help="Overwrite output file without asking",
     )
 
+    # simulate command
+    sim_parser = subparsers.add_parser("simulate", help="What-if rule simulation")
+    sim_parser.add_argument("--rules", required=True, help="Base ruleset path")
+    sim_parser.add_argument("--new-rule", required=True, help="New rule YAML to test")
+    sim_parser.add_argument("--tool", required=True, help="Tool name to simulate")
+    sim_parser.add_argument("--args", default="{}", help="JSON args string")
+    sim_parser.add_argument("--session-id", default="simulate", help="Session ID")
+
     parsed = parser.parse_args(args)
 
     if parsed.command == "validate":
@@ -311,6 +321,8 @@ def app(args: list[str] | None = None) -> int:
         return _cmd_doctor(parsed)
     elif parsed.command == "generate-rules":
         return _cmd_generate_rules(parsed)
+    elif parsed.command == "simulate":
+        return _cmd_simulate(parsed)
     elif parsed.command == "openclaw":
         from policyshield.cli.openclaw import cmd_openclaw
 
@@ -421,8 +433,34 @@ def _cmd_server(parsed: argparse.Namespace) -> int:
     if parsed.reload:
         print("  Hot reload: enabled")
 
+    # TLS support — env var fallback
+    tls_cert = getattr(parsed, "tls_cert", None) or os.environ.get("POLICYSHIELD_TLS_CERT")
+    tls_key = getattr(parsed, "tls_key", None) or os.environ.get("POLICYSHIELD_TLS_KEY")
+
+    uvicorn_kwargs: dict = {
+        "host": parsed.host,
+        "port": parsed.port,
+        "workers": parsed.workers,
+    }
+
+    if tls_cert and tls_key:
+        cert_path = Path(tls_cert)
+        key_path = Path(tls_key)
+        if not cert_path.exists():
+            print(f"❌ TLS cert not found: {cert_path}", file=sys.stderr)
+            return 1
+        if not key_path.exists():
+            print(f"❌ TLS key not found: {key_path}", file=sys.stderr)
+            return 1
+        uvicorn_kwargs["ssl_certfile"] = str(cert_path)
+        uvicorn_kwargs["ssl_keyfile"] = str(key_path)
+        print(f"  🔒 TLS enabled: cert={cert_path}")
+    elif tls_cert or tls_key:
+        print("❌ Both --tls-cert and --tls-key required", file=sys.stderr)
+        return 1
+
     app = create_app(engine, enable_watcher=parsed.reload)
-    uvicorn.run(app, host=parsed.host, port=parsed.port, workers=parsed.workers)
+    uvicorn.run(app, **uvicorn_kwargs)
     return 0
 
 
@@ -913,6 +951,71 @@ def _cmd_replay(parsed: argparse.Namespace) -> int:
 
     if summary["tightened"] > 0:
         print(f"\n⚠️  {summary['tightened']} tool call(s) would be MORE restricted with new rules.")
+
+    return 0
+
+
+def _cmd_simulate(parsed: argparse.Namespace) -> int:
+    """Simulate a tool call with and without a new rule."""
+    import json as _json
+
+    from policyshield.core.models import RuleSet
+    from policyshield.shield.engine import ShieldEngine
+
+    try:
+        args = _json.loads(parsed.args)
+    except _json.JSONDecodeError as e:
+        print(f"❌ Invalid JSON args: {e}", file=sys.stderr)
+        return 1
+
+    # Check with CURRENT rules
+    try:
+        current_rules = load_rules(parsed.rules)
+    except PolicyShieldParseError as e:
+        print(f"❌ Cannot load rules: {e}", file=sys.stderr)
+        return 1
+
+    engine_current = ShieldEngine(rules=current_rules)
+    result_current = engine_current.check(tool_name=parsed.tool, args=args, session_id=parsed.session_id)
+
+    # Check with NEW rule added
+    try:
+        new_rules = load_rules(parsed.new_rule)
+    except PolicyShieldParseError as e:
+        print(f"❌ Cannot load new rule: {e}", file=sys.stderr)
+        return 1
+
+    # Merge: base rules + new rule
+    merged = RuleSet(
+        rules=list(current_rules.rules) + list(new_rules.rules),
+        shield_name=current_rules.shield_name,
+        version=current_rules.version,
+        default_verdict=current_rules.default_verdict,
+        honeypots=current_rules.honeypots,
+        taint_chain=current_rules.taint_chain,
+    )
+    engine_merged = ShieldEngine(rules=merged)
+    result_merged = engine_merged.check(tool_name=parsed.tool, args=args, session_id=parsed.session_id)
+
+    # Display
+    print(f"Tool:    {parsed.tool}")
+    print(f"Args:    {args}")
+    print()
+    print(f"📋 Current rules ({len(current_rules.rules)} rules):")
+    print(f"   Verdict: {result_current.verdict.value} (rule: {result_current.rule_id or 'none'})")
+    print()
+    print(f"📋 With new rule  ({len(merged.rules)} rules):")
+    print(f"   Verdict: {result_merged.verdict.value} (rule: {result_merged.rule_id or 'none'})")
+    if result_merged.message:
+        print(f"   Message: {result_merged.message}")
+
+    # Diff highlight
+    if result_current.verdict != result_merged.verdict:
+        print()
+        print(f"⚠️  CHANGE: {result_current.verdict.value} → {result_merged.verdict.value}")
+    else:
+        print()
+        print("✅ No change in verdict")
 
     return 0
 
