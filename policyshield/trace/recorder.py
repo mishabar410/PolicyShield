@@ -70,6 +70,7 @@ class TraceRecorder:
         pii_types: list[str] | None = None,
         latency_ms: float = 0.0,
         args: dict | None = None,
+        approval_info: dict | None = None,
     ) -> None:
         """Add a trace record to the buffer.
 
@@ -81,6 +82,7 @@ class TraceRecorder:
             pii_types: List of detected PII type names.
             latency_ms: Processing latency in milliseconds.
             args: Original arguments (hashed in privacy mode).
+            approval_info: Optional approval audit trail data.
         """
         entry: dict[str, Any] = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -100,6 +102,8 @@ class TraceRecorder:
                 entry["args_hash"] = compute_args_hash(args)
             else:
                 entry["args"] = args
+        if approval_info:
+            entry["approval"] = approval_info
 
         with self._lock:
             self._buffer.append(entry)

@@ -273,10 +273,19 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
             rules_hash=_rules_hash(engine),
         )
 
+    # ── Approval poll timeout (316) ──
+    _approval_poll_timeout = float(os.environ.get("POLICYSHIELD_APPROVAL_POLL_TIMEOUT", 30))
+
     @app.post("/api/v1/check-approval", response_model=ApprovalStatusResponse, dependencies=auth)
     async def check_approval(req: ApprovalStatusRequest) -> ApprovalStatusResponse:
         """Check the status of a pending approval request."""
-        result = engine.get_approval_status(req.approval_id)
+        try:
+            result = await asyncio.wait_for(
+                asyncio.to_thread(engine.get_approval_status, req.approval_id),
+                timeout=_approval_poll_timeout,
+            )
+        except asyncio.TimeoutError:
+            return ApprovalStatusResponse(approval_id=req.approval_id, status="timeout")
         return ApprovalStatusResponse(
             approval_id=req.approval_id,
             status=result["status"],
@@ -308,6 +317,8 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
     @app.get("/api/v1/pending-approvals", response_model=PendingApprovalsResponse, dependencies=auth)
     async def pending_approvals() -> PendingApprovalsResponse:
         """List all pending approval requests."""
+        from policyshield.approval.sanitizer import sanitize_args
+
         backend = engine.approval_backend
         if backend is None:
             return PendingApprovalsResponse()
@@ -318,7 +329,7 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
                 tool_name=r.tool_name,
                 rule_id=r.rule_id,
                 message=r.message,
-                args=r.args,
+                args=sanitize_args(r.args),
             )
             for r in pending
         ]

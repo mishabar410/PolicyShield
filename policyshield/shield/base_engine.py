@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import threading
 from pathlib import Path
+from time import monotonic
 from typing import Any
 
 from policyshield.approval.base import ApprovalBackend, ApprovalRequest
@@ -85,6 +86,9 @@ class BaseShieldEngine:
         self._watcher = None
         # Approval metadata for cache population after resolution
         self._approval_meta: dict[str, dict] = {}
+        self._approval_meta_ts: dict[str, float] = {}
+        self._approval_meta_ttl: float = 3600.0  # 1 hour
+        self._max_approval_meta: int = 10_000
         # Resolved approval statuses for idempotent polling
         self._resolved_approvals: dict[str, dict] = {}
         self._max_resolved_approvals = 10_000
@@ -331,6 +335,8 @@ class BaseShieldEngine:
                 "session_id": session_id,
                 "strategy": strategy,
             }
+            self._approval_meta_ts[req.request_id] = monotonic()
+            self._cleanup_approval_meta()
 
         # Return APPROVE verdict with the approval_id for async polling
         return ShieldResult(
@@ -339,6 +345,21 @@ class BaseShieldEngine:
             message=rule.message or "Approval required",
             approval_id=req.request_id,
         )
+
+    def _cleanup_approval_meta(self) -> None:
+        """Remove stale and excess entries from _approval_meta (caller holds lock)."""
+        now = monotonic()
+        # TTL cleanup
+        expired = [k for k, ts in self._approval_meta_ts.items() if now - ts > self._approval_meta_ttl]
+        for k in expired:
+            self._approval_meta.pop(k, None)
+            self._approval_meta_ts.pop(k, None)
+
+        # Hard limit (evict oldest)
+        while len(self._approval_meta) > self._max_approval_meta:
+            oldest = min(self._approval_meta_ts, key=self._approval_meta_ts.get)  # type: ignore[arg-type]
+            self._approval_meta.pop(oldest, None)
+            self._approval_meta_ts.pop(oldest, None)
 
     def get_approval_status(self, approval_id: str) -> dict:
         """Check the status of a pending approval request.
