@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, patch
+import uuid
 
 import pytest
 
@@ -97,3 +98,26 @@ class TestGlobalExceptionHandler:
         body = resp.json()
         assert body["error"] == "validation_error"
         assert "pydantic" not in body.get("message", "").lower()
+
+
+# ── Prompt 302: Request / Correlation ID ─────────────────────────
+
+
+class TestRequestId:
+    def test_response_always_has_request_id(self, client: TestClient):
+        resp = client.post("/api/v1/check", json={"tool_name": "test"})
+        data = resp.json()
+        assert "request_id" in data
+        assert len(data["request_id"]) > 0
+
+    def test_client_request_id_echoed(self, client: TestClient):
+        resp = client.post(
+            "/api/v1/check",
+            json={"tool_name": "test", "request_id": "my-id-123"},
+        )
+        assert resp.json()["request_id"] == "my-id-123"
+
+    def test_generated_id_is_uuid(self, client: TestClient):
+        resp = client.post("/api/v1/check", json={"tool_name": "test"})
+        rid = resp.json()["request_id"]
+        uuid.UUID(rid)  # Raises ValueError if not valid UUID

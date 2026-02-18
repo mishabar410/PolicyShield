@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import os
+import uuid
 from contextlib import asynccontextmanager
 
 import logging
@@ -121,11 +122,18 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
 
     @app.post("/api/v1/check", response_model=CheckResponse, dependencies=auth)
     async def check(req: CheckRequest) -> CheckResponse:
+        req_id = req.request_id or str(uuid.uuid4())
         result = await engine.check(
             tool_name=req.tool_name,
             args=req.args,
             session_id=req.session_id,
             sender=req.sender,
+        )
+        _logger.info(
+            "Check request_id=%s tool=%s verdict=%s",
+            req_id,
+            req.tool_name,
+            result.verdict.value,
         )
         return CheckResponse(
             verdict=result.verdict.value,
@@ -135,6 +143,7 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
             pii_types=[m.pii_type.value for m in result.pii_matches],
             approval_id=result.approval_id,
             shield_version=__version__,
+            request_id=req_id,
         )
 
     @app.post("/api/v1/post-check", response_model=PostCheckResponse, dependencies=auth)

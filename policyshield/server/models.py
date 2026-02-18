@@ -12,6 +12,7 @@ class CheckRequest(BaseModel):
     args: dict = {}
     session_id: str = "default"
     sender: str | None = None
+    request_id: str | None = None
 
 
 class CheckResponse(BaseModel):
@@ -24,6 +25,7 @@ class CheckResponse(BaseModel):
     pii_types: list[str] = []
     approval_id: str | None = None
     shield_version: str = ""
+    request_id: str = ""
 
 
 class PostCheckRequest(BaseModel):
