@@ -16,3 +16,13 @@
 | [🟡 Tier 2 — Medium](features/tier2_medium.md) | Post-v1.0: resilience, observability, extensibility | ~20 |
 | [🧠 Tier 3 — LLM Guard](features/tier3_llm_guard.md) | Отдельный milestone: LLM-based security | 6 |
 | [🔵 Tier 4 — Enterprise](features/tier4_enterprise.md) | Enterprise/scale + отложенные + интеграции | ~25 |
+
+### Tier 1.5 — группы фич
+
+| Группа | Файл | Кол-во |
+|--------|------|--------|
+| 🛡️ Server Hardening | [tier1_5_server_hardening.md](features/tier1_5_server_hardening.md) | 8 |
+| 🔄 Approval Flow | [tier1_5_approval_flow.md](features/tier1_5_approval_flow.md) | 7 |
+| 🔒 Security & Data | [tier1_5_security.md](features/tier1_5_security.md) | 6 |
+| ⚙️ Lifecycle & Reliability | [tier1_5_lifecycle.md](features/tier1_5_lifecycle.md) | 10 |
+| 🚀 DX & Adoption | [tier1_5_dx_adoption.md](features/tier1_5_dx_adoption.md) | 17 |
