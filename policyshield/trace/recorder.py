@@ -7,7 +7,7 @@ import json
 import logging
 import os
 import threading
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -44,12 +44,19 @@ class TraceRecorder:
         output_dir: str | Path,
         batch_size: int = 100,
         privacy_mode: bool = False,
+        max_file_size: int = 100 * 1024 * 1024,  # 100MB
+        rotation: str = "size",  # "size" | "daily" | "none"
+        retention_days: int = 30,
     ):
         import atexit
 
         self._output_dir = Path(output_dir)
         self._batch_size = batch_size
         self._privacy_mode = privacy_mode
+        self._max_file_size = max_file_size
+        self._rotation = rotation
+        self._retention_days = retention_days
+        self._current_date = datetime.now(timezone.utc).strftime("%Y%m%d")
         self._buffer: list[dict] = []
         self._file_path: Path | None = None
         self._record_count = 0
@@ -70,9 +77,18 @@ class TraceRecorder:
             pass
 
     def _generate_file_path(self) -> Path:
-        """Generate a timestamped trace file path."""
+        """Generate a timestamped trace file path (unique even within same second)."""
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-        return self._output_dir / f"trace_{timestamp}.jsonl"
+        base = self._output_dir / f"trace_{timestamp}.jsonl"
+        if not base.exists():
+            return base
+        # Append counter to avoid collisions during rapid rotation
+        counter = 1
+        while True:
+            candidate = self._output_dir / f"trace_{timestamp}_{counter}.jsonl"
+            if not candidate.exists():
+                return candidate
+            counter += 1
 
     def record(
         self,
@@ -150,6 +166,9 @@ class TraceRecorder:
         if not self._buffer:
             return
 
+        if self._should_rotate():
+            self._rotate()
+
         try:
             with self._open_file(self._file_path) as f:
                 for entry in self._buffer:
@@ -179,3 +198,38 @@ class TraceRecorder:
 
     def __exit__(self, *args) -> None:
         self.flush()
+
+    def _should_rotate(self) -> bool:
+        """Check if current trace file needs rotation."""
+        if self._file_path is None or not self._file_path.exists():
+            return False
+        if self._rotation == "size":
+            return self._file_path.stat().st_size >= self._max_file_size
+        if self._rotation == "daily":
+            today = datetime.now(timezone.utc).strftime("%Y%m%d")
+            return today != self._current_date
+        return False
+
+    def _rotate(self) -> None:
+        """Rotate to a new trace file."""
+        self._file_path = self._generate_file_path()
+        self._current_date = datetime.now(timezone.utc).strftime("%Y%m%d")
+        logger.info("Rotated trace file to %s", self._file_path)
+
+    def cleanup_old_traces(self) -> int:
+        """Remove trace files older than retention_days. Returns count removed."""
+        if self._retention_days <= 0:
+            return 0
+        cutoff = datetime.now(timezone.utc) - timedelta(days=self._retention_days)
+        removed = 0
+        for f in self._output_dir.glob("trace_*.jsonl"):
+            if f.stat().st_mtime < cutoff.timestamp():
+                f.unlink()
+                removed += 1
+        if removed:
+            logger.info(
+                "Cleaned up %d old trace files (retention=%dd)",
+                removed,
+                self._retention_days,
+            )
+        return removed
