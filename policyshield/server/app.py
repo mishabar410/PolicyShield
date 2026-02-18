@@ -7,7 +7,11 @@ import hmac
 import os
 from contextlib import asynccontextmanager
 
+import logging
+
 from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
+from starlette.responses import JSONResponse
 
 from policyshield import __version__
 
@@ -85,6 +89,33 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
             engine.stop_watching()
 
     app = FastAPI(title="PolicyShield", version=__version__, lifespan=lifespan)
+
+    _logger = logging.getLogger("policyshield.server")
+
+    @app.exception_handler(Exception)
+    async def shield_error_handler(request: Request, exc: Exception):
+        """Return machine-readable verdict even on internal errors."""
+        _logger.error("Unhandled exception in %s: %s", request.url.path, exc, exc_info=True)
+        verdict = "ALLOW" if getattr(engine, "_fail_open", False) else "BLOCK"
+        return JSONResponse(
+            status_code=500,
+            content={
+                "verdict": verdict,
+                "error": "internal_error",
+                "message": "Internal server error",
+            },
+        )
+
+    @app.exception_handler(RequestValidationError)
+    async def validation_error_handler(request: Request, exc: RequestValidationError):
+        """Return clean validation error without leaking internals."""
+        return JSONResponse(
+            status_code=422,
+            content={
+                "error": "validation_error",
+                "message": "Invalid request format",
+            },
+        )
 
     auth = [Depends(verify_token)]
 
