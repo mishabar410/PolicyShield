@@ -55,6 +55,24 @@ PolicyShield is a runtime policy layer that sits between the LLM and the tools i
 
 ---
 
+## 🔌 Built for OpenClaw
+
+[OpenClaw](https://github.com/AgenturAI/OpenClaw) is an open-source AI agent framework that lets LLMs call tools — shell commands, file operations, API calls, database queries. Out of the box, there are **no guardrails**: the LLM decides what to run, and the tool runs.
+
+PolicyShield plugs into OpenClaw as a sidecar. Every tool call goes through PolicyShield first. If the call violates a rule, it's blocked, redacted, or sent for human approval — before the tool ever executes.
+
+```bash
+# One command — installs plugin, generates 11 security rules, starts server
+pip install "policyshield[server]"
+policyshield openclaw setup
+```
+
+That's it. Your OpenClaw agent is now protected with rules that block `rm -rf`, `curl | bash`, detect PII, and require approval for sensitive operations.
+
+> **Also works with**: LangChain, CrewAI, FastAPI, or any framework — via Python SDK or HTTP API. See [Integrations](#other-integrations).
+
+---
+
 ## Installation
 
 ```bash
