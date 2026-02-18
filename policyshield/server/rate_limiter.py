@@ -28,3 +28,23 @@ class InMemoryRateLimiter:
             for k in stale:
                 del self._requests[k]
             return True
+
+
+class APIRateLimiter:
+    """Rate limiter for HTTP API endpoints."""
+
+    def __init__(
+        self,
+        max_requests: int = 100,
+        window_seconds: float = 60.0,
+    ) -> None:
+        self._max_requests = max_requests
+        self._window = window_seconds
+        self._limiter = InMemoryRateLimiter(max_requests=max_requests, window_seconds=window_seconds)
+
+    def is_allowed(self, key: str) -> bool:
+        return self._limiter.is_allowed(key)
+
+    @property
+    def limit_info(self) -> dict:
+        return {"max_requests": self._max_requests, "window_seconds": self._window}
