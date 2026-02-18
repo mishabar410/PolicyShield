@@ -34,7 +34,9 @@ def _make_bench_engine() -> AsyncShieldEngine:
 
 
 @pytest.fixture
-def bench_client() -> TestClient:
+def bench_client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
+    # Raise API rate limit so 1000 rapid benchmark requests don't get 429
+    monkeypatch.setenv("POLICYSHIELD_API_RATE_LIMIT", "10000")
     engine = _make_bench_engine()
     app = create_app(engine)
     return TestClient(app)

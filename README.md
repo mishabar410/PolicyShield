@@ -321,30 +321,40 @@ pii_patterns:
 |----------|-------------|
 | **YAML DSL** | Declarative rules with regex, glob, exact match, session conditions |
 | **Chain Rules** | Temporal conditions (`when.chain`) — detect multi-step attack patterns |
+| **Rule Composition** | `include:` / `extends:` for rule inheritance and modularity |
 | **Verdicts** | `ALLOW` · `BLOCK` · `REDACT` · `APPROVE` (human-in-the-loop) |
 | **Kill Switch** | `policyshield kill` / `POST /api/v1/kill` — block ALL calls instantly |
 | **Honeypot Tools** | Decoy tools that trigger on prompt injection — always block, even in AUDIT mode |
 | **Doctor** | `policyshield doctor` — 10-check health scan with A-F security grading |
 | **Auto-Rules** | `policyshield generate-rules --from-openclaw` — zero-config rule generation |
-| **HTTP Server** | FastAPI server with check, post-check, health, kill switch, and constraints endpoints |
+| **HTTP Server** | FastAPI server with TLS, API rate limiting, and 11 REST endpoints |
 | **OpenClaw Plugin** | Native plugin with before/after hooks and policy injection |
 | **PII Detection** | EMAIL, PHONE, CREDIT_CARD, SSN, IBAN, IP, PASSPORT, DOB + custom patterns |
 | **Built-in Detectors** | Path traversal, shell injection, SQL injection, SSRF, URL schemes — zero-config |
+| **Plugin System** | Extensible detector API — register custom detectors without forking |
 | **Async Engine** | Full `async`/`await` support for FastAPI, aiohttp, async agents |
-| **Approval Flow** | InMemory and Telegram backends (`POLICYSHIELD_TELEGRAM_TOKEN` / `POLICYSHIELD_TELEGRAM_CHAT_ID`) |
-| **Rate Limiting** | Sliding-window per tool/session, configurable in YAML |
+| **Approval Flow** | InMemory and Telegram backends with circuit breaker and health checks |
+| **Rate Limiting** | Per-tool, per-session, global, and adaptive (burst detection) rate limiting |
+| **Budget Caps** | USD-based per-session and per-hour cost limits |
+| **Shadow Mode** | Test new rules in production (dual-path evaluation, no blocking) |
+| **Canary Deployments** | Roll out rules to N% of sessions, auto-promote after duration |
 | **Hot Reload** | File-watcher auto-reloads rules on change |
+| **Dynamic Rules** | Fetch rules from HTTP/HTTPS with periodic refresh |
 | **Input Sanitizer** | Normalize args, block prompt injection patterns |
+| **Output Policy** | Post-call response scanning with block patterns and size limits |
 | **OpenTelemetry** | OTLP export to Jaeger/Grafana (spans + metrics) |
-| **Trace & Audit** | JSONL log, search, stats, violations, CSV/HTML export |
+| **Trace & Audit** | JSONL log, search, stats, violations, CSV/HTML export, rotation & retention |
 | **Replay & Simulation** | Re-run JSONL traces against new rules (`policyshield replay`) |
+| **Compliance Reports** | HTML reports: verdicts, violations, PII stats, rule coverage |
+| **Incident Timeline** | Chronological session timeline for post-mortems |
 | **AI Rule Writer** | Generate YAML rules from natural language (`policyshield generate`) |
 | **Cost Estimator** | Token/dollar cost estimation per tool call and model |
 | **Alert Engine** | 5 condition types with Console, Webhook, Slack, Telegram backends |
 | **Dashboard** | FastAPI REST API + WebSocket live stream + dark-themed SPA |
-| **Prometheus** | `/metrics` endpoint with per-tool and PII labels + Grafana preset |
+| **Prometheus** | `/metrics` endpoint with per-tool, PII, and approval labels + Grafana preset |
 | **Rule Testing** | YAML test cases for policies (`policyshield test`) |
-| **Rule Linter** | Static analysis: 7 checks including chain rule validation |
+| **Rule Linter** | Static analysis: 7 checks + multi-file validation + dead rule detection |
+| **Config Migration** | `policyshield migrate` — auto-migrate YAML between versions |
 | **Docker** | Container-ready with Dockerfile.server and docker-compose |
 
 ---
@@ -379,6 +389,7 @@ policyshield test ./policies/              # Run YAML test cases
 
 policyshield server --rules ./rules.yaml   # Start HTTP server
 policyshield server --rules ./rules.yaml --port 8100 --mode audit
+policyshield server --rules ./rules.yaml --tls-cert cert.pem --tls-key key.pem
 
 policyshield trace show ./traces/trace.jsonl
 policyshield trace violations ./traces/trace.jsonl
@@ -393,6 +404,9 @@ policyshield trace dashboard --port 8000 --prometheus
 # Replay traces against new rules
 policyshield replay ./traces/trace.jsonl --rules ./new-rules.yaml --changed-only
 
+# Simulate a rule without traces
+policyshield simulate --rule new_rule.yaml --tool exec --args '{"cmd":"ls"}'
+
 # Generate rules from templates (offline)
 policyshield generate --template --tools delete_file send_email -o rules.yaml
 
@@ -402,6 +416,15 @@ policyshield generate "Block all file deletions and require approval for deploys
 # Auto-generate rules from OpenClaw or tool list
 policyshield generate-rules --from-openclaw --url http://localhost:3000
 policyshield generate-rules --tools exec,write_file,delete_file -o policies/rules.yaml
+
+# Compliance report for auditors
+policyshield report --traces ./traces/ --format html
+
+# Incident timeline for post-mortems
+policyshield incident session_abc123 --format html
+
+# Config migration between versions
+policyshield migrate --from 0.11 --to 1.0 rules.yaml
 
 # Kill switch — emergency stop
 policyshield kill --port 8100 --reason "Incident response"
@@ -499,7 +522,7 @@ cd PolicyShield
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev,server]"
 
-pytest tests/ -v                 # 974+ tests
+pytest tests/ -v                 # 1192+ tests
 ruff check policyshield/ tests/  # Lint
 ruff format --check policyshield/ tests/  # Format check
 ```

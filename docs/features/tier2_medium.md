@@ -1,262 +1,134 @@
-# 🟡 Tier 2 — Medium Impact (после v1.0)
+# 🟡 Tier 2 — Medium Impact ✅ (Implemented in v0.12)
 
+> All 20 features implemented and tested (1192 tests passing).
+>
 > **Перенесено в Tier 1.5 как v1.0-blockers:** Config Validation на старте, Retry/Backoff для Telegram,
 > Idempotency, Approval Audit Trail. См. [tier1_5_critical.md](tier1_5_critical.md).
 
-### ~~Config Validation на старте~~ → перенесено в Tier 1.5
+## Phase 1: Resilience & Approval (401–407) ✅
 
-> **Moved up.** Сервер не падает при невалидном конфиге — должен быть fail-fast. См. Tier 1.5.
+### Circuit Breaker для Approval Backends ✅
 
-### ~~Retry/Backoff для Telegram и Webhook~~ → перенесено в Tier 1.5
+Если Telegram или Webhook backend недоступен — circuit breaker переключается на fallback (BLOCK).
 
-> **Moved up.** Без retry approval молча пропадает. См. Tier 1.5.
+→ `policyshield/approval/circuit_breaker.py`
 
-### ~~Idempotency / Request Deduplication~~ → перенесено в Tier 1.5
+### Approval Backend Healthcheck ✅
 
-> **Moved up.** Agent retry → дублирование approvals → confusion. См. Tier 1.5.
+Runtime проверка что Telegram бот жив. Периодический ping + `/readyz` интеграция.
 
-### ~~Approval Audit Trail~~ → перенесено в Tier 1.5
+→ `policyshield/approval/base.py`
 
-> **Moved up.** Кто одобрил и когда — обязательно для compliance. См. Tier 1.5.
+### Rule Simulate / What-If Analysis ✅
 
-### Circuit Breaker для Approval Backends 🔴
+`policyshield simulate --rule new_rule.yaml --tool exec --args '{"cmd":"ls"}'`
 
-Если Telegram или Webhook backend недоступен — approvals висят вечно. Нужен circuit breaker: после N ошибок переключиться на fallback (другой backend или auto-BLOCK).
+→ `policyshield/cli/main.py`
 
-```yaml
-approval:
-  backend: telegram
-  circuit_breaker:
-    failure_threshold: 3
-    reset_timeout: 60s
-    fallback: BLOCK
-```
+### Audit Log Rotation & Retention ✅
 
-- **Усилия**: Средние (~80 строк)
-- **Ценность**: Высокая — resilience, иначе один сбой Telegram кладёт весь approval flow
+JSONL трейсы с ротацией, max-size, TTL.
 
-### Approval Backend Healthcheck 🔴
+→ `policyshield/trace/recorder.py`
 
-`policyshield doctor` проверяет конфиг, но нет **runtime** проверки что Telegram бот жив и может доставлять уведомления. Нужен периодический ping + метрика.
+### TLS для HTTP сервера ✅
 
-- **Усилия**: Маленькие (~30 строк, `/readyz` интеграция)
-- **Ценность**: Высокая — без этого approvals могут молча пропадать
+`policyshield server --rules rules.yaml --tls-cert cert.pem --tls-key key.pem`
 
-### Rule Simulate / What-If Analysis
+→ `policyshield/cli/main.py`
 
-Есть `policyshield replay` для трейсов, но нет простого "что будет если я добавлю это правило" без наличия трейсов.
+### Rate Limit на HTTP API ✅
 
-```bash
-policyshield simulate --rule new_rule.yaml --tool exec --args '{"cmd":"ls"}'
-# Verdict: ALLOW (no rule matched)
-# If new_rule.yaml applied: BLOCK (rule block-exec)
-```
+FastAPI middleware для `/check` и `/post-check` эндпоинтов.
 
-- **Усилия**: Маленькие (~50 строк, обёртка над engine.check)
-- **Ценность**: Средняя — проще отлаживать правила без production трейсов
+→ `policyshield/server/rate_limiter.py`, `policyshield/server/app.py`
 
-### Audit Log Rotation & Retention
+### Approval Metrics (Prometheus) ✅
 
-JSONL трейсы растут бесконечно. Нет ротации, TTL, или max-size. Диск заполнится.
+Метрики: pending count, avg response time, timeout rate.
 
-```yaml
-trace:
-  max_size: 100MB
-  rotation: daily
-  retention: 30d
-```
+→ `policyshield/server/metrics.py`
 
-- **Усилия**: Средние (RotatingFileHandler или кастомный)
-- **Ценность**: Высокая для production
+## Phase 2: Rules Engine (408–414) ✅
 
-### TLS для HTTP сервера
+### Shadow Mode ✅
 
-Bearer token есть, но без TLS токен летит plaintext.
+Новые правила работают параллельно, но не блокируют — только логируют.
 
-```bash
-policyshield server --rules rules.yaml --tls-cert cert.pem --tls-key key.pem
-```
+→ `policyshield/shield/base_engine.py`
 
-- **Усилия**: Маленькие (uvicorn `ssl_certfile`/`ssl_keyfile`)
-- **Ценность**: Высокая — enterprise security
+### Output/Response Policy ✅
 
-### Rate Limit на HTTP API
+Проверка ответов тулов: max_size, block_patterns, output rules.
 
-Rate limiter есть для tool calls внутри engine, но нет для самого HTTP API. Если API открыт — DoS вектор.
+→ `policyshield/core/models.py`
 
-- **Усилия**: Маленькие (FastAPI middleware, `slowapi`)
-- **Ценность**: Средняя — hardening
+### Plugin System (extensible detectors) ✅
 
-### Approval Metrics (Prometheus)
+Generic API для подключения кастомных детекторов.
 
-Prometheus метрики есть для verdicts, но нет метрик на approval flow: pending count, avg response time, timeout rate.
+→ `policyshield/plugins/__init__.py`
 
-- **Усилия**: Маленькие (~20 строк counters/gauges)
-- **Ценность**: Средняя — SLA мониторинг
+### Multi-file Rule Validation ✅
 
-### Shadow Mode
+Lint проверка всего дерева правил с учётом наследования и конфликтов.
 
-Новые правила работают параллельно, но не блокируют — только логируют:
+→ `policyshield/lint/cross_file.py`
 
-```
-policyshield shadow rules_v2.yaml --duration 1h
-```
+### Dead Rule Detection ✅
 
-- **Усилия**: Средние (dual-path в engine)
-- **Ценность**: Высокая — безопасный деплой правил
+Правила, которые никогда не сработали (cross-ref traces × rules).
 
-### Output/Response Policy
+→ `policyshield/lint/dead_rules.py`
 
-Проверка не только аргументов, но и **ответов** тулов:
+### Dynamic Rules — загрузка по HTTP/HTTPS ✅
 
-```yaml
-output_policy:
-  max_size: 10MB
-  block_patterns: [base64_blob, executable_content]
-  rules:
-    - when: { tool: read_database, output_contains: "password" }
-      then: REDACT
-```
+Центральный сервер правил для флота агентов с периодическим обновлением.
 
-- **Усилия**: Средние (вторая pipeline для output)
-- **Ценность**: Высокая — сейчас output проверяется только на PII
+→ `policyshield/shield/remote_loader.py`
 
-### Plugin System (extensible detectors)
+### Rule Composition ✅
 
-Generic API для подключения кастомных детекторов и хуков:
+`include:`, `extends:` — переиспользование и наследование правил.
 
-```python
-from policyshield.plugins import detector
+→ `policyshield/core/parser.py`
 
-@detector("credit_score_leak")
-def check_credit_score(args: dict) -> bool:
-    return "credit_score" in str(args)
-```
+## Phase 3: Observability (415–418) ✅
 
-- **Усилия**: Средние (plugin registry + hooks)
-- **Ценность**: Высокая — расширяемость без форков
+### Budget Caps ✅
 
-### Multi-file Rule Validation
+Per-session и per-hour USD-based cost limits.
 
-`policyshield lint` работает с одним файлом. Когда появится `include:` / `extends:` — нужна lint проверка **всего дерева** правил с учётом наследования и конфликтов между файлами.
+→ `policyshield/shield/budget.py`
 
-```bash
-policyshield lint --recursive ./rules/
-# ✅ base.yaml: 5 rules OK
-# ✅ overrides.yaml: 2 rules OK
-# ⚠️  overrides.yaml:rule-3 shadows base.yaml:rule-2 (same tool pattern, lower priority)
-# ❌ team_a.yaml:rule-7 conflicts with base.yaml:rule-1 (contradicting verdicts)
-```
+### Global & Adaptive Rate Limiting ✅
 
-- **Усилия**: Средние (расширить lint + rule resolver)
-- **Ценность**: Высокая — без этого `include:` / `extends:` развалится на больших проектах
+Global rate limit + adaptive burst detection с auto-cooldown.
 
-### Dead Rule Detection
+→ `policyshield/shield/rate_limiter.py`
 
-Правила, которые никогда не сработали:
+### Compliance Reports ✅
 
-```
-policyshield lint --check unused --traces traces/
-```
+HTML отчёт для аудиторов: verdicts, violations, PII stats, rule coverage.
 
-- **Усилия**: Маленькие (cross-ref traces × rules)
-- **Ценность**: Средняя — гигиена правил
+→ `policyshield/reporting/compliance.py`
 
-### Dynamic Rules — загрузка по HTTP/S3
+### Incident Timeline ✅
 
-Центральный сервер правил для флота агентов:
+Хронологический таймлайн сессии для post-mortem анализа.
 
-```yaml
-rules:
-  source: https://policies.internal/rules.yaml
-  signature_key: ${POLICY_SIGN_KEY}
-  refresh: 30s
-```
+→ `policyshield/reporting/incident.py`
 
-- **Усилия**: Средние
-- **Ценность**: Высокая для production multi-agent
+## Phase 4: Operations (419–420) ✅
 
-### Rule Composition
+### Canary Deployments для правил ✅
 
-`include:`, `extends:`, `priority:` — переиспользование и наследование правил.
+Hash-based session bucketing, auto-promote after configurable duration.
 
-```yaml
-include:
-  - ./base_rules.yaml
-  - ./team_overrides.yaml
-```
+→ `policyshield/shield/canary.py`
 
-- **Усилия**: Средние
-- **Ценность**: Средняя — нужно для больших конфигов
+### `policyshield migrate` — миграция конфига ✅
 
-### Budget Caps
+Sequential migration chain: 0.11 → 0.12 → 1.0.
 
-Не «10 вызовов в минуту», а «не больше $5 за сессию»:
-
-```yaml
-budget:
-  max_per_session: 5.00
-  max_per_hour: 20.00
-  currency: USD
-```
-
-- **Усилия**: Средние (интеграция с cost estimator)
-- **Ценность**: Средняя — для платных API
-
-### Global & Adaptive Rate Limiting
-
-Текущий rate limiter — per-tool sliding window. Не хватает:
-- **Global rate limit** (все тулы в сумме)
-- **Adaptive**: при аномальном поведении автоматически ужесточить
-- **Per-user/role** (связано с RBAC)
-
-- **Усилия**: Средние
-- **Ценность**: Средняя — production hardening
-
-### Compliance Reports
-
-PDF/HTML отчёт для аудиторов:
-
-```
-policyshield report --period 30d --format pdf
-```
-
-- **Усилия**: Средние (aggregator + jinja2 шаблоны)
-- **Ценность**: Высокая для enterprise
-
-### Incident Timeline
-
-Авто-генерация таймлайна сессии при инциденте:
-
-```
-policyshield incident session_abc123 --format html
-```
-
-- **Усилия**: Средние (trace reader + HTML renderer)
-- **Ценность**: Высокая — post-mortem
-
-### Canary Deployments для правил
-
-Новые правила на 5% сессий → мониторинг → 100%:
-
-```yaml
-rules:
-  - id: new-strict-rule
-    canary: 5%
-    promote_after: 24h
-```
-
-- **Усилия**: Средние (session hash routing)
-- **Ценность**: Высокая для production
-
-### `policyshield migrate` — миграция конфига
-
-При обновлении между версиями (v0.x → v1.0) формат YAML может измениться. Автоматическая миграция вместо ручного разбора changelog.
-
-```bash
-policyshield migrate --from 0.11 --to 1.0 rules.yaml
-# Migrated 3 rules: renamed 'then' → 'verdict', added 'severity' defaults
-```
-
-- **Усилия**: Маленькие (~80 строк, YAML transformer)
-- **Ценность**: Средняя — снижает трение при обновлениях
+→ `policyshield/migration/migrator.py`

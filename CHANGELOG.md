@@ -4,6 +4,41 @@ All notable changes to PolicyShield will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.12.0] - 2026-02-19
+
+### Added — Tier 2 Features (20 modules)
+
+**Resilience & Approval (401–407)**
+- **Circuit breaker** for approval backends (Telegram/Webhook) with configurable failure threshold and fallback
+- **Backend health checks** and `/readyz` runtime endpoint
+- **Rule simulation** CLI: `policyshield simulate --rule rule.yaml --tool exec --args '{}'`
+- **Trace log rotation** with max-size, daily rotation, and TTL retention
+- **TLS support** via `--tls-cert`/`--tls-key` for HTTPS server
+- **API rate limiting** middleware for `/check` and `/post-check` endpoints (configurable via env vars)
+- **Approval flow Prometheus metrics** (pending count, response time, timeout rate)
+
+**Rules Engine (408–414)**
+- **Shadow mode**: dual-path rule evaluation (log only, no blocking) for safe rollouts
+- **Output/response policy pipeline**: post-call response scanning with block patterns and size limits
+- **Plugin system**: extensible detector API for custom security checks
+- **Multi-file rule validation**: cross-file lint with conflict and shadow detection
+- **Dead rule detection**: cross-reference rules with trace files to find unused rules
+- **Dynamic rules**: fetch rules from HTTP/HTTPS with periodic refresh
+- **Rule composition**: `include:` / `extends:` for rule inheritance and modularity
+
+**Observability (415–418)**
+- **Budget caps**: per-session and per-hour USD-based cost limits
+- **Global & adaptive rate limiting**: cross-tool rate limiting with burst detection
+- **Compliance reports**: `policyshield report` generates HTML reports for auditors
+- **Incident timeline**: `policyshield incident <session_id>` for post-mortem analysis
+
+**Operations (419–420)**
+- **Canary deployments**: hash-based session bucketing, auto-promote after duration
+- **Config migration**: `policyshield migrate` with sequential migration chain (0.11 → 0.12 → 1.0)
+
+### Fixed
+- **Benchmark CI**: `test_check_latency_p99` was failing with 429 due to API rate limiter; fixed by raising limit in benchmark fixture
+
 ## [0.11.1] - 2026-02-18
 
 ### Fixed

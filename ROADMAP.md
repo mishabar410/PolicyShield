@@ -93,7 +93,7 @@
 - Chain linting check (7 lint checks total)
 - 816 tests
 
-### v0.11 — Tier 0: "Install and Protected" ✅ (current)
+### v0.11 — Tier 0: "Install and Protected" ✅
 - **Built-in Security Patterns**: 5 detectors (path traversal, shell injection, SQL injection, SSRF, URL schemes)
 - **Kill Switch**: `policyshield kill` / `POST /admin/kill` — instant emergency stop
 - **Secure Preset**: `--preset secure` with `default_verdict: BLOCK`, fail-closed, all 5 detectors
@@ -103,15 +103,36 @@
 - **Honeypot Tools**: decoy tool detection, always blocks (even in AUDIT mode)
 - 974 tests
 
+### v0.12 — Tier 2: Medium Impact ✅ (current)
+- **Circuit breaker** for approval backends with fallback
+- **Backend health checks** and `/readyz` runtime endpoint
+- **Rule simulation**: `policyshield simulate` what-if analysis
+- **Trace log rotation** with max-size, daily rotation, TTL retention
+- **TLS support** for HTTPS server
+- **API rate limiting** middleware for `/check` endpoints
+- **Approval flow Prometheus metrics**
+- **Shadow mode**: dual-path evaluation for safe rule rollouts
+- **Output/response policy pipeline** for post-call scanning
+- **Plugin system**: extensible detector API
+- **Multi-file rule validation** with conflict detection
+- **Dead rule detection** via trace cross-reference
+- **Dynamic rules** from HTTP/HTTPS with periodic refresh
+- **Rule composition**: `include:` / `extends:` support
+- **Budget caps**: per-session and per-hour USD limits
+- **Global & adaptive rate limiting** with burst detection
+- **Compliance reports**: HTML reports for auditors
+- **Incident timeline** for post-mortem analysis
+- **Canary deployments**: hash-based session bucketing
+- **Config migration**: `policyshield migrate` between versions
+- 1192 tests
+
 ## Next
 
 ### v1.0 — Production Release (planned)
 - Bounded session storage (LRU eviction, TTL)
-- Rule composition (`include:` / `extends:` / `priority:`)
 - Mypy type checking in CI
 - Coverage gate raised to 90%
 - Production deployment guide
-- Shadow mode for safe rule rollouts
 
 ---
 
@@ -120,12 +141,10 @@
 | Item | Description |
 |------|-------------|
 | **Conditional rules** | `when.context` conditions: time of day, user role, session state |
-| **Dynamic rules** | Fetch rules from remote (HTTP/S3) with signature verification |
 | **Policy-as-Code SDK** | Python API to define rules programmatically alongside YAML |
 | **Rego/OPA bridge** | Optional: evaluate rules via Open Policy Agent |
 | **Multi-tenant** | Per-user / per-org policy sets with inheritance |
 | **RBAC** | Role-based tool access: `admin` can delete, `viewer` cannot |
-| **Compliance packs** | Pre-built rule sets: GDPR, HIPAA, SOX, PCI-DSS |
 | **Agent sandbox** | OS-level isolation for tool execution (containers, seccomp) |
 | **Multi-language SDKs** | TypeScript, Go, Rust wrappers |
 | **Rule marketplace** | Community-contributed policy packs |

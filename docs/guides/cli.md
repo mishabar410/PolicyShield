@@ -203,3 +203,58 @@ policyshield generate-rules --tools exec,write_file,delete_file [-o output.yaml]
 | `--default-verdict` | `BLOCK` | Default verdict for unknown tools |
 | `--force` | — | Overwrite output file if it exists |
 | `-o` | stdout | Output file path |
+
+### `policyshield simulate`
+
+Simulate a rule against a specific tool call without real traces.
+
+```bash
+policyshield simulate --rule <path> --tool <name> --args '<json>'
+```
+
+| Argument | Description |
+|----------|-------------|
+| `--rule` | Path to rule YAML file to test |
+| `--tool` | Tool name to simulate |
+| `--args` | JSON string of tool arguments |
+
+### `policyshield report`
+
+Generate compliance reports for auditors.
+
+```bash
+policyshield report --traces <dir> [--format html|json]
+```
+
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `--traces` | (required) | Path to traces directory |
+| `--format` | `html` | Output format |
+
+### `policyshield incident`
+
+Generate incident timeline for post-mortem analysis.
+
+```bash
+policyshield incident <session_id> [--traces <dir>] [--format text|html]
+```
+
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `session_id` | (required) | Session ID to investigate |
+| `--traces` | auto-detected | Traces directory |
+| `--format` | `text` | Output format |
+
+### `policyshield migrate`
+
+Migrate configuration YAML between PolicyShield versions.
+
+```bash
+policyshield migrate --from <version> --to <version> <config-file>
+```
+
+| Argument | Description |
+|----------|-------------|
+| `--from` | Source version (e.g. `0.11`) |
+| `--to` | Target version (e.g. `1.0`) |
+| `<config-file>` | Path to YAML config to migrate |
