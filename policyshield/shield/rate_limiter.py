@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import time
 import threading
 from collections import defaultdict
@@ -179,3 +180,84 @@ class RateLimitResult:
     window_seconds: float = 0
     current_count: int = 0
     message: str = ""
+
+
+_logger = logging.getLogger(__name__)
+
+
+class GlobalRateLimiter:
+    """Rate limiter across all tools for a session."""
+
+    def __init__(self, max_calls: int = 1000, window: float = 3600.0) -> None:
+        self._max_calls = max_calls
+        self._window = window
+        self._counters: dict[str, _SlidingWindow] = {}
+        self._lock = threading.Lock()
+
+    def check(self, session_id: str) -> bool:
+        """Returns True if the call is allowed."""
+        now = time.monotonic()
+        with self._lock:
+            if session_id not in self._counters:
+                self._counters[session_id] = _SlidingWindow()
+            counter = self._counters[session_id]
+            count = counter.count_in_window(now, self._window)
+            if count >= self._max_calls:
+                return False
+            counter.add(now)
+            return True
+
+
+class AdaptiveRateLimiter:
+    """Automatically tightens rate limits on anomalous behavior."""
+
+    def __init__(
+        self,
+        base_limit: int = 100,
+        window: float = 60.0,
+        burst_threshold: float = 3.0,
+        tighten_factor: float = 0.5,
+        cooldown: float = 300.0,
+    ) -> None:
+        self._base_limit = base_limit
+        self._window = window
+        self._burst_threshold = burst_threshold
+        self._tighten_factor = tighten_factor
+        self._cooldown = cooldown
+        self._effective_limit = base_limit
+        self._call_history: list[float] = []
+        self._last_tighten: float = 0
+        self._lock = threading.Lock()
+
+    @property
+    def effective_limit(self) -> int:
+        with self._lock:
+            if self._effective_limit < self._base_limit:
+                if time.monotonic() - self._last_tighten > self._cooldown:
+                    self._effective_limit = self._base_limit
+            return self._effective_limit
+
+    def check_and_adapt(self, session_id: str) -> tuple[bool, dict]:
+        """Check rate limit and adapt if necessary."""
+        now = time.monotonic()
+
+        with self._lock:
+            cutoff = now - self._window
+            self._call_history = [t for t in self._call_history if t > cutoff]
+            current_rate = len(self._call_history)
+
+            # Detect burst
+            if current_rate > self._base_limit * self._burst_threshold:
+                self._effective_limit = max(1, int(self._base_limit * self._tighten_factor))
+                self._last_tighten = now
+                _logger.warning(
+                    "Adaptive rate limit tightened: %d → %d",
+                    self._base_limit,
+                    self._effective_limit,
+                )
+
+            if current_rate >= self._effective_limit:
+                return False, {"rate": current_rate, "limit": self._effective_limit, "adapted": True}
+
+            self._call_history.append(now)
+            return True, {"rate": current_rate + 1, "limit": self._effective_limit}
