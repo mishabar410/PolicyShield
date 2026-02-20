@@ -6,6 +6,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 from policyshield import __version__
 from policyshield.core.exceptions import PolicyShieldParseError
@@ -384,6 +385,7 @@ def _cmd_server(parsed: argparse.Namespace) -> int:
     # Use Telegram backend if env vars are set, otherwise InMemory
     tg_token = os.environ.get("POLICYSHIELD_TELEGRAM_TOKEN")
     tg_chat = os.environ.get("POLICYSHIELD_TELEGRAM_CHAT_ID")
+    approval_backend: Any
     if tg_token and tg_chat:
         from policyshield.approval.telegram import TelegramApprovalBackend
 

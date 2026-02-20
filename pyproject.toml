@@ -104,8 +104,6 @@ addopts = "-m 'not benchmark'"
 
 [tool.coverage.run]
 omit = [
-    "policyshield/server/*",
-    "policyshield/dashboard/*",
     "policyshield/trace/otel.py",
 ]
 

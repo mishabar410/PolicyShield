@@ -114,7 +114,7 @@ class TraceExporter:
                 row_class = ' class="row-approve"'
 
             rows_html.write(f"<tr{row_class}>")
-            for c in cols:
+            for c in cols:  # type: ignore[assignment]
                 if c == "pii_types":
                     val = ";".join(rec.get("pii_types") or [])
                 elif c == "args_hash":

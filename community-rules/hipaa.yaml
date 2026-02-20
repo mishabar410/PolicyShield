@@ -9,6 +9,10 @@
 #
 # Note: These rules cover common PHI scenarios. Customize for
 # your specific covered entity and business associate agreements.
+#
+# DISCLAIMER: These rules are NOT a substitute for professional legal
+# or compliance review. They represent best-effort community patterns
+# and may not cover all HIPAA requirements for your use case.
 
 shield_name: hipaa-compliance
 version: 1

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from typing import Any
 
 from policyshield.core.models import ChainCondition, RuleConfig, RuleSet, Severity, Verdict
 
@@ -269,7 +270,7 @@ class MatcherEngine:
     def _check_chain(
         self,
         chain: list[dict],
-        event_buffer: object | None,
+        event_buffer: Any,
     ) -> bool:
         """Check whether all chain prerequisites are satified in the event buffer."""
         if event_buffer is None:

@@ -1,6 +1,6 @@
 # HTTP Server / FastAPI
 
-PolicyShield includes a built-in HTTP server for framework-agnostic policy enforcement. This is the recommended way to integrate with non-Python frameworks (e.g., OpenClaw, TypeScript agents).
+PolicyShield includes a built-in HTTP server for policy enforcement. This is the recommended way to integrate with non-Python frameworks (e.g., OpenClaw, TypeScript agents).
 
 ## Starting the server
 

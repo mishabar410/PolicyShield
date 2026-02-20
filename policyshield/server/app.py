@@ -319,7 +319,7 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
         if idem_key:
             cached = _idem_cache.get(idem_key)
             if cached:
-                return JSONResponse(content=cached)
+                return JSONResponse(content=cached)  # type: ignore[return-value]
         result = await engine.check(
             tool_name=req.tool_name,
             args=req.args,

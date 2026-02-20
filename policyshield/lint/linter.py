@@ -129,7 +129,7 @@ class RuleLinter:
         """Check for rules with the same tool and overlapping args_match but different verdicts."""
         warnings: list[LintWarning] = []
         # Group rules by tool pattern
-        tool_groups: dict[str, list] = {}
+        tool_groups: dict[str | tuple[str, ...], list] = {}
         for rule in ruleset.rules:
             if not rule.enabled:
                 continue

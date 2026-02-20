@@ -170,6 +170,7 @@ class TraceRecorder:
             self._rotate()
 
         try:
+            assert self._file_path is not None
             with self._open_file(self._file_path) as f:
                 for entry in self._buffer:
                     f.write(json.dumps(entry, default=str) + "\n")

@@ -45,7 +45,10 @@ _default_engine: Any = None
 def _get_default_engine() -> Any:
     global _default_engine
     if _default_engine is None:
+        import os
+
         from policyshield.shield.engine import ShieldEngine
 
-        _default_engine = ShieldEngine()
+        rules_path = os.environ.get("POLICYSHIELD_RULES", "policies/rules.yaml")
+        _default_engine = ShieldEngine(rules=rules_path)
     return _default_engine

@@ -73,7 +73,7 @@ def fetch_tools(
         elif isinstance(item, dict):
             result.append(
                 ToolInfo(
-                    name=item.get("name", item.get("tool_name", "")),
+                    name=item.get("name") or item.get("tool_name") or "",
                     description=item.get("description", ""),
                     parameters=item.get("parameters", item.get("params")),
                 )

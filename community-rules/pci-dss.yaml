@@ -10,6 +10,10 @@
 # Note: PCI-DSS compliance requires many controls beyond
 # tool-call policy. These rules cover the data-in-transit
 # and data-handling aspects relevant to AI agent tool calls.
+#
+# DISCLAIMER: These rules are NOT a substitute for professional legal
+# or compliance review. They represent best-effort community patterns
+# and may not cover all PCI-DSS requirements for your use case.
 
 shield_name: pci-dss-compliance
 version: 1

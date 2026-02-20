@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 import yaml
@@ -22,7 +23,7 @@ class Migrator:
     """Applies sequential migrations to PolicyShield YAML config."""
 
     def __init__(self) -> None:
-        self._migrations: list[tuple[str, str, object]] = []
+        self._migrations: list[tuple[str, str, Callable[[dict], list[str]]]] = []
         self._register_all()
 
     def _register_all(self) -> None:

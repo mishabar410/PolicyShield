@@ -9,6 +9,10 @@
 #
 # Note: These rules provide a baseline. Customize for your
 # specific data processing activities and legal basis.
+#
+# DISCLAIMER: These rules are NOT a substitute for professional legal
+# or compliance review. They represent best-effort community patterns
+# and may not cover all GDPR requirements for your use case.
 
 shield_name: gdpr-compliance
 version: 1

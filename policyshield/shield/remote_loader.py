@@ -6,6 +6,7 @@ import hashlib
 import hmac
 import logging
 import threading
+from typing import Any
 
 import httpx
 
@@ -31,7 +32,7 @@ class RemoteRuleLoader:
         url: str,
         refresh_interval: float = 30.0,
         signature_key: str | None = None,
-        callback: object = None,
+        callback: Any = None,
         timeout: float = 10.0,
     ) -> None:
         self._url = url

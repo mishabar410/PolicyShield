@@ -42,12 +42,12 @@ class BaseShieldEngine:
         pii_detector: PIIDetector | None = None,
         session_manager: SessionManager | None = None,
         trace_recorder: TraceRecorder | None = None,
-        rate_limiter: object | None = None,
+        rate_limiter: Any = None,
         approval_backend: ApprovalBackend | None = None,
         approval_cache: ApprovalCache | None = None,
         fail_open: bool = True,
-        otel_exporter: object | None = None,
-        sanitizer: object | None = None,
+        otel_exporter: Any = None,
+        sanitizer: Any = None,
     ):
         """Initialize engine components.
 
@@ -94,7 +94,7 @@ class BaseShieldEngine:
         self._otel = otel_exporter
         self._sanitizer = sanitizer
         self._lock = threading.Lock()
-        self._watcher = None
+        self._watcher: Any = None
         # Approval metadata for cache population after resolution
         self._approval_meta: dict[str, dict] = {}
         self._approval_meta_ts: dict[str, float] = {}
@@ -113,7 +113,7 @@ class BaseShieldEngine:
         if honeypot_config:
             from policyshield.shield.honeypots import HoneypotChecker
 
-            self._honeypot_checker: object | None = HoneypotChecker.from_config(honeypot_config)
+            self._honeypot_checker: Any = HoneypotChecker.from_config(honeypot_config)
         else:
             self._honeypot_checker = None
 
