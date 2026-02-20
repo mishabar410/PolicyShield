@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Test hot reload and kill switch via direct API."""
-import json, urllib.request, time
+import json
+import urllib.request
 
 BASE = "http://localhost:8100/api/v1"
 

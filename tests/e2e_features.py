@@ -203,7 +203,7 @@ passed = sum(1 for _, p in results if p)
 total = len(results)
 print(f"  Results: {passed}/{total} passed")
 if passed == total:
-    print(f"  🎉 ALL FEATURES VERIFIED!")
+    print("  🎉 ALL FEATURES VERIFIED!")
 else:
     failed = [name for name, p in results if not p]
     print(f"  Failed: {', '.join(failed)}")
