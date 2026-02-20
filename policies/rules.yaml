@@ -1,4 +1,12 @@
-# PolicyShield rules — preset: openclaw
+# PolicyShield rules for OpenClaw agents
+#
+# Real OpenClaw tool names (from openclaw/src/agents/tools/):
+#   read, write, edit, exec, bash, message, canvas, image, gateway,
+#   cron, tts, sessions_send, sessions_spawn, sessions_list,
+#   sessions_history, session_status, agents_list, memory_search,
+#   memory_get
+#
+# Tool names from MCP servers or custom tools will vary by setup.
 shield_name: openclaw-policy
 version: 1
 rules:
@@ -69,10 +77,9 @@ rules:
     tool: write
     args_match:
       path:
-        regex: \.(env|pem|key|crt|p12|pfx)(\..*)?$
+        regex: \.(env|pem|key|crt|p12|pfx)$
   then: approve
   severity: high
-  priority: 100
   message: Writing to sensitive file requires approval
 - id: approve-ssh-access
   description: Require approval for SSH key modification
@@ -83,24 +90,23 @@ rules:
         contains: .ssh/
   then: approve
   severity: critical
-  priority: 100
   message: SSH key modification requires approval
 - id: rate-limit-exec
-  description: Rate limit exec calls
+  description: Rate limit exec calls per session
   when:
     tool: exec
     session:
       tool_count.exec:
         gt: 60
   then: block
-  message: exec rate limit exceeded (60/min)
+  message: exec rate limit exceeded (60 calls/session)
 - id: rate-limit-web
-  description: Rate limit web_fetch calls
+  description: Rate limit web_fetch calls per session
   when:
     tool: web_fetch
     session:
       tool_count.web_fetch:
         gt: 30
   then: block
-  message: web_fetch rate limit exceeded (30/min)
+  message: web_fetch rate limit exceeded (30 calls/session)
 default_verdict: allow

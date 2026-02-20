@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "policyshield"
-version = "0.10.0"
+version = "0.11.0"
 description = "Declarative firewall for AI agent tool calls"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -46,6 +46,7 @@ dashboard = [
 server = [
     "fastapi>=0.100",
     "uvicorn[standard]>=0.20",
+    "httpx>=0.24",
 ]
 prometheus = [
     "prometheus-client>=0.17",

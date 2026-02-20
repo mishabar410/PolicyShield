@@ -104,7 +104,7 @@ class TestVersionSync:
     def test_version_is_current(self):
         from policyshield import __version__
 
-        assert __version__ == "0.10.0"
+        assert __version__ == "0.11.0"
 
     def test_pyproject_version_matches_init(self):
         from policyshield import __version__
@@ -117,7 +117,7 @@ class TestVersionSync:
 
     def test_changelog_has_current_version(self):
         content = (ROOT / "CHANGELOG.md").read_text()
-        assert "[0.10.0]" in content
+        assert "[0.11.0]" in content
 
     def test_server_app_uses_dynamic_version(self):
         import importlib
@@ -154,4 +154,4 @@ class TestVersionSync:
             pytest.skip("plugin package.json not found")
 
         data = json.loads(pkg.read_text())
-        assert data["version"] == "0.10.0"
+        assert data["version"] == "0.11.0"
