@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Test hot reload and kill switch via direct API."""
+
 import json
 import urllib.request
 
 BASE = "http://localhost:8100/api/v1"
+
 
 def api(method, path, body=None):
     url = f"{BASE}{path}"
@@ -14,8 +16,10 @@ def api(method, path, body=None):
     with urllib.request.urlopen(req, timeout=5) as resp:
         return json.loads(resp.read())
 
+
 def check(tool, args, session="test"):
     return api("POST", "/check", {"tool_name": tool, "args": args, "session_id": session})
+
 
 print("=== HOT RELOAD TEST ===")
 
