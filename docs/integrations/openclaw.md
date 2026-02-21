@@ -8,17 +8,19 @@ that intercepts every tool call and enforces declarative YAML-based security pol
 ## TL;DR — get running in 2 minutes
 
 ```bash
-# 1. Install
+# 1. Install & set up everything (server + plugin + rules)
 pip install "policyshield[server]"
-
-# 2. Set up everything (server + plugin + rules)
 policyshield openclaw setup
 
-# 3. Start with demo rules that block HARMLESS commands (cat, ls, echo)
+# 2. Stop the server (setup started it with production rules)
+policyshield openclaw teardown
+
+# 3. Restart with demo rules that block HARMLESS commands (cat, ls, echo)
 #    This proves PolicyShield is blocking — not the LLM self-censoring.
 policyshield server --rules policies/demo-verify.yaml --port 8100
 
 # 4. Ask the agent to do something any LLM would normally do
+#    (requires OPENAI_API_KEY or any provider key configured in OpenClaw)
 openclaw agent --local --session-id test \
   -m "Show me the contents of /etc/hosts using cat"
 ```
@@ -27,10 +29,9 @@ openclaw agent --local --session-id test \
 
 🎉 No LLM would refuse `cat /etc/hosts` on its own — that's PolicyShield blocking it.
 
-Once verified, switch to real security rules: `policyshield server --rules policies/rules.yaml --port 8100`
+Once verified, stop the demo server (`Ctrl+C`) and switch to real security rules: `policyshield server --rules policies/rules.yaml --port 8100`
 
-> **Note:** Step 4 requires an LLM API key (`OPENAI_API_KEY` env var).
-> If you don't have one yet, you can verify the server directly with curl — see [smoke tests](#verifying-without-an-llm-curl-smoke-tests) below.
+> **No API key?** You can verify the server directly with curl — see [smoke tests](#verifying-without-an-llm-curl-smoke-tests) below.
 
 ---
 

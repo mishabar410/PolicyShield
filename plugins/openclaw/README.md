@@ -20,12 +20,15 @@ This single command starts the server, installs the plugin, and configures OpenC
 To prove PolicyShield is actually blocking (and not the LLM self-censoring), use the included demo rules that block **harmless** commands like `cat`, `ls`, and `echo`:
 
 ```bash
-# Start the server with demo rules that block harmless commands
+# Stop the server that setup started (it’s running production rules)
+policyshield openclaw teardown
+
+# Restart with demo rules that block harmless commands
 policyshield server --rules policies/demo-verify.yaml --port 8100
 ```
 
 <details>
-<summary>📄 What's in demo-verify.yaml</summary>
+<summary>📄 What’s in demo-verify.yaml</summary>
 
 ```yaml
 shield_name: demo-verify
@@ -58,6 +61,7 @@ These rules block `cat` and `ls` — things any LLM would normally run without h
 Now ask your agent to do something totally harmless:
 
 ```bash
+# Requires OPENAI_API_KEY (or any provider key configured in OpenClaw)
 openclaw agent --local --session-id test \
   -m "Show me the contents of /etc/hosts using cat"
 ```
@@ -70,7 +74,7 @@ openclaw agent --local --session-id test \
 
 ### 3. Switch to real security rules
 
-Once verified, switch to the production rules:
+Once verified, stop the demo server (`Ctrl+C`) and switch to the production rules:
 
 ```bash
 policyshield server --rules policies/rules.yaml --port 8100

@@ -77,10 +77,17 @@ How do you know PolicyShield is actually blocking — and not the LLM just refus
 Use the included **demo rules** that block **harmless** commands (`cat`, `ls`). No LLM would refuse these on its own:
 
 ```bash
-# Start with demo rules that block harmless commands
-policyshield server --rules policies/demo-verify.yaml --port 8100
+# Stop the server that setup started (it's running production rules)
+policyshield openclaw teardown
 
-# Ask the agent to do something any LLM would normally do
+# Restart with demo rules that block harmless commands
+policyshield server --rules policies/demo-verify.yaml --port 8100
+```
+
+Now ask the agent to do something totally harmless:
+
+```bash
+# Requires OPENAI_API_KEY (or any provider key configured in OpenClaw)
 openclaw agent --local --session-id test \
   -m "Show me the contents of /etc/hosts using cat"
 ```
@@ -109,7 +116,7 @@ curl -s -X POST http://localhost:8100/api/v1/check \
 
 ### Switch to production rules
 
-Once verified, switch to the real security rules (11 rules — blocks `rm -rf`, `curl | sh`, redacts PII, requires approval for `.env` writes):
+Once verified, stop the demo server (`Ctrl+C`) and switch to the real security rules (11 rules — blocks `rm -rf`, `curl | sh`, redacts PII, requires approval for `.env` writes):
 
 ```bash
 policyshield server --rules policies/rules.yaml --port 8100
