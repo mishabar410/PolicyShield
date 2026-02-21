@@ -1,0 +1,47 @@
+# PolicyShield demo rules — for verifying the integration works.
+# These rules intentionally block HARMLESS commands so you can confirm
+# that PolicyShield is the one blocking, not the LLM.
+#
+# Usage:
+#   policyshield server --rules policies/demo-verify.yaml --port 8100
+#
+# After verifying, switch to the real rules:
+#   policyshield server --rules policies/rules.yaml --port 8100
+
+shield_name: demo-verify
+version: 1
+rules:
+  - id: block-cat
+    description: Block the cat command (demo rule to prove PolicyShield works)
+    when:
+      tool: exec
+      args_match:
+        command:
+          contains: cat
+    then: block
+    severity: high
+    message: "🛡️ PolicyShield blocked 'cat' (demo rule: block-cat)"
+
+  - id: block-ls
+    description: Block the ls command (demo rule to prove PolicyShield works)
+    when:
+      tool: exec
+      args_match:
+        command:
+          regex: \bls\b
+    then: block
+    severity: high
+    message: "🛡️ PolicyShield blocked 'ls' (demo rule: block-ls)"
+
+  - id: block-echo
+    description: Block the echo command (demo rule to prove PolicyShield works)
+    when:
+      tool: exec
+      args_match:
+        command:
+          regex: \becho\b
+    then: block
+    severity: high
+    message: "🛡️ PolicyShield blocked 'echo' (demo rule: block-echo)"
+
+default_verdict: allow

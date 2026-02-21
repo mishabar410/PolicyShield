@@ -1,49 +1,139 @@
 # @policyshield/openclaw-plugin
 
-> 🛡️ PolicyShield plugin for [OpenClaw](https://github.com/AgenturAI/OpenClaw) — runtime tool call policy enforcement for AI agents.
+> 🛡️ PolicyShield plugin for [OpenClaw](https://github.com/AgenturAI/OpenClaw) — blocks dangerous tool calls, redacts PII, and adds human approval to your AI agent.
 
-> Verified with **OpenClaw 2026.2.13** and **PolicyShield 0.9.0**.
+## Quick Start (2 minutes)
 
-## What it does
+> **Requires:** Python ≥ 3.10, OpenClaw ≥ 2026.2
 
-Intercepts every tool call in OpenClaw and enforces declarative YAML-based security policies:
-
-- **BLOCK** — prevent dangerous tool calls (e.g., `rm -rf /`, `curl | sh`)
-- **REDACT** — mask PII before it reaches tools (emails, phones, credit cards)
-- **APPROVE** — require human confirmation for sensitive operations
-- **ALLOW** — let safe calls through with audit trail
-
-## Quick Start
-
-### 1. Start the PolicyShield server
+### 1. Install & start
 
 ```bash
 pip install "policyshield[server]"
-policyshield init --preset openclaw --no-interactive
+policyshield openclaw setup
+```
+
+This single command starts the server, installs the plugin, and configures OpenClaw.
+
+### 2. Verify the integration works
+
+To prove PolicyShield is actually blocking (and not the LLM self-censoring), use the included demo rules that block **harmless** commands like `cat`, `ls`, and `echo`:
+
+```bash
+# Start the server with demo rules that block harmless commands
+policyshield server --rules policies/demo-verify.yaml --port 8100
+```
+
+<details>
+<summary>📄 What's in demo-verify.yaml</summary>
+
+```yaml
+shield_name: demo-verify
+version: 1
+rules:
+  - id: block-cat
+    when:
+      tool: exec
+      args_match:
+        command:
+          contains: cat
+    then: block
+    message: "🛡️ PolicyShield blocked 'cat' (demo rule: block-cat)"
+
+  - id: block-ls
+    when:
+      tool: exec
+      args_match:
+        command:
+          regex: \bls\b
+    then: block
+    message: "🛡️ PolicyShield blocked 'ls' (demo rule: block-ls)"
+
+default_verdict: allow
+```
+
+These rules block `cat` and `ls` — things any LLM would normally run without hesitation.
+</details>
+
+Now ask your agent to do something totally harmless:
+
+```bash
+openclaw agent --local --session-id test \
+  -m "Show me the contents of /etc/hosts using cat"
+```
+
+**Expected response:**
+
+> "I can't run the `cat` command due to **policy restrictions**."
+
+🎉 **Proof it works!** No LLM would refuse `cat /etc/hosts` on its own — that's PolicyShield blocking it.
+
+### 3. Switch to real security rules
+
+Once verified, switch to the production rules:
+
+```bash
 policyshield server --rules policies/rules.yaml --port 8100
 ```
 
-Verify: `curl http://localhost:8100/api/v1/health`
+These rules block things that actually matter:
 
-### 2. Install the plugin into OpenClaw
+| Rule | Verdict | Catches |
+|------|---------|---------|
+| Destructive commands | 🛑 BLOCK | `rm -rf`, `mkfs`, `dd if=`, `chmod 777` |
+| Remote code execution | 🛑 BLOCK | `curl \| sh`, `wget \| bash` |
+| Secrets exfiltration | 🛑 BLOCK | `curl ... $API_KEY`, `wget ... $SECRET` |
+| Environment dumps | 🛑 BLOCK | `env`, `printenv` |
+| PII in messages | ✂️ REDACT | Emails, phones, SSNs in outgoing messages |
+| PII in file writes | ✂️ REDACT | PII in `write` / `edit` tool calls |
+| Sensitive file writes | 🔒 APPROVE | `.env`, `.pem`, `.key`, SSH keys |
+| Rate limits | 🛑 BLOCK | >60 exec or >30 web_fetch per session |
+
+---
+
+## How it works
+
+```
+  OpenClaw Agent
+       │
+       │ LLM wants to call tool("exec", {command: "cat /etc/hosts"})
+       ▼
+  ┌─────────────────────────────┐
+  │  PolicyShield Plugin (TS)   │── before_tool_call ──▶ POST /api/v1/check
+  │                             │◀── verdict: BLOCK ───  PolicyShield Server
+  └─────────────────────────────┘
+       │
+       ▼
+  Tool call BLOCKED — agent tells user it can't do that.
+```
+
+| Hook | When | What happens |
+|------|------|-------------|
+| `before_agent_start` | Session starts | Injects security rules into the LLM system prompt |
+| `before_tool_call` | Before every tool call | Checks policy → ALLOW / BLOCK / REDACT / APPROVE |
+| `after_tool_call` | After every tool call | Scans tool output for PII leaks |
+
+---
+
+## Verifying without an LLM (curl)
+
+If you don't have an API key, verify the server directly:
 
 ```bash
-npm install --prefix ~/.openclaw/extensions/policyshield @policyshield/openclaw-plugin
-cp -r ~/.openclaw/extensions/policyshield/node_modules/@policyshield/openclaw-plugin/* \
-     ~/.openclaw/extensions/policyshield/
+# Should return "verdict": "BLOCK" (with demo rules loaded)
+curl -s -X POST http://localhost:8100/api/v1/check \
+  -H "Content-Type: application/json" \
+  -d '{"tool_name": "exec", "args": {"command": "cat /etc/hosts"}}' \
+  | python3 -m json.tool
+
+# Should return "verdict": "ALLOW" (pwd is not blocked)
+curl -s -X POST http://localhost:8100/api/v1/check \
+  -H "Content-Type: application/json" \
+  -d '{"tool_name": "exec", "args": {"command": "pwd"}}' \
+  | python3 -m json.tool
 ```
 
-### 3. Configure the server URL
-
-Add to `~/.openclaw/openclaw.json` under `plugins.entries`:
-
-```json
-"policyshield": { "enabled": true, "config": { "url": "http://localhost:8100" } }
-```
-
-Or use the one-command setup: `policyshield openclaw setup`
-
-### 4. Verify the plugin is loaded
+Check plugin status:
 
 ```bash
 openclaw plugins info policyshield
@@ -51,33 +141,9 @@ openclaw plugins info policyshield
 # → ✓ Connected to PolicyShield server
 ```
 
-### 5. Test it
-
-```bash
-openclaw agent --local --session-id test -m "Run: rm -rf /"
-# → "I'm unable to execute that command as it is considered destructive
-#    and is blocked by policy."
-```
-
-## Plugin Hooks
-
-| Hook | When | What it does |
-|------|------|-------------|
-| `before_agent_start` | Agent session starts | Injects all active policy rules into the LLM system prompt |
-| `before_tool_call` | Before every tool call | Checks policy → ALLOW, BLOCK, REDACT, or APPROVE |
-| `after_tool_call` | After every tool call | Scans tool output for PII leaks |
-
-## Features
-
-- 🔒 **Pre-check**: blocks/redacts tool calls before execution
-- 📝 **Post-check**: scans tool output for PII leaks
-- 🧠 **Prompt enrichment**: injects active rules into agent context
-- ⏱️ **Human-in-the-loop**: APPROVE verdict with Telegram or REST approval backends
-- 🛡️ **Fail-open**: graceful degradation when server is down
+---
 
 ## Configuration
-
-Set options via the OpenClaw CLI:
 
 ```bash
 openclaw config set plugins.entries.policyshield.config.<key> <value>
@@ -99,11 +165,19 @@ openclaw config set plugins.entries.policyshield.config.<key> <value>
 |---------|-----|
 | `⚠ PolicyShield server unreachable` | Check server is running: `curl http://localhost:8100/api/v1/health` |
 | `plugin id mismatch` warning | Cosmetic — rename `~/.openclaw/extensions/openclaw-plugin` to `policyshield` |
-| `No API key found` | Set model + auth profile (see [full guide](../../docs/integrations/openclaw.md)) |
+| `No API key found` | Set `OPENAI_API_KEY` env var, or see [full guide](../../docs/integrations/openclaw.md) |
+| `externally-managed-environment` | Use a venv: `python3 -m venv venv && source venv/bin/activate` |
+| `Requires-Python >=3.10` | Install Python 3.10+: `brew install python@3.12` |
+
+## Teardown
+
+```bash
+policyshield openclaw teardown
+```
 
 ## Documentation
 
-Full integration guide: [docs/integrations/openclaw.md](../../docs/integrations/openclaw.md)
+Full integration guide with Docker, Telegram approvals, and architecture: [docs/integrations/openclaw.md](../../docs/integrations/openclaw.md)
 
 ## License
 
