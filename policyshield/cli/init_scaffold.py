@@ -292,6 +292,35 @@ _OPENCLAW_RULES: list[dict[str, Any]] = [
     },
 ]
 
+# Demo rules that block HARMLESS commands to prove PolicyShield is enforcing.
+# Used for verification: no LLM would refuse "cat /etc/hosts" on its own.
+_DEMO_VERIFY_RULES: list[dict[str, Any]] = [
+    {
+        "id": "block-cat",
+        "description": "Block the cat command (demo rule to prove PolicyShield works)",
+        "when": {"tool": "exec", "args_match": {"command": {"contains": "cat"}}},
+        "then": "block",
+        "severity": "high",
+        "message": "\ud83d\udee1\ufe0f PolicyShield blocked 'cat' (demo rule: block-cat)",
+    },
+    {
+        "id": "block-ls",
+        "description": "Block the ls command (demo rule to prove PolicyShield works)",
+        "when": {"tool": "exec", "args_match": {"command": {"regex": r"\bls\b"}}},
+        "then": "block",
+        "severity": "high",
+        "message": "\ud83d\udee1\ufe0f PolicyShield blocked 'ls' (demo rule: block-ls)",
+    },
+    {
+        "id": "block-echo",
+        "description": "Block the echo command (demo rule to prove PolicyShield works)",
+        "when": {"tool": "exec", "args_match": {"command": {"regex": r"\becho\b"}}},
+        "then": "block",
+        "severity": "high",
+        "message": "\ud83d\udee1\ufe0f PolicyShield blocked 'echo' (demo rule: block-echo)",
+    },
+]
+
 _SECURE_RULES: list[dict[str, Any]] = [
     # === Whitelist: safe read-only operations ===
     {
@@ -542,6 +571,30 @@ def scaffold(
             encoding="utf-8",
         )
         created.append("policies/rules.yaml")
+
+    # demo-verify.yaml — only for openclaw preset
+    if preset == "openclaw":
+        demo_file = policies_dir / "demo-verify.yaml"
+        if demo_file.exists():
+            print(f"  ⚠ Skipped {demo_file} (already exists)")
+        else:
+            demo_data: dict[str, Any] = {
+                "shield_name": "demo-verify",
+                "version": 1,
+                "rules": [dict(r) for r in _DEMO_VERIFY_RULES],
+                "default_verdict": "allow",
+            }
+            demo_file.write_text(
+                "# PolicyShield demo rules — blocks harmless commands to prove the integration works.\n"
+                "# No LLM would refuse 'cat /etc/hosts' on its own — if it does, that's PolicyShield.\n"
+                "#\n"
+                "# Usage: policyshield server --rules policies/demo-verify.yaml --port 8100\n"
+                "# After verifying, switch to production rules:\n"
+                "#   policyshield server --rules policies/rules.yaml --port 8100\n"
+                + yaml.dump(demo_data, default_flow_style=False, allow_unicode=True, sort_keys=False),
+                encoding="utf-8",
+            )
+            created.append("policies/demo-verify.yaml")
 
     # test_rules.yaml
     test_file = tests_dir / "test_rules.yaml"
