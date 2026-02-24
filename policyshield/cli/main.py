@@ -268,6 +268,14 @@ def app(args: list[str] | None = None) -> int:
     openapi_parser.add_argument("--output", "-o", default=None, help="Output file (default: stdout)")
     openapi_parser.add_argument("--indent", type=int, default=2, help="JSON indent (default: 2)")
 
+    # check (dry-run) command
+    check_parser = subparsers.add_parser("check", help="One-shot tool call check (dry-run)")
+    check_parser.add_argument("--tool", required=True, help="Tool name to check")
+    check_parser.add_argument("--args", default="{}", help="JSON args string")
+    check_parser.add_argument("--rules", required=True, help="Path to YAML rules file")
+    check_parser.add_argument("--session-id", default="cli", help="Session ID")
+    check_parser.add_argument("--json", dest="json_output", action="store_true", help="JSON output")
+
     parsed = parser.parse_args(args)
 
     if parsed.command == "validate":
@@ -332,6 +340,8 @@ def app(args: list[str] | None = None) -> int:
         return _cmd_simulate(parsed)
     elif parsed.command == "openapi":
         return _cmd_openapi(parsed)
+    elif parsed.command == "check":
+        return _cmd_check(parsed)
     elif parsed.command == "openclaw":
         from policyshield.cli.openclaw import cmd_openclaw
 
@@ -1382,3 +1392,41 @@ def _cmd_openapi(parsed: argparse.Namespace) -> int:
         print(output)
 
     return 0
+
+
+def _cmd_check(parsed: argparse.Namespace) -> int:
+    """One-shot tool call check (dry-run)."""
+    rules_path = Path(parsed.rules)
+    if not rules_path.exists():
+        print(f"✗ Rules not found: {rules_path}", file=sys.stderr)
+        return 1
+
+    from policyshield.shield.engine import ShieldEngine
+
+    engine = ShieldEngine(rules=rules_path)
+    try:
+        args = json.loads(parsed.args)
+    except json.JSONDecodeError as e:
+        print(f"✗ Invalid JSON args: {e}", file=sys.stderr)
+        return 1
+
+    result = engine.check(parsed.tool, args, session_id=parsed.session_id)
+
+    if getattr(parsed, "json_output", False):
+        out = {
+            "verdict": result.verdict.value,
+            "message": result.message,
+            "rule_id": result.rule_id,
+        }
+        if result.modified_args:
+            out["modified_args"] = result.modified_args
+        if result.pii_matches:
+            out["pii_types"] = [m.pii_type.value for m in result.pii_matches]
+        print(json.dumps(out, indent=2))
+    else:
+        icon = "✓" if result.verdict.value == "ALLOW" else "✗"
+        print(f"{icon} {result.verdict.value}: {result.message}")
+        if result.rule_id:
+            print(f"  Rule: {result.rule_id}")
+
+    return 0 if result.verdict.value == "ALLOW" else 2

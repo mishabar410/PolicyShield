@@ -400,6 +400,15 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
                 )
         return result
 
+    # Aliases under /api/v1/ prefix for consistency
+    @app.get("/api/v1/livez")
+    async def api_livez():
+        return await liveness()
+
+    @app.get("/api/v1/readyz")
+    async def api_readyz():
+        return await readiness()
+
     _metrics_collector = MetricsCollector()
 
     @app.get("/metrics")
