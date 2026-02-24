@@ -74,8 +74,24 @@ services:
         check("Check ALLOW", "POST", "/check",
               body={"tool_name": "safe_tool"},
               expect_json={"verdict": "ALLOW"})
-        check("Content-Type 415", "POST", "/check",
-              body=None, expect_status=415)
+
+        # Content-Type test: send body with text/plain header
+        url = BASE + "/check"
+        data = b'{"tool_name": "test"}'
+        req = urllib.request.Request(url, data=data, method="POST")
+        req.add_header("Content-Type", "text/plain")
+        try:
+            resp = urllib.request.urlopen(req)
+            code = resp.status
+        except urllib.error.HTTPError as e:
+            code = e.code
+        if code == 415:
+            PASS += 1
+            print("  ✓ Content-Type 415")
+        else:
+            FAIL += 1
+            print(f"  ✗ Content-Type 415 (got {code})")
+
         check("Validation 422", "POST", "/check",
               body={"tool_name": ""},
               expect_status=422)
