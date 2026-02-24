@@ -19,6 +19,7 @@ export type CheckRequest = {
     args: Record<string, unknown>;
     session_id: string;
     sender?: string;
+    request_id?: string;
 };
 
 export type CheckResponse = {
@@ -28,6 +29,8 @@ export type CheckResponse = {
     modified_args?: Record<string, unknown>;
     pii_types?: string[];
     approval_id?: string;
+    shield_version?: string;
+    request_id?: string;
 };
 
 export type PostCheckRequest = {

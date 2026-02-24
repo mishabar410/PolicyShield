@@ -262,6 +262,12 @@ def app(args: list[str] | None = None) -> int:
     sim_parser.add_argument("--args", default="{}", help="JSON args string")
     sim_parser.add_argument("--session-id", default="simulate", help="Session ID")
 
+    # openapi command
+    openapi_parser = subparsers.add_parser("openapi", help="Export OpenAPI schema as JSON")
+    openapi_parser.add_argument("--rules", required=True, help="Path to YAML rules file")
+    openapi_parser.add_argument("--output", "-o", default=None, help="Output file (default: stdout)")
+    openapi_parser.add_argument("--indent", type=int, default=2, help="JSON indent (default: 2)")
+
     parsed = parser.parse_args(args)
 
     if parsed.command == "validate":
@@ -324,6 +330,8 @@ def app(args: list[str] | None = None) -> int:
         return _cmd_generate_rules(parsed)
     elif parsed.command == "simulate":
         return _cmd_simulate(parsed)
+    elif parsed.command == "openapi":
+        return _cmd_openapi(parsed)
     elif parsed.command == "openclaw":
         from policyshield.cli.openclaw import cmd_openclaw
 
@@ -1345,4 +1353,32 @@ def _cmd_generate_rules(parsed: argparse.Namespace) -> int:
     output_path.write_text(yaml_str, encoding="utf-8")
     print(f"\n✓ Rules written to {output_path}")
     print(f"  Next: policyshield validate {output_path}")
+    return 0
+
+
+def _cmd_openapi(parsed: argparse.Namespace) -> int:
+    """Export the OpenAPI schema as JSON."""
+    rules_path = Path(parsed.rules)
+    if not rules_path.exists():
+        print(f"✗ Rules not found: {rules_path}", file=sys.stderr)
+        return 1
+
+    try:
+        from policyshield.server.app import create_app
+        from policyshield.shield.async_engine import AsyncShieldEngine
+    except ImportError:
+        print("ERROR: server extras required. Run: pip install policyshield[server]", file=sys.stderr)
+        return 1
+
+    engine = AsyncShieldEngine(rules=rules_path)
+    app = create_app(engine)
+    schema = app.openapi()
+    output = json.dumps(schema, indent=parsed.indent, ensure_ascii=False)
+
+    if parsed.output:
+        Path(parsed.output).write_text(output + "\n", encoding="utf-8")
+        print(f"✓ OpenAPI schema written to {parsed.output}", file=sys.stderr)
+    else:
+        print(output)
+
     return 0

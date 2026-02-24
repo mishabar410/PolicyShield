@@ -54,9 +54,19 @@ jobs:
           name: coverage-report
           path: coverage.xml
 
+  sdk-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check SDK type sync
+        run: python scripts/check_sdk_sync.py
+
   build:
     runs-on: ubuntu-latest
-    needs: [lint, typecheck, test, benchmark, plugin-test, plugin-e2e-smoke]
+    needs: [lint, typecheck, test, benchmark, plugin-test, plugin-e2e-smoke, sdk-sync]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

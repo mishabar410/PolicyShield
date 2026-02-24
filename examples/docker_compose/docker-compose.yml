@@ -1,0 +1,30 @@
+# Minimal Docker Compose deployment example for PolicyShield.
+#
+# Usage:
+#   cd examples/docker_compose
+#   docker compose up -d
+#   curl http://localhost:8100/api/v1/health
+
+services:
+  policyshield:
+    image: ghcr.io/mishabar410/policyshield:latest
+    # or build from source:
+    # build:
+    #   context: ../..
+    #   dockerfile: Dockerfile.server
+    ports:
+      - "8100:8100"
+    volumes:
+      - ./rules.yaml:/app/rules/rules.yaml:ro
+    environment:
+      POLICYSHIELD_MODE: enforce
+      # POLICYSHIELD_API_TOKEN: "your-secret-token"
+      # POLICYSHIELD_ADMIN_TOKEN: "your-admin-token"
+      # POLICYSHIELD_TELEGRAM_TOKEN: "bot-token"
+      # POLICYSHIELD_TELEGRAM_CHAT_ID: "chat-id"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8100/api/v1/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 3

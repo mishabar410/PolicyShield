@@ -1,0 +1,85 @@
+# Prometheus Alerting Rules for PolicyShield
+#
+# These rules assume PolicyShield is exporting /metrics in Prometheus format.
+# Drop this file into your Prometheus alerting rules directory.
+#
+# Example prometheus.yml:
+#   rule_files:
+#     - "policyshield_alerts.yml"
+
+groups:
+  - name: policyshield
+    interval: 30s
+    rules:
+      # ── High block rate ──
+      - alert: PolicyShieldHighBlockRate
+        expr: |
+          (
+            sum(rate(policyshield_checks_total{verdict="BLOCK"}[5m]))
+            /
+            sum(rate(policyshield_checks_total[5m]))
+          ) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          service: policyshield
+        annotations:
+          summary: "High block rate (>50%) on PolicyShield"
+          description: "PolicyShield is blocking more than 50% of tool calls for the last 5 minutes. This may indicate a misconfigured policy or an active attack."
+
+      # ── High latency ──
+      - alert: PolicyShieldHighLatency
+        expr: |
+          histogram_quantile(0.95, rate(policyshield_check_duration_seconds_bucket[5m])) > 1.0
+        for: 5m
+        labels:
+          severity: warning
+          service: policyshield
+        annotations:
+          summary: "PolicyShield p95 latency >1s"
+          description: "PolicyShield check latency p95 exceeds 1 second. This may indicate regex backtracking or an overloaded engine."
+
+      # ── Kill switch active ──
+      - alert: PolicyShieldKillSwitchActive
+        expr: policyshield_kill_switch_active == 1
+        for: 1m
+        labels:
+          severity: critical
+          service: policyshield
+        annotations:
+          summary: "PolicyShield kill switch is active"
+          description: "All tool calls are being blocked because the kill switch is active. This is an emergency measure — investigate immediately."
+
+      # ── Approval backlog ──
+      - alert: PolicyShieldApprovalBacklog
+        expr: policyshield_pending_approvals > 10
+        for: 10m
+        labels:
+          severity: warning
+          service: policyshield
+        annotations:
+          summary: "PolicyShield has >10 pending approvals"
+          description: "There are {{ $value }} pending approvals waiting for human review. Agents may be blocked waiting for responses."
+
+      # ── High error rate ──
+      - alert: PolicyShieldHighErrorRate
+        expr: |
+          sum(rate(policyshield_errors_total[5m])) > 0.1
+        for: 5m
+        labels:
+          severity: critical
+          service: policyshield
+        annotations:
+          summary: "PolicyShield error rate >0.1/s"
+          description: "PolicyShield is reporting {{ $value | humanize }}/s internal errors. Check server logs for details."
+
+      # ── Server down ──
+      - alert: PolicyShieldDown
+        expr: up{job="policyshield"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: policyshield
+        annotations:
+          summary: "PolicyShield server is down"
+          description: "Prometheus cannot scrape PolicyShield metrics. The server is likely crashed or unreachable."

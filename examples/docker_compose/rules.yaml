@@ -1,0 +1,23 @@
+shield_name: example-shield
+version: "1"
+
+rules:
+  - id: block-dangerous
+    description: Block dangerous commands
+    when:
+      tool: exec_command
+    then: BLOCK
+    message: "Direct command execution is not allowed"
+
+  - id: allow-read
+    description: Allow read operations
+    when:
+      tool: read_file
+    then: ALLOW
+
+  - id: approve-write
+    description: Require approval for write operations
+    when:
+      tool: write_file
+    then: APPROVE
+    message: "File write requires human approval"

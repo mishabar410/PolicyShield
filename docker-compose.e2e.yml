@@ -1,0 +1,84 @@
+# E2E Docker Compose for PolicyShield
+#
+# Usage:
+#   docker compose -f docker-compose.e2e.yml up --build --abort-on-container-exit
+#
+# Starts PolicyShield server + runs E2E smoke tests against it.
+
+services:
+  policyshield:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    ports:
+      - "8100:8100"
+    volumes:
+      - ./examples/fastapi_agent/policies:/app/rules:ro
+    environment:
+      POLICYSHIELD_MODE: enforce
+      POLICYSHIELD_LOG_FORMAT: json
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8100/api/v1/health')"]
+      interval: 3s
+      timeout: 2s
+      retries: 10
+      start_period: 5s
+
+  e2e-test:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    depends_on:
+      policyshield:
+        condition: service_healthy
+    entrypoint: ["python", "-c"]
+    command:
+      - |
+        import json, sys, urllib.request
+
+        BASE = "http://policyshield:8100/api/v1"
+        PASS = 0
+        FAIL = 0
+
+        def check(name, method, path, body=None, expect_status=200, expect_json=None):
+            global PASS, FAIL
+            url = BASE + path
+            data = json.dumps(body).encode() if body else None
+            req = urllib.request.Request(url, data=data, method=method)
+            if data:
+                req.add_header("Content-Type", "application/json")
+            try:
+                resp = urllib.request.urlopen(req)
+                code = resp.status
+                result = json.loads(resp.read())
+            except urllib.error.HTTPError as e:
+                code = e.code
+                result = json.loads(e.read())
+
+            ok = code == expect_status
+            if ok and expect_json:
+                for k, v in expect_json.items():
+                    if result.get(k) != v:
+                        ok = False
+                        break
+            if ok:
+                PASS += 1
+                print(f"  ✓ {name}")
+            else:
+                FAIL += 1
+                print(f"  ✗ {name} (status={code}, body={json.dumps(result)[:200]})")
+
+        print("\n🧪 E2E Smoke Tests\n")
+
+        check("Health OK", "GET", "/health")
+        check("Check ALLOW", "POST", "/check",
+              body={"tool_name": "safe_tool"},
+              expect_json={"verdict": "ALLOW"})
+        check("Content-Type 415", "POST", "/check",
+              body=None, expect_status=415)
+        check("Validation 422", "POST", "/check",
+              body={"tool_name": ""},
+              expect_status=422)
+
+        print(f"\n{'✓' if FAIL == 0 else '✗'} {PASS} passed, {FAIL} failed")
+        sys.exit(1 if FAIL else 0)
