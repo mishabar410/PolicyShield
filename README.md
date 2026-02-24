@@ -1,5 +1,9 @@
 # 🛡️ PolicyShield
 
+<p align="center">
+  <img src="demo.gif" alt="PolicyShield Demo" width="700">
+</p>
+
 **AI agents can `rm -rf /`, leak your database, and run up a $10k API bill — all in one session.**
 
 PolicyShield is a runtime policy layer that sits between the LLM and the tools it calls. You write rules in YAML, PolicyShield enforces them before any tool executes — and logs everything for audit.
