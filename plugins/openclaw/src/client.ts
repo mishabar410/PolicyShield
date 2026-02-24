@@ -136,4 +136,47 @@ export class PolicyShieldClient {
         }
         return { approval_id: approvalId, status: "pending" };
     }
+
+    async kill(reason: string = "SDK kill switch"): Promise<void> {
+        await fetch(`${this.url}/api/v1/kill`, {
+            method: "POST",
+            headers: this.getHeaders(),
+            body: JSON.stringify({ reason }),
+            signal: AbortSignal.timeout(this.timeout),
+        });
+    }
+
+    async resume(): Promise<void> {
+        await fetch(`${this.url}/api/v1/resume`, {
+            method: "POST",
+            headers: this.getHeaders(),
+            signal: AbortSignal.timeout(this.timeout),
+        });
+    }
+
+    async reload(): Promise<void> {
+        await fetch(`${this.url}/api/v1/reload`, {
+            method: "POST",
+            headers: this.getHeaders(),
+            signal: AbortSignal.timeout(this.timeout),
+        });
+    }
+
+    async waitForApproval(
+        approvalId: string,
+        opts: { timeout?: number; pollInterval?: number } = {},
+    ): Promise<ApprovalStatusResponse> {
+        const timeout = opts.timeout ?? 60_000;
+        const pollInterval = opts.pollInterval ?? 2_000;
+        const deadline = Date.now() + timeout;
+
+        while (Date.now() < deadline) {
+            const status = await this.checkApproval(approvalId);
+            if (status.status !== "pending") {
+                return status;
+            }
+            await new Promise((r) => setTimeout(r, pollInterval));
+        }
+        throw new Error(`Approval ${approvalId} not resolved within ${timeout}ms`);
+    }
 }
