@@ -131,7 +131,17 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
             engine.stop_watching()
         _logger.info("PolicyShield server stopped")
 
-    app = FastAPI(title="PolicyShield", version=__version__, lifespan=lifespan)
+    app = FastAPI(
+        title="PolicyShield",
+        version=__version__,
+        description="Declarative firewall for AI agent tool calls",
+        lifespan=lifespan,
+        openapi_tags=[
+            {"name": "check", "description": "Tool call validation endpoints"},
+            {"name": "admin", "description": "Kill switch, reload, approval management"},
+            {"name": "observability", "description": "Health, metrics, readiness probes"},
+        ],
+    )
 
     # CORS middleware (env config, disabled by default)
     cors_origins = os.environ.get("POLICYSHIELD_CORS_ORIGINS", "").split(",")

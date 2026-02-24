@@ -276,6 +276,9 @@ def app(args: list[str] | None = None) -> int:
     check_parser.add_argument("--session-id", default="cli", help="Session ID")
     check_parser.add_argument("--json", dest="json_output", action="store_true", help="JSON output")
 
+    # quickstart command
+    subparsers.add_parser("quickstart", help="Interactive setup wizard")
+
     parsed = parser.parse_args(args)
 
     if parsed.command == "validate":
@@ -342,6 +345,9 @@ def app(args: list[str] | None = None) -> int:
         return _cmd_openapi(parsed)
     elif parsed.command == "check":
         return _cmd_check(parsed)
+    elif parsed.command == "quickstart":
+        from policyshield.cli.quickstart import cmd_quickstart
+        return cmd_quickstart()
     elif parsed.command == "openclaw":
         from policyshield.cli.openclaw import cmd_openclaw
 

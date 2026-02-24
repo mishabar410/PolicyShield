@@ -37,6 +37,24 @@ class PolicyShieldSettings:
             o.strip() for o in os.environ.get("POLICYSHIELD_CORS_ORIGINS", "").split(",") if o.strip()
         ]
     )
+    # Engine
+    mode: str = field(default_factory=lambda: os.environ.get("POLICYSHIELD_MODE", "enforce"))
+    rules_path: str = field(default_factory=lambda: os.environ.get("POLICYSHIELD_RULES", "policies/rules.yaml"))
+    fail_open: bool = field(
+        default_factory=lambda: os.environ.get("POLICYSHIELD_FAIL_OPEN", "").lower() in ("1", "true")
+    )
+    # Tracing
+    trace_dir: str = field(default_factory=lambda: os.environ.get("POLICYSHIELD_TRACE_DIR", "./traces"))
+    trace_privacy: bool = field(
+        default_factory=lambda: os.environ.get("POLICYSHIELD_TRACE_PRIVACY", "").lower() in ("1", "true")
+    )
+    # Approval
+    approval_timeout: float = field(
+        default_factory=lambda: float(os.environ.get("POLICYSHIELD_APPROVAL_TIMEOUT", "60"))
+    )
+    telegram_token: str | None = field(default_factory=lambda: os.environ.get("POLICYSHIELD_TELEGRAM_TOKEN"))
+    telegram_chat_id: str | None = field(default_factory=lambda: os.environ.get("POLICYSHIELD_TELEGRAM_CHAT_ID"))
+    slack_webhook_url: str | None = field(default_factory=lambda: os.environ.get("POLICYSHIELD_SLACK_WEBHOOK_URL"))
 
 
 def get_settings() -> PolicyShieldSettings:
