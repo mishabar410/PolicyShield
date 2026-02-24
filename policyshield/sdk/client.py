@@ -81,7 +81,7 @@ class PolicyShieldClient:
 
     def kill(self, reason: str = "SDK kill switch") -> dict:
         """Activate kill switch."""
-        resp = self._client.post("/api/v1/kill-switch", json={"reason": reason})
+        resp = self._client.post("/api/v1/kill", json={"reason": reason})
         resp.raise_for_status()
         return resp.json()
 

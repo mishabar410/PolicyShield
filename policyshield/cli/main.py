@@ -347,6 +347,7 @@ def app(args: list[str] | None = None) -> int:
         return _cmd_check(parsed)
     elif parsed.command == "quickstart":
         from policyshield.cli.quickstart import cmd_quickstart
+
         return cmd_quickstart()
     elif parsed.command == "openclaw":
         from policyshield.cli.openclaw import cmd_openclaw
@@ -1419,7 +1420,7 @@ def _cmd_check(parsed: argparse.Namespace) -> int:
     result = engine.check(parsed.tool, args, session_id=parsed.session_id)
 
     if getattr(parsed, "json_output", False):
-        out = {
+        out: dict[str, Any] = {
             "verdict": result.verdict.value,
             "message": result.message,
             "rule_id": result.rule_id,
