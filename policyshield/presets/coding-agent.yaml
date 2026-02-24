@@ -1,0 +1,33 @@
+shield_name: coding-agent
+version: "1"
+default_verdict: BLOCK
+rules:
+  - id: block-exec
+    tool_name: "exec_command"
+    then: BLOCK
+    message: "Direct command execution blocked for coding agents"
+
+  - id: block-delete
+    tool_name: "delete_file"
+    then: BLOCK
+    message: "File deletion blocked — use version control instead"
+
+  - id: approve-write
+    tool_name: "write_file"
+    then: APPROVE
+    message: "File write requires human approval"
+
+  - id: allow-read
+    tool_name: "read_file"
+    then: ALLOW
+    message: "Read operations allowed"
+
+  - id: allow-search
+    tool_name: "search*"
+    then: ALLOW
+    message: "Search operations allowed"
+
+  - id: allow-list
+    tool_name: "list_*"
+    then: ALLOW
+    message: "Directory listing allowed"

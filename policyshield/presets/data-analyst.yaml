@@ -1,0 +1,36 @@
+shield_name: data-analyst
+version: "1"
+default_verdict: BLOCK
+rules:
+  - id: block-network
+    tool_name: "http_request"
+    then: BLOCK
+    message: "Network requests blocked for data analysts"
+
+  - id: block-exec
+    tool_name: "exec_command"
+    then: BLOCK
+    message: "Command execution blocked"
+
+  - id: allow-db-read
+    tool_name: "execute_sql"
+    when:
+      args:
+        query: "^SELECT"
+    then: ALLOW
+    message: "SELECT queries allowed"
+
+  - id: approve-db-write
+    tool_name: "execute_sql"
+    then: APPROVE
+    message: "Write queries require approval"
+
+  - id: allow-read-file
+    tool_name: "read_file"
+    then: ALLOW
+    message: "File reads allowed"
+
+  - id: approve-write-file
+    tool_name: "write_file"
+    then: APPROVE
+    message: "File writes require approval"
