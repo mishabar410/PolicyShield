@@ -103,7 +103,7 @@
 - **Honeypot Tools**: decoy tool detection, always blocks (even in AUDIT mode)
 - 974 tests
 
-### v0.12 — Tier 2: Medium Impact ✅ (current)
+### v0.12 — Tier 1.5: Server Hardening & Reliability ✅
 - **Circuit breaker** for approval backends with fallback
 - **Backend health checks** and `/readyz` runtime endpoint
 - **Rule simulation**: `policyshield simulate` what-if analysis
@@ -126,13 +126,31 @@
 - **Config migration**: `policyshield migrate` between versions
 - 1192 tests
 
+### v0.13 — Tier 2: SDK, DX & Integrations ✅ (current)
+- **Python SDK**: `PolicyShieldClient` + `AsyncPolicyShieldClient` — typed check, kill, resume, reload, post_check
+- **TypeScript SDK**: added kill/resume/reload/waitForApproval — full parity with Python SDK
+- **`@shield()` decorator**: sync + async function wrapping with `on_block` config
+- **MCP Proxy**: transparent MCP tool call proxy through PolicyShield
+- **Quickstart wizard**: `policyshield quickstart` — interactive setup
+- **Dry-run CLI**: `policyshield check --tool <name> --rules <path>` (exit 0/2)
+- **Role presets**: `coding-agent`, `data-analyst`, `customer-support`
+- **Retry/backoff**: async `retry_with_backoff()` utility
+- **K8s probes**: `/api/v1/livez` and `/api/v1/readyz` aliases
+- **Full ENV config**: 31 `POLICYSHIELD_*` env vars (12-factor)
+- **OpenAPI tags**: check, admin, observability API groups
+- **Slack approval backend**: Incoming Webhook notifications
+- **Integration examples**: standalone_check, fastapi_middleware, docker_compose
+- 1226 tests, 85% coverage
+
 ## Next
 
 ### v1.0 — Production Release (planned)
+- LLM Guard: prompt injection detection, semantic PII, intent classification
+- Conditional rules: time of day, user role
 - Bounded session storage (LRU eviction, TTL)
-- Mypy type checking in CI
 - Coverage gate raised to 90%
 - Production deployment guide
+- Web UI dashboard
 
 ---
 
@@ -141,14 +159,16 @@
 | Item | Description |
 |------|-------------|
 | **Conditional rules** | `when.context` conditions: time of day, user role, session state |
+| **LLM Guard** | Prompt injection detection, semantic PII, intent classification |
 | **Policy-as-Code SDK** | Python API to define rules programmatically alongside YAML |
 | **Rego/OPA bridge** | Optional: evaluate rules via Open Policy Agent |
 | **Multi-tenant** | Per-user / per-org policy sets with inheritance |
 | **RBAC** | Role-based tool access: `admin` can delete, `viewer` cannot |
 | **Agent sandbox** | OS-level isolation for tool execution (containers, seccomp) |
-| **Multi-language SDKs** | TypeScript, Go, Rust wrappers |
+| **Multi-language SDKs** | Go, Rust wrappers |
 | **Rule marketplace** | Community-contributed policy packs |
 | **Federated policies** | Central policy server for fleet of agents |
+| **Web UI Dashboard** | SPA with WebSocket live verdict stream |
 
 ---
 

@@ -289,6 +289,9 @@ policyshield server --rules ./rules.yaml --port 8100 --mode enforce
 | `/api/v1/reload` | POST | Hot-reload rules from disk |
 | `/api/v1/kill` | POST | Emergency kill switch — block ALL tool calls |
 | `/api/v1/resume` | POST | Deactivate kill switch — resume normal operation |
+| `/healthz` · `/api/v1/livez` | GET | Liveness probe (K8s-ready) |
+| `/readyz` · `/api/v1/readyz` | GET | Readiness probe (rules loaded, backend healthy) |
+| `/metrics` | GET | Prometheus metrics (per-tool, PII, approvals) |
 
 ### Docker
 
@@ -375,31 +378,37 @@ pii_patterns:
 | **Kill Switch** | `policyshield kill` / `POST /api/v1/kill` — block ALL calls instantly |
 | **Chain Rules** | Temporal conditions (`when.chain`) — detect multi-step attack patterns |
 | **Rate Limiting** | Per-tool, per-session, global, and adaptive (burst detection) rate limiting |
-| **Approval Flow** | InMemory and Telegram backends with circuit breaker and health checks |
+| **Approval Flow** | InMemory, Telegram, and Slack backends with circuit breaker and health checks |
 | **Hot Reload** | File-watcher auto-reloads rules on change |
 | **Trace & Audit** | JSONL log, search, stats, violations, CSV/HTML export, rotation & retention |
+| **Idempotency** | `X-Idempotency-Key` header support for safe retries |
 
-### Server & Integrations
+### SDK & Integrations
 
 | Category | What you get |
 |----------|-------------|
-| **HTTP Server** | FastAPI server with TLS, API rate limiting, and 11 REST endpoints |
+| **Python SDK** | `PolicyShieldClient` + `AsyncPolicyShieldClient` — typed check, kill, resume, reload |
+| **TypeScript SDK** | `PolicyShieldClient` in `@policyshield/openclaw-plugin` — check, kill, resume, waitForApproval |
+| **`@shield()` decorator** | Wrap any function with policy enforcement (sync + async) |
+| **MCP Proxy** | Transparent proxy for MCP tool calls through PolicyShield |
+| **HTTP Server** | FastAPI server with TLS, API rate limiting, OpenAPI tags, and 13 REST endpoints |
 | **OpenClaw Plugin** | Native plugin with before/after hooks and policy injection |
-| **Async Engine** | Full `async`/`await` support for FastAPI, aiohttp, async agents |
-| **Input Sanitizer** | Normalize args, block prompt injection patterns |
-| **Output Policy** | Post-call response scanning with block patterns and size limits |
-| **Honeypot Tools** | Decoy tools that trigger on prompt injection — always block, even in AUDIT mode |
+| **LangChain / CrewAI** | Adapters for LangChain `BaseTool` and CrewAI tools |
 | **Docker** | Container-ready with Dockerfile.server and docker-compose |
 
 ### Developer Experience
 
 | Category | What you get |
 |----------|-------------|
+| **Quickstart Wizard** | `policyshield quickstart` — interactive setup with preset selection |
 | **Doctor** | `policyshield doctor` — 10-check health scan with A-F security grading |
+| **Dry-Run CLI** | `policyshield check --tool <name> --rules rules.yaml` — one-shot check |
 | **Auto-Rules** | `policyshield generate-rules --from-openclaw` — zero-config rule generation |
+| **Role Presets** | `coding-agent`, `data-analyst`, `customer-support` — ready-made rule sets |
 | **Rule Testing** | YAML test cases for policies (`policyshield test`) |
 | **Rule Linter** | Static analysis: 7 checks + multi-file validation + dead rule detection |
 | **Replay & Simulation** | Re-run JSONL traces against new rules (`policyshield replay`) |
+| **ENV Config** | Full 12-factor: 31 `POLICYSHIELD_*` env vars for all settings |
 
 <details>
 <summary><strong>Advanced features</strong> (shadow mode, canary, dashboards, OTel, etc.)</summary>
@@ -421,27 +430,67 @@ pii_patterns:
 | **Compliance Reports** | HTML reports: verdicts, violations, PII stats, rule coverage |
 | **Incident Timeline** | Chronological session timeline for post-mortems |
 | **Config Migration** | `policyshield migrate` — auto-migrate YAML between versions |
+| **Retry/Backoff** | Generic async retry with exponential backoff for approval notifications |
 
 </details>
 
 ---
 
-## Other Integrations
-
-### LangChain
+## Python SDK
 
 ```python
-from policyshield.integrations.langchain import PolicyShieldTool, shield_all_tools
+from policyshield.sdk.client import PolicyShieldClient
 
-safe_tool = PolicyShieldTool(wrapped_tool=my_tool, engine=engine)
-safe_tools = shield_all_tools([tool1, tool2], engine)
+# Connect to PolicyShield server
+with PolicyShieldClient("http://localhost:8100") as client:
+    result = client.check("exec_command", {"cmd": "rm -rf /"})
+    print(result.verdict)  # BLOCK
+    print(result.message)
+
+    # Admin operations
+    client.kill("Incident response")
+    client.resume()
+    client.reload()
+
+    # Post-call PII scan
+    pii = client.post_check("send_email", "SSN: 123-45-6789")
 ```
 
-### CrewAI
+### `@shield()` Decorator
 
 ```python
-from policyshield.integrations.crewai import shield_crewai_tools
+from policyshield.decorators import shield
+from policyshield.shield.engine import ShieldEngine
 
+engine = ShieldEngine(rules="rules.yaml")
+
+@shield(engine, tool_name="delete_file")
+def delete_file(path: str):
+    os.remove(path)  # ← only runs if PolicyShield allows
+
+@shield(engine, tool_name="exec_command", on_block="return_none")
+async def exec_cmd(cmd: str):
+    return subprocess.run(cmd)  # ← returns None if blocked
+```
+
+### Async SDK
+
+```python
+from policyshield.sdk.client import AsyncPolicyShieldClient
+
+async with AsyncPolicyShieldClient("http://localhost:8100") as client:
+    result = await client.check("send_email", {"to": "admin@corp.com"})
+```
+
+### Other Integrations
+
+```python
+# LangChain
+from policyshield.integrations.langchain import PolicyShieldTool, shield_all_tools
+safe_tools = shield_all_tools([tool1, tool2], engine)
+
+# CrewAI
+from policyshield.integrations.crewai import shield_crewai_tools
 safe_tools = shield_crewai_tools([tool1, tool2], engine)
 ```
 
@@ -450,59 +499,56 @@ safe_tools = shield_crewai_tools([tool1, tool2], engine)
 ## CLI
 
 ```bash
+# Setup & Init
+policyshield quickstart                    # Interactive setup wizard
+policyshield init --preset secure          # Initialize with preset rules
+policyshield doctor                        # 10-check health scan (A-F grading)
+
+# Rules
 policyshield validate ./policies/          # Validate rules
 policyshield lint ./policies/rules.yaml    # Static analysis (7 checks)
 policyshield test ./policies/              # Run YAML test cases
 
+# Dry-run check (no server needed)
+policyshield check --tool exec_command --rules rules.yaml
+policyshield check --tool send_email --rules rules.yaml --json
+
+# Server
 policyshield server --rules ./rules.yaml   # Start HTTP server
 policyshield server --rules ./rules.yaml --port 8100 --mode audit
 policyshield server --rules ./rules.yaml --tls-cert cert.pem --tls-key key.pem
 
+# Traces & Observability
 policyshield trace show ./traces/trace.jsonl
 policyshield trace violations ./traces/trace.jsonl
 policyshield trace stats --dir ./traces/ --format json
 policyshield trace search --tool exec --verdict BLOCK
 policyshield trace cost --dir ./traces/ --model gpt-4o
 policyshield trace export ./traces/trace.jsonl -f html
-
-# Launch the live web dashboard
 policyshield trace dashboard --port 8000 --prometheus
 
-# Replay traces against new rules
+# Replay & Simulation
 policyshield replay ./traces/trace.jsonl --rules ./new-rules.yaml --changed-only
-
-# Simulate a rule without traces
 policyshield simulate --rule new_rule.yaml --tool exec --args '{"cmd":"ls"}'
 
-# Generate rules from templates (offline)
+# Rule Generation
 policyshield generate --template --tools delete_file send_email -o rules.yaml
-
-# Generate rules with AI (requires OPENAI_API_KEY)
-policyshield generate "Block all file deletions and require approval for deploys"
-
-# Auto-generate rules from OpenClaw or tool list
+policyshield generate "Block all file deletions"  # AI (requires OPENAI_API_KEY)
 policyshield generate-rules --from-openclaw --url http://localhost:3000
-policyshield generate-rules --tools exec,write_file,delete_file -o policies/rules.yaml
 
-# Compliance report for auditors
+# Reports
 policyshield report --traces ./traces/ --format html
-
-# Incident timeline for post-mortems
 policyshield incident session_abc123 --format html
 
-# Config migration between versions
-policyshield migrate --from 0.11 --to 1.0 rules.yaml
-
-# Kill switch — emergency stop
+# Operations
 policyshield kill --port 8100 --reason "Incident response"
 policyshield resume --port 8100
+policyshield migrate --from 0.11 --to 1.0 rules.yaml
 
-# Health check
-policyshield doctor --config policyshield.yaml --rules rules.yaml
-policyshield doctor --json
-
-# Initialize a new project
-policyshield init --preset secure --no-interactive
+# OpenClaw integration
+policyshield openclaw setup
+policyshield openclaw teardown
+policyshield openclaw status
 ```
 
 ---
@@ -532,9 +578,23 @@ docker compose run test
 |---------|-------------|
 | [`langchain_demo.py`](examples/langchain_demo.py) | LangChain tool wrapping |
 | [`async_demo.py`](examples/async_demo.py) | Async engine usage |
+| [`standalone_check.py`](examples/standalone_check.py) | Standalone check without server |
+| [`fastapi_middleware.py`](examples/fastapi_middleware.py) | FastAPI middleware integration |
 | [`openclaw_rules.yaml`](examples/openclaw_rules.yaml) | OpenClaw preset rules (11 rules) |
 | [`chain_rules.yaml`](examples/chain_rules.yaml) | Chain rule examples (anti-exfiltration, retry storm) |
 | [`policies/`](examples/policies/) | Production-ready rule sets (security, compliance, full) |
+| [`docker_compose/`](examples/docker_compose/) | Docker Compose deployment example |
+
+### Role Presets
+
+| Preset | Default | Description |
+|--------|---------|-------------|
+| `strict` | BLOCK | Maximum restriction — allow only explicitly permitted tools |
+| `permissive` | ALLOW | Minimum restriction — block only dangerous tools |
+| `minimal` | ALLOW | Bare minimum rules |
+| `coding-agent` | BLOCK | Blocks exec/delete, approves writes, allows reads |
+| `data-analyst` | BLOCK | Allows SELECT SQL, blocks network/exec, approves writes |
+| `customer-support` | BLOCK | CRM reads allowed, account changes need approval |
 
 ### Community Rule Packs
 
@@ -589,9 +649,10 @@ cd PolicyShield
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev,server]"
 
-pytest tests/ -v                 # 1192+ tests
+pytest tests/ -v                 # 1226+ tests
 ruff check policyshield/ tests/  # Lint
 ruff format --check policyshield/ tests/  # Format check
+mypy policyshield/               # Type checking
 ```
 
 📖 **Documentation**: [mishabar410.github.io/PolicyShield](https://mishabar410.github.io/PolicyShield/)

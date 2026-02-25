@@ -4,9 +4,43 @@ All notable changes to PolicyShield will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.13.0] - 2026-02-25
+
+### Added — Tier 2: SDK, DX & Integrations (16 features)
+
+**SDK & Integrations (501–504)**
+- **Python SDK**: `PolicyShieldClient` + `AsyncPolicyShieldClient` with typed `CheckResult`, context manager support, and methods for check, post_check, health, kill, resume, reload
+- **TypeScript SDK**: added `kill()`, `resume()`, `reload()`, `waitForApproval()` to `PolicyShieldClient` in `@policyshield/openclaw-plugin` — full parity with Python SDK
+- **`@shield()` decorator**: sync and async function wrapping with policy enforcement. Configurable `on_block` behavior (`raise` / `return_none`). Backward-compatible `guard()` alias
+- **MCP Proxy**: transparent MCP tool call proxy through PolicyShield (`policyshield/mcp_proxy.py`)
+
+**CLI & DX (511–514)**
+- **Quickstart wizard**: `policyshield quickstart` — interactive setup with framework selection, tool auto-discovery, and preset application
+- **Dry-run CLI**: `policyshield check --tool <name> --rules <path>` — one-shot check without server (exit 0=ALLOW, 2=BLOCK)
+- **Role presets**: `coding-agent`, `data-analyst`, `customer-support` — ready-made rule sets for common agent roles
+- **Test coverage**: CI gate at 85% with coverage XML report
+
+**Reliability (521–524)**
+- **Idempotency**: `X-Idempotency-Key` header support (already existed, verified)
+- **Retry/backoff**: generic `retry_with_backoff()` async utility with exponential backoff
+- **K8s probes**: `/api/v1/livez` and `/api/v1/readyz` aliases for K8s probe consistency
+- **Deep health**: `/healthz` and `/readyz` endpoints (already existed, verified)
+
+**Operations & Observability (531–534)**
+- **Full ENV config**: 31 `POLICYSHIELD_*` env vars — mode, rules_path, fail_open, trace_dir, trace_privacy, approval_timeout, telegram, slack, and more
+- **OpenAPI expansion**: API tags (check, admin, observability) and description added to FastAPI app
+- **Slack approval backend**: `SlackApprovalBackend` with Incoming Webhook notifications, delegates storage to `InMemoryBackend`
+- **Integration examples**: standalone_check.py, fastapi_middleware.py, docker_compose/
+
+### Fixed
+- **mypy**: `dict[str, Any]` annotation in `_cmd_check` (was inferring incorrect type)
+- **SDK client**: `/api/v1/kill-switch` → `/api/v1/kill` (matched server endpoint)
+- **ruff format**: fixed formatting in `cli/main.py` and `test_tier2.py`
+- **Coverage**: 83.65% → 85.26% with 16 additional tests for Slack, MCP proxy, quickstart, SDK, ENV config
+
 ## [0.12.0] - 2026-02-19
 
-### Added — Tier 2 Features (20 modules)
+### Added — Tier 1.5 Features (20 modules)
 
 **Resilience & Approval (401–407)**
 - **Circuit breaker** for approval backends (Telegram/Webhook) with configurable failure threshold and fallback
