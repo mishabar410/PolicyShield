@@ -8,7 +8,7 @@ if sys.version_info < (3, 10):
         "Please upgrade Python or use a virtual environment with 3.10+."
     )
 
-__version__ = "0.11.0"
+__version__ = "0.13.0"
 
 from policyshield.core.models import (  # noqa: E402, F401
     RuleConfig,
