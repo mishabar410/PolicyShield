@@ -389,8 +389,8 @@ from policyshield.shield.engine import ShieldEngine
 from policyshield.trace.recorder import TraceRecorder
 import tempfile, os
 d = tempfile.mkdtemp()
-rec = TraceRecorder(directory=d)
-engine = ShieldEngine(rules='policies/rules.yaml', tracer=rec)
+rec = TraceRecorder(output_dir=d)
+engine = ShieldEngine(rules='policies/rules.yaml', trace_recorder=rec)
 engine.check('exec', {'command': 'ls'})
 engine.check('exec', {'command': 'rm -rf /'})
 engine.check('safe_tool', {})
@@ -452,28 +452,37 @@ ls -la /tmp/report.html
 
 ```python
 python3 -c "
-from policyshield.shield.sanitizer import InputSanitizer
-san = InputSanitizer()
+from policyshield.shield.sanitizer import InputSanitizer, SanitizerConfig
+
+# Enable all 5 built-in detectors
+san = InputSanitizer(SanitizerConfig(
+    builtin_detectors=['path_traversal', 'shell_injection', 'sql_injection', 'ssrf', 'url_schemes']
+))
 
 # Path traversal
-r = san.check({'path': '../../../etc/passwd'})
-print(f'Path traversal: {r}')
+r = san.sanitize({'path': '../../../etc/passwd'})
+assert r.rejected, 'Path traversal not detected'
+print(f'✅ Path traversal: {r.rejection_reason}')
 
 # Shell injection
-r = san.check({'command': 'ls; rm -rf /'})
-print(f'Shell injection: {r}')
+r = san.sanitize({'command': 'ls; rm -rf /'})
+assert r.rejected, 'Shell injection not detected'
+print(f'✅ Shell injection: {r.rejection_reason}')
 
 # SQL injection
-r = san.check({'query': \"SELECT * FROM users WHERE id = '1' OR '1'='1'\"})
-print(f'SQL injection: {r}')
+r = san.sanitize({'query': \"SELECT * FROM users WHERE id = '1' OR '1'='1'\"})
+assert r.rejected, 'SQL injection not detected'
+print(f'✅ SQL injection: {r.rejection_reason}')
 
 # SSRF
-r = san.check({'url': 'http://169.254.169.254/latest/meta-data/'})
-print(f'SSRF: {r}')
+r = san.sanitize({'url': 'http://169.254.169.254/latest/meta-data/'})
+assert r.rejected, 'SSRF not detected'
+print(f'✅ SSRF: {r.rejection_reason}')
 
 # URL schemes
-r = san.check({'url': 'file:///etc/passwd'})
-print(f'URL scheme: {r}')
+r = san.sanitize({'url': 'file:///etc/passwd'})
+assert r.rejected, 'URL scheme not detected'
+print(f'✅ URL scheme: {r.rejection_reason}')
 
 print('✅ All 5 detectors working')
 "
@@ -881,7 +890,7 @@ shield_name: honeypot-test
 version: \"1\"
 rules: []
 honeypots:
-  - tool_name: get_admin_password
+  - tool: get_admin_password
     message: Honeypot triggered
 ''')
 rules.close()
