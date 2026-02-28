@@ -51,9 +51,13 @@ def shield(
             @functools.wraps(func)
             async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
                 result = await engine.check(name, kwargs, session_id=session_id)
-                if result.verdict in (Verdict.BLOCK, Verdict.APPROVE):
+                if result.verdict == Verdict.BLOCK:
                     if on_block == "raise":
-                        raise PermissionError(f"PolicyShield {result.verdict.value}: {result.message}")
+                        raise PermissionError(f"PolicyShield blocked: {result.message}")
+                    return None
+                if result.verdict == Verdict.APPROVE:
+                    if on_block == "raise":
+                        raise PermissionError(f"PolicyShield requires approval: {result.message}")
                     return None
                 if result.modified_args:
                     kwargs.update(result.modified_args)
@@ -65,9 +69,13 @@ def shield(
             @functools.wraps(func)
             def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
                 result = engine.check(name, kwargs, session_id=session_id)
-                if result.verdict in (Verdict.BLOCK, Verdict.APPROVE):
+                if result.verdict == Verdict.BLOCK:
                     if on_block == "raise":
-                        raise PermissionError(f"PolicyShield {result.verdict.value}: {result.message}")
+                        raise PermissionError(f"PolicyShield blocked: {result.message}")
+                    return None
+                if result.verdict == Verdict.APPROVE:
+                    if on_block == "raise":
+                        raise PermissionError(f"PolicyShield requires approval: {result.message}")
                     return None
                 if result.modified_args:
                     kwargs.update(result.modified_args)
@@ -100,10 +108,8 @@ _default_engine_lock: threading.Lock = threading.Lock()
 
 def _get_default_engine() -> Any:
     global _default_engine
-    if _default_engine is not None:
-        return _default_engine
     with _default_engine_lock:
-        if _default_engine is not None:  # double-checked locking
+        if _default_engine is not None:
             return _default_engine
         import os
 
@@ -111,4 +117,4 @@ def _get_default_engine() -> Any:
 
         rules_path = os.environ.get("POLICYSHIELD_RULES", "policies/rules.yaml")
         _default_engine = ShieldEngine(rules=rules_path)
-    return _default_engine
+        return _default_engine

@@ -41,18 +41,23 @@ class InMemoryBackend(ApprovalBackend):
         self._gc_ttl = gc_ttl
         self._gc_interval = gc_interval
         self._gc_timer: threading.Timer | None = None
+        self._stopped = False
         self._start_gc()
 
     # ── GC ────────────────────────────────────────────────────────
 
     def _start_gc(self) -> None:
         """Start periodic garbage collection."""
+        if self._stopped:
+            return
         self._gc_timer = threading.Timer(self._gc_interval, self._run_gc)
         self._gc_timer.daemon = True
         self._gc_timer.start()
 
     def _run_gc(self) -> None:
         """Remove entries older than gc_ttl."""
+        if self._stopped:
+            return
         now = monotonic()
         with self._lock:
             expired = [k for k, ts in self._created_at.items() if now - ts > self._gc_ttl]
@@ -63,7 +68,8 @@ class InMemoryBackend(ApprovalBackend):
                 self._events.pop(k, None)
             if expired:
                 logger.info("GC: cleaned %d stale approvals", len(expired))
-        self._start_gc()  # Reschedule
+        if not self._stopped:
+            self._start_gc()  # Reschedule
 
     # ── Core API ──────────────────────────────────────────────────
 
@@ -74,7 +80,11 @@ class InMemoryBackend(ApprovalBackend):
             self._created_at[request.request_id] = monotonic()
 
     def get_status(self, request_id: str) -> dict:
-        """Check status of a request, including timeout detection."""
+        """Check status of a request, including timeout detection.
+
+        On timeout, auto-resolves the request, creates an ApprovalResponse,
+        and signals the event so ``wait_for_response`` unblocks.
+        """
         with self._lock:
             if request_id in self._responses:
                 resp = self._responses[request_id]
@@ -86,10 +96,23 @@ class InMemoryBackend(ApprovalBackend):
             if request_id in self._created_at:
                 elapsed = monotonic() - self._created_at[request_id]
                 if elapsed > self._timeout:
+                    # Auto-resolve on timeout
+                    auto_approved = self._on_timeout == "ALLOW"
+                    self._responses[request_id] = ApprovalResponse(
+                        request_id=request_id,
+                        approved=auto_approved,
+                        responder="__timeout__",
+                        comment=f"Auto-resolved after {elapsed:.1f}s (policy: {self._on_timeout})",
+                    )
+                    self._requests.pop(request_id, None)
+                    event = self._events.get(request_id)
+                    if event:
+                        event.set()
                     return {
                         "status": "timeout",
                         "elapsed": elapsed,
                         "auto_verdict": self._on_timeout,
+                        "approved": auto_approved,
                     }
             return {"status": "pending", "responder": None}
 
@@ -148,6 +171,7 @@ class InMemoryBackend(ApprovalBackend):
 
     def stop(self) -> None:
         """Clean up all pending state and stop GC timer (called during shutdown)."""
+        self._stopped = True  # Set BEFORE cancel to prevent reschedule
         if self._gc_timer:
             self._gc_timer.cancel()
             self._gc_timer = None

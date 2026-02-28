@@ -61,14 +61,37 @@ class ApprovalCache:
             self._cache[key] = response
 
     def clear(self, session_id: str | None = None) -> None:
-        """Clear cache, optionally for a specific session only."""
+        """Clear cache, optionally for a specific session only.
+
+        Note: PER_RULE approvals (global) are NOT cleared when clearing
+        a specific session. Use :meth:`clear_global` for that.
+        """
         with self._lock:
             if session_id is None:
                 self._cache.clear()
-            else:
-                keys_to_remove = [k for k in self._cache if k.startswith(f"{session_id}:")]
-                for k in keys_to_remove:
-                    del self._cache[k]
+                return
+
+            keys_to_remove = []
+            for key in self._cache:
+                # PER_RULE keys are global ("__global__:rule_id") —
+                # skip when clearing a specific session
+                if key.startswith("__global__:"):
+                    continue
+                # PER_SESSION: "{session_id}:{rule_id}"
+                # PER_TOOL: "{session_id}:{tool_name}"
+                # ONCE fallback: "{session_id}:{rule_id}:{tool_name}"
+                if key.startswith(f"{session_id}:"):
+                    keys_to_remove.append(key)
+
+            for k in keys_to_remove:
+                del self._cache[k]
+
+    def clear_global(self) -> None:
+        """Clear all global (PER_RULE) cached approvals."""
+        with self._lock:
+            keys_to_remove = [k for k in self._cache if k.startswith("__global__:")]
+            for k in keys_to_remove:
+                del self._cache[k]
 
     def _make_key(
         self,

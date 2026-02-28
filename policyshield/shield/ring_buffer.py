@@ -79,9 +79,16 @@ class EventRingBuffer:
         tool: str,
         *,
         within_seconds: float | None = None,
+        verdict: str | None = None,
     ) -> bool:
-        """Check if a tool was called recently."""
-        return len(self.find_recent(tool, within_seconds=within_seconds)) > 0
+        """Check if a tool was called recently.
+
+        Args:
+            tool: Tool name to search for.
+            within_seconds: Only events within this many seconds.
+            verdict: Filter by verdict (e.g. "BLOCK", "ALLOW").
+        """
+        return len(self.find_recent(tool, within_seconds=within_seconds, verdict=verdict)) > 0
 
     @property
     def events(self) -> list[ToolEvent]:

@@ -239,9 +239,9 @@ class BaseShieldEngine:
             except Exception as e:
                 logger.warning("Plugin detector '%s' error: %s", pname, e)
 
-        # Rate limit check
+        # Rate limit check (atomic check + record)
         if self._rate_limiter is not None:
-            rl_result = self._rate_limiter.check(tool_name, session_id)
+            rl_result = self._rate_limiter.check_and_record(tool_name, session_id)
             if not rl_result.allowed:
                 return ShieldResult(
                     verdict=Verdict.BLOCK,
@@ -533,8 +533,6 @@ class BaseShieldEngine:
         # Update session & rate-limit only when the tool will actually execute
         if result.verdict not in (Verdict.BLOCK, Verdict.APPROVE):
             self._session_mgr.increment(session_id, tool_name)
-            if self._rate_limiter is not None:
-                self._rate_limiter.record(tool_name, session_id)
 
         # Record event in ring buffer for chain rule tracking
         buf = self._session_mgr.get_event_buffer(session_id)

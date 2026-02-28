@@ -142,9 +142,9 @@ class AsyncShieldEngine(BaseShieldEngine):
             except Exception as e:
                 logger.warning("Plugin detector '%s' error: %s", pname, e)
 
-        # Rate limit check
+        # Rate limit check (atomic check + record)
         if self._rate_limiter is not None:
-            rl_result = self._rate_limiter.check(tool_name, session_id)
+            rl_result = self._rate_limiter.check_and_record(tool_name, session_id)
             if not rl_result.allowed:
                 return ShieldResult(
                     verdict=Verdict.BLOCK,

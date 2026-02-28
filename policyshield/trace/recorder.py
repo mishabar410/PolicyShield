@@ -61,6 +61,7 @@ class TraceRecorder:
         self._file_path: Path | None = None
         self._record_count = 0
         self._lock = threading.Lock()
+        self._closed = False
 
         # Ensure output directory exists
         self._output_dir.mkdir(parents=True, exist_ok=True)
@@ -69,12 +70,28 @@ class TraceRecorder:
         # Register atexit handler for crash safety
         atexit.register(self._atexit_flush)
 
+    def close(self) -> None:
+        """Flush and deregister atexit handler."""
+        import atexit
+
+        if not self._closed:
+            self.flush()
+            atexit.unregister(self._atexit_flush)
+            self._closed = True
+
+    def __enter__(self) -> TraceRecorder:
+        return self
+
+    def __exit__(self, *args: Any) -> None:
+        self.close()
+
     def _atexit_flush(self) -> None:
         """Flush remaining buffer on process exit (best effort)."""
-        try:
-            self.flush()
-        except Exception:
-            pass
+        if not self._closed:
+            try:
+                self.flush()
+            except Exception:
+                pass
 
     def _generate_file_path(self) -> Path:
         """Generate a timestamped trace file path (unique even within same second)."""

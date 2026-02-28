@@ -21,10 +21,19 @@ except ImportError:
 def create_mcp_server(engine: Any) -> Any:
     """Create MCP server with PolicyShield tools.
 
-    Requires the ``mcp`` package: ``pip install mcp``.
+    Requires the ``mcp`` package and an :class:`AsyncShieldEngine`.
     """
     if not HAS_MCP:
         raise ImportError("MCP support requires the 'mcp' package: pip install mcp")
+
+    # Validate engine — MCP handlers are async and require awaitable engine
+    from policyshield.shield.async_engine import AsyncShieldEngine
+
+    if not isinstance(engine, AsyncShieldEngine):
+        raise TypeError(
+            f"MCP server requires AsyncShieldEngine, got {type(engine).__name__}. "
+            "Use AsyncShieldEngine or build_async_engine_from_config()."
+        )
 
     server = Server("policyshield")
 

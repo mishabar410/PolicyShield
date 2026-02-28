@@ -16,7 +16,7 @@ import yaml
 
 from policyshield.core.models import ShieldMode
 
-_ENV_RE = re.compile(r"\$\{([^}]+)\}")
+_ENV_RE = re.compile(r"\$\{([^}:]+)(?::-(.*?))?\}")
 _SCHEMA_PATH = Path(__file__).parent / "schema.json"
 
 
@@ -70,10 +70,17 @@ class PolicyShieldConfig:
 
 
 def _expand_env(value: str) -> str:
-    """Replace ``${VAR}`` with env values."""
+    """Replace ``${VAR}`` and ``${VAR:-default}`` with env values."""
 
     def _sub(m: re.Match) -> str:
-        return os.environ.get(m.group(1), m.group(0))
+        var_name = m.group(1)
+        default = m.group(2)  # None if no :-default provided
+        env_val = os.environ.get(var_name)
+        if env_val is not None:
+            return env_val
+        if default is not None:
+            return default
+        return m.group(0)  # Keep original ${VAR} if not found and no default
 
     return _ENV_RE.sub(_sub, value)
 
@@ -202,14 +209,18 @@ def build_engine_from_config(config: PolicyShieldConfig):  # noqa: ANN201
         sanitizer = InputSanitizer(
             SanitizerConfig(
                 max_string_length=config.sanitizer_max_string_length,
-                blocked_patterns=config.sanitizer_blocked_patterns or None,
-                builtin_detectors=config.sanitizer_builtin_detectors or None,
+                blocked_patterns=config.sanitizer_blocked_patterns,
+                builtin_detectors=config.sanitizer_builtin_detectors,
             )
         )
 
     tracer = None
     if config.trace_enabled:
-        tracer = TraceRecorder(output_dir=config.trace_output_dir)
+        tracer = TraceRecorder(
+            output_dir=config.trace_output_dir,
+            batch_size=config.trace_batch_size,
+            privacy_mode=config.trace_privacy_mode,
+        )
 
     pii = PIIDetector() if config.pii_enabled else None
 
@@ -239,14 +250,18 @@ def build_async_engine_from_config(config: PolicyShieldConfig):  # noqa: ANN201
         sanitizer = InputSanitizer(
             SanitizerConfig(
                 max_string_length=config.sanitizer_max_string_length,
-                blocked_patterns=config.sanitizer_blocked_patterns or None,
-                builtin_detectors=config.sanitizer_builtin_detectors or None,
+                blocked_patterns=config.sanitizer_blocked_patterns,
+                builtin_detectors=config.sanitizer_builtin_detectors,
             )
         )
 
     tracer = None
     if config.trace_enabled:
-        tracer = TraceRecorder(output_dir=config.trace_output_dir)
+        tracer = TraceRecorder(
+            output_dir=config.trace_output_dir,
+            batch_size=config.trace_batch_size,
+            privacy_mode=config.trace_privacy_mode,
+        )
 
     pii = PIIDetector() if config.pii_enabled else None
 

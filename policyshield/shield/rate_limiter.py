@@ -102,7 +102,9 @@ class RateLimiter:
         return cls(configs)
 
     def check(self, tool_name: str, session_id: str = "default") -> RateLimitResult:
-        """Check if a tool call is within rate limits.
+        """Check if a tool call is within rate limits (read-only).
+
+        .. note:: Prefer :meth:`check_and_record` for thread-safe usage.
 
         Args:
             tool_name: Name of the tool being called.
@@ -135,6 +137,49 @@ class RateLimiter:
                         current_count=count,
                         message=config.message,
                     )
+
+        return RateLimitResult(allowed=True, tool=tool_name)
+
+    def check_and_record(self, tool_name: str, session_id: str = "default") -> RateLimitResult:
+        """Atomically check and record a tool call.
+
+        Prevents TOCTOU races where concurrent threads could both pass
+        ``check()`` before either calls ``record()``.
+        """
+        now = time.monotonic()
+
+        with self._lock:
+            self._cleanup_stale_windows(now)
+            for config in self._configs:
+                if config.tool != "*" and config.tool != tool_name:
+                    continue
+
+                key = (
+                    config.tool,
+                    session_id if config.per_session else "__global__",
+                )
+                window = self._windows[key]
+                count = window.count_in_window(now, config.window_seconds)
+
+                if count >= config.max_calls:
+                    return RateLimitResult(
+                        allowed=False,
+                        tool=tool_name,
+                        limit=config.max_calls,
+                        window_seconds=config.window_seconds,
+                        current_count=count,
+                        message=config.message,
+                    )
+
+            # Record under same lock — atomic with check
+            for config in self._configs:
+                if config.tool != "*" and config.tool != tool_name:
+                    continue
+                key = (
+                    config.tool,
+                    session_id if config.per_session else "__global__",
+                )
+                self._windows[key].add(now)
 
         return RateLimitResult(allowed=True, tool=tool_name)
 
@@ -211,7 +256,10 @@ class GlobalRateLimiter:
 
 
 class AdaptiveRateLimiter:
-    """Automatically tightens rate limits on anomalous behavior."""
+    """Automatically tightens rate limits on anomalous behavior.
+
+    Tracks call history per-session to prevent cross-session DoS.
+    """
 
     def __init__(
         self,
@@ -226,40 +274,60 @@ class AdaptiveRateLimiter:
         self._burst_threshold = burst_threshold
         self._tighten_factor = tighten_factor
         self._cooldown = cooldown
-        self._effective_limit = base_limit
-        self._call_history: list[float] = []
-        self._last_tighten: float = 0
+        self._call_histories: dict[str, list[float]] = defaultdict(list)
+        self._effective_limits: dict[str, int] = {}
+        self._last_tighten: dict[str, float] = {}
         self._lock = threading.Lock()
 
     @property
     def effective_limit(self) -> int:
+        """Return base limit (per-session limits are internal)."""
+        return self._base_limit
+
+    def get_session_limit(self, session_id: str) -> int:
+        """Return effective limit for a specific session."""
         with self._lock:
-            if self._effective_limit < self._base_limit:
-                if time.monotonic() - self._last_tighten > self._cooldown:
-                    self._effective_limit = self._base_limit
-            return self._effective_limit
+            eff = self._effective_limits.get(session_id, self._base_limit)
+            if eff < self._base_limit:
+                last_t = self._last_tighten.get(session_id, 0)
+                if time.monotonic() - last_t > self._cooldown:
+                    eff = self._base_limit
+                    self._effective_limits[session_id] = eff
+            return eff
 
     def check_and_adapt(self, session_id: str) -> tuple[bool, dict]:
-        """Check rate limit and adapt if necessary."""
+        """Check rate limit and adapt if necessary (per-session)."""
         now = time.monotonic()
 
         with self._lock:
+            history = self._call_histories[session_id]
             cutoff = now - self._window
-            self._call_history = [t for t in self._call_history if t > cutoff]
-            current_rate = len(self._call_history)
+            history[:] = [t for t in history if t > cutoff]
+            current_rate = len(history)
 
-            # Detect burst
+            eff_limit = self._effective_limits.get(session_id, self._base_limit)
+
+            # Auto-restore after cooldown
+            if eff_limit < self._base_limit:
+                last_t = self._last_tighten.get(session_id, 0)
+                if now - last_t > self._cooldown:
+                    eff_limit = self._base_limit
+                    self._effective_limits[session_id] = eff_limit
+
+            # Detect burst per-session
             if current_rate > self._base_limit * self._burst_threshold:
-                self._effective_limit = max(1, int(self._base_limit * self._tighten_factor))
-                self._last_tighten = now
+                eff_limit = max(1, int(self._base_limit * self._tighten_factor))
+                self._effective_limits[session_id] = eff_limit
+                self._last_tighten[session_id] = now
                 _logger.warning(
-                    "Adaptive rate limit tightened: %d → %d",
+                    "Adaptive rate limit tightened for session %s: %d → %d",
+                    session_id,
                     self._base_limit,
-                    self._effective_limit,
+                    eff_limit,
                 )
 
-            if current_rate >= self._effective_limit:
-                return False, {"rate": current_rate, "limit": self._effective_limit, "adapted": True}
+            if current_rate >= eff_limit:
+                return False, {"rate": current_rate, "limit": eff_limit, "adapted": True}
 
-            self._call_history.append(now)
-            return True, {"rate": current_rate + 1, "limit": self._effective_limit}
+            history.append(now)
+            return True, {"rate": current_rate + 1, "limit": eff_limit}

@@ -5,6 +5,7 @@ Protects against prompt injection, normalizes data, and enforces limits.
 
 from __future__ import annotations
 
+import functools
 import re
 import unicodedata
 from dataclasses import dataclass, field
@@ -12,6 +13,12 @@ from typing import Any
 
 # Control-char regex: match C0/C1 controls except \n \r \t
 _CONTROL_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]")
+
+
+@functools.lru_cache(maxsize=128)
+def _compile_pattern(pattern: str) -> re.Pattern[str]:
+    """Compile regex pattern with caching."""
+    return re.compile(pattern, re.IGNORECASE)
 
 
 @dataclass
@@ -47,7 +54,7 @@ class InputSanitizer:
         self._config = config or SanitizerConfig()
         self._compiled_patterns: list[re.Pattern] | None = None
         if self._config.blocked_patterns:
-            self._compiled_patterns = [re.compile(p, re.IGNORECASE) for p in self._config.blocked_patterns]
+            self._compiled_patterns = [_compile_pattern(p) for p in self._config.blocked_patterns]
 
         # Load built-in detectors (if configured)
         self._detectors: list | None = None

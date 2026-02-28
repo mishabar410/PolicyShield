@@ -26,19 +26,19 @@ class TestGlobalRateLimit:
 class TestAdaptiveRateLimit:
     def test_adapts_on_burst(self):
         limiter = AdaptiveRateLimiter(base_limit=10, burst_threshold=2.0, tighten_factor=0.5, cooldown=600.0)
-        # Directly inject burst into history
+        # Directly inject burst into per-session history
         now = time.monotonic()
-        limiter._call_history = [now - i * 0.001 for i in range(21)]
+        limiter._call_histories["s1"] = [now - i * 0.001 for i in range(21)]
         # Next check should detect burst and tighten
         limiter.check_and_adapt("s1")
-        assert limiter._effective_limit < 10
+        assert limiter.get_session_limit("s1") < 10
 
     def test_relaxes_after_cooldown(self):
         limiter = AdaptiveRateLimiter(base_limit=10, cooldown=0.1)
-        limiter._effective_limit = 5
-        limiter._last_tighten = time.monotonic()
+        limiter._effective_limits["s1"] = 5
+        limiter._last_tighten["s1"] = time.monotonic()
         time.sleep(0.15)
-        assert limiter.effective_limit == 10
+        assert limiter.get_session_limit("s1") == 10
 
     def test_normal_traffic_not_tightened(self):
         limiter = AdaptiveRateLimiter(base_limit=100)
@@ -46,3 +46,15 @@ class TestAdaptiveRateLimit:
             ok, _ = limiter.check_and_adapt("s1")
             assert ok
         assert limiter.effective_limit == 100
+
+    def test_sessions_independent(self):
+        """Burst in one session should not affect another session."""
+        limiter = AdaptiveRateLimiter(base_limit=10, burst_threshold=2.0, tighten_factor=0.5, cooldown=600.0)
+        now = time.monotonic()
+        # Inject burst only for s1
+        limiter._call_histories["s1"] = [now - i * 0.001 for i in range(21)]
+        limiter.check_and_adapt("s1")
+        # s1 is tightened
+        assert limiter.get_session_limit("s1") < 10
+        # s2 is unaffected
+        assert limiter.get_session_limit("s2") == 10

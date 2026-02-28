@@ -36,6 +36,9 @@ class RuleWatcher:
         self._mtimes: dict[Path, float] = {}
         self._thread: threading.Thread | None = None
         self._stop_event = threading.Event()
+        self._consecutive_failures: int = 0
+        self._max_consecutive_failures: int = 10
+        self._last_error: str | None = None
         self._scan_mtimes()
 
     def _scan_mtimes(self) -> None:
@@ -68,6 +71,16 @@ class RuleWatcher:
         """Return True if watcher thread is running."""
         return self._thread is not None and self._thread.is_alive()
 
+    @property
+    def health(self) -> dict:
+        """Return watcher health status."""
+        return {
+            "alive": self.is_alive,
+            "consecutive_failures": self._consecutive_failures,
+            "healthy": self._consecutive_failures < self._max_consecutive_failures,
+            "last_error": self._last_error,
+        }
+
     def _watch_loop(self) -> None:
         """Main polling loop."""
         while not self._stop_event.is_set():
@@ -77,8 +90,23 @@ class RuleWatcher:
             try:
                 if self._has_changes():
                     self._reload()
+                self._consecutive_failures = 0
             except Exception as e:
-                logger.warning("Watcher error: %s", e)
+                self._consecutive_failures += 1
+                self._last_error = str(e)
+                if self._consecutive_failures >= self._max_consecutive_failures:
+                    logger.error(
+                        "Watcher: %d consecutive failures, last error: %s",
+                        self._consecutive_failures,
+                        e,
+                    )
+                else:
+                    logger.warning(
+                        "Watcher error (%d/%d): %s",
+                        self._consecutive_failures,
+                        self._max_consecutive_failures,
+                        e,
+                    )
 
     def _has_changes(self) -> bool:
         """Check if any YAML file has been modified."""
