@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import asyncio
 import functools
+import threading
 from typing import Any, Callable
 
 from policyshield.core.models import Verdict
@@ -94,11 +95,16 @@ def guard(
 
 
 _default_engine: Any = None
+_default_engine_lock: threading.Lock = threading.Lock()
 
 
 def _get_default_engine() -> Any:
     global _default_engine
-    if _default_engine is None:
+    if _default_engine is not None:
+        return _default_engine
+    with _default_engine_lock:
+        if _default_engine is not None:  # double-checked locking
+            return _default_engine
         import os
 
         from policyshield.shield.engine import ShieldEngine

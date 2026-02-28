@@ -34,7 +34,7 @@ def compute_signature(payload: bytes, secret: str) -> str:
     Returns:
         Hex-encoded signature string prefixed with ``sha256=``.
     """
-    sig = hmac.new(secret.encode(), payload, hashlib.sha256).hexdigest()
+    sig = hmac.HMAC(secret.encode(), payload, hashlib.sha256).hexdigest()
     return f"sha256={sig}"
 
 

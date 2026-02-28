@@ -264,9 +264,28 @@ class PIIDetector:
         matches = self.scan(text)
         if not matches:
             return text
+
+        # Sort by start position, then merge overlapping spans
+        sorted_matches = sorted(matches, key=lambda m: m.span[0])
+        merged: list[PIIMatch] = [sorted_matches[0]]
+        for match in sorted_matches[1:]:
+            prev = merged[-1]
+            if match.span[0] <= prev.span[1]:
+                # Overlapping — extend span, keep whichever has larger coverage
+                if match.span[1] > prev.span[1]:
+                    extended_text = text[prev.span[0]:match.span[1]]
+                    merged[-1] = PIIMatch(
+                        pii_type=prev.pii_type,
+                        span=(prev.span[0], match.span[1]),
+                        field=prev.field,
+                        masked_value=self.mask(extended_text),
+                    )
+            else:
+                merged.append(match)
+
         # Apply masks in reverse order to preserve positions
         result = text
-        for match in sorted(matches, key=lambda m: m.span[0], reverse=True):
+        for match in reversed(merged):
             start, end = match.span
             result = result[:start] + match.masked_value + result[end:]
         return result

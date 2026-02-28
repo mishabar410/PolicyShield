@@ -195,13 +195,15 @@ def _flatten_to_string(value: Any) -> str:
     return " ".join(parts)
 
 
-def _flatten_recurse(value: Any, parts: list[str]) -> None:
+def _flatten_recurse(value: Any, parts: list[str], _depth: int = 0) -> None:
+    if _depth > 50:  # prevent stack overflow on deeply nested input
+        return
     if isinstance(value, dict):
         for v in value.values():
-            _flatten_recurse(v, parts)
+            _flatten_recurse(v, parts, _depth + 1)
     elif isinstance(value, list):
         for item in value:
-            _flatten_recurse(item, parts)
+            _flatten_recurse(item, parts, _depth + 1)
     elif isinstance(value, str):
         parts.append(value)
     elif value is not None:

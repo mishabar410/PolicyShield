@@ -194,8 +194,20 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
     @app.middleware("http")
     async def payload_size_limit(request: Request, call_next):
         if request.method in ("POST", "PUT", "PATCH"):
+            # Quick reject by header
             content_length = request.headers.get("content-length")
             if content_length and int(content_length) > _max_request_size:
+                return JSONResponse(
+                    status_code=413,
+                    content={
+                        "error": "payload_too_large",
+                        "message": f"Request body exceeds {_max_request_size} bytes",
+                        "max_bytes": _max_request_size,
+                    },
+                )
+            # Also verify actual body size (Content-Length can be spoofed)
+            body = await request.body()
+            if len(body) > _max_request_size:
                 return JSONResponse(
                     status_code=413,
                     content={
@@ -212,7 +224,7 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
 
     @app.middleware("http")
     async def backpressure_middleware(request: Request, call_next):
-        if request.url.path in ("/api/v1/check", "/api/v1/post-check"):
+        if request.url.path in ("/api/v1/check", "/api/v1/post-check", "/api/v1/check-approval"):
             try:
                 # Atomic try-acquire with tiny timeout (no TOCTOU race)
                 await asyncio.wait_for(_semaphore.acquire(), timeout=0.01)

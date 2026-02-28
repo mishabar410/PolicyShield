@@ -25,6 +25,8 @@ class SessionManager:
         self._max_sessions = max_sessions
         self._sessions: dict[str, SessionState] = {}
         self._lock = threading.Lock()
+        self._eviction_counter = 0
+        self._eviction_every_n = 100
 
     def get_or_create(self, session_id: str) -> SessionState:
         """Get an existing session or create a new one.
@@ -40,7 +42,7 @@ class SessionManager:
 
     def _get_or_create_unlocked(self, session_id: str) -> SessionState:
         """Get or create session — caller must hold self._lock."""
-        self._evict_expired()
+        self._maybe_evict()
         if session_id in self._sessions:
             return self._sessions[session_id]
 
@@ -138,6 +140,14 @@ class SessionManager:
     def _is_expired(self, session: SessionState) -> bool:
         """Check if a session has exceeded its TTL."""
         return datetime.now(timezone.utc) - session.created_at > timedelta(seconds=self._ttl_seconds)
+
+    def _maybe_evict(self) -> None:
+        """Periodically evict expired sessions (amortized). Must be called with lock held."""
+        self._eviction_counter += 1
+        if self._eviction_counter < self._eviction_every_n:
+            return
+        self._eviction_counter = 0
+        self._evict_expired()
 
     def _evict_expired(self) -> None:
         """Remove all expired sessions. Must be called with lock held."""

@@ -82,7 +82,7 @@ class RemoteRuleLoader:
             # Verify signature if key is configured
             if self._signature_key:
                 server_sig = resp.headers.get("X-PolicyShield-Signature", "")
-                expected = "sha256=" + hmac.new(self._signature_key.encode(), body, hashlib.sha256).hexdigest()
+                expected = "sha256=" + hmac.HMAC(self._signature_key.encode(), body, hashlib.sha256).hexdigest()
                 if not hmac.compare_digest(expected, server_sig):
                     logger.error("Remote rules signature verification FAILED")
                     return None

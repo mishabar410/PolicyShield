@@ -588,17 +588,19 @@ class BaseShieldEngine:
             if orule.tool != ".*" and not _re.match(f"^{orule.tool}$", tool_name):
                 continue
             # Max size check
-            if orule.max_size and len(output_str.encode()) > orule.max_size:
-                logger.warning(
-                    "Output too large for %s (%d bytes, max %d)",
-                    tool_name,
-                    len(output_str.encode()),
-                    orule.max_size,
-                )
-                return PostCheckResult(
-                    blocked=True,
-                    block_reason=orule.message or f"Output exceeds max_size ({orule.max_size} bytes)",
-                )
+            if orule.max_size:
+                encoded_size = len(output_str.encode())
+                if encoded_size > orule.max_size:
+                    logger.warning(
+                        "Output too large for %s (%d bytes, max %d)",
+                        tool_name,
+                        encoded_size,
+                        orule.max_size,
+                    )
+                    return PostCheckResult(
+                        blocked=True,
+                        block_reason=orule.message or f"Output exceeds max_size ({orule.max_size} bytes)",
+                    )
             # Pattern blocking
             for pattern in orule.block_patterns:
                 if _re.search(pattern, output_str):

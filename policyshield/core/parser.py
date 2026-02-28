@@ -224,20 +224,26 @@ def _load_rules_from_dir(dir_path: Path) -> RuleSet:
     return ruleset
 
 
-def _resolve_includes(data: dict, base_dir: Path) -> dict:
+def _resolve_includes(data: dict, base_dir: Path, _visited: set[Path] | None = None) -> dict:
     """Resolve ``include:`` directives, merging rules from included files."""
+    if _visited is None:
+        _visited = set()
+
     includes = data.pop("include", None)
     if not includes:
         return data
 
     all_rules: list[dict] = []
     for inc_path in includes:
-        resolved = base_dir / inc_path
+        resolved = (base_dir / inc_path).resolve()
         if not resolved.exists():
             raise PolicyShieldParseError(f"Include not found: {resolved}")
+        if resolved in _visited:
+            raise PolicyShieldParseError(f"Circular include detected: {resolved}")
+        _visited.add(resolved)
         inc_data = parse_rule_file(resolved)
         # Recursive includes
-        inc_data = _resolve_includes(inc_data, resolved.parent)
+        inc_data = _resolve_includes(inc_data, resolved.parent, _visited)
         inc_rules = inc_data.get("rules", [])
         all_rules.extend(inc_rules)
 
@@ -274,11 +280,24 @@ def _parse_output_rule(raw: dict, file_path: str | None = None) -> OutputRule:
     tool = raw.get("tool", "")
     if not tool:
         raise PolicyShieldParseError("Output rule missing 'tool' field", file_path)
+
+    # Parse verdict (then) if specified
+    then = Verdict.REDACT
+    if "then" in raw:
+        try:
+            then = Verdict(raw["then"].upper())
+        except (ValueError, AttributeError):
+            raise PolicyShieldParseError(
+                f"Invalid output_rule verdict '{raw['then']}'", file_path
+            )
+
     return OutputRule(
+        id=raw.get("id", f"output_{tool}"),
         tool=tool,
         block_patterns=raw.get("block_patterns", []),
-        redact_patterns=raw.get("redact_patterns", []),
-        pii_action=raw.get("pii_action", "redact"),
+        max_size=raw.get("max_size"),
+        then=then,
+        message=raw.get("message", ""),
     )
 
 

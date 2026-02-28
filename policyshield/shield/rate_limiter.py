@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import time
 import threading
-from collections import defaultdict
+from collections import defaultdict, deque
 from dataclasses import dataclass, field
 
 
@@ -32,14 +32,16 @@ class RateLimitConfig:
 class _SlidingWindow:
     """Sliding window counter for rate limiting."""
 
-    timestamps: list[float] = field(default_factory=list)
+    timestamps: deque[float] = field(default_factory=deque)
 
     def add(self, now: float) -> None:
         self.timestamps.append(now)
 
     def count_in_window(self, now: float, window: float) -> int:
         cutoff = now - window
-        self.timestamps = [t for t in self.timestamps if t > cutoff]
+        # Remove expired timestamps from left (oldest first) — O(1) amortized
+        while self.timestamps and self.timestamps[0] <= cutoff:
+            self.timestamps.popleft()
         return len(self.timestamps)
 
 

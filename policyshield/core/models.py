@@ -6,7 +6,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 # --- Enums ---
@@ -117,6 +117,13 @@ class OutputRule(BaseModel):
     block_patterns: list[str] = []
     then: Verdict = Verdict.REDACT
     message: str = ""
+
+    @field_validator("tool")
+    @classmethod
+    def validate_tool_length(cls, v: str) -> str:
+        if len(v) > 500:
+            raise ValueError(f"tool pattern too long: {len(v)} > 500")
+        return v
 
 
 class RuleSet(BaseModel):

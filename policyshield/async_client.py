@@ -40,19 +40,23 @@ class AsyncPolicyShieldClient:
         for attempt in range(self._retries + 1):
             try:
                 response = await self._client.request(method, path, **kwargs)
-                response.raise_for_status()
-                return response
+                if response.status_code < 500:
+                    return response
+                # 5xx — treat as transient, retry
+                last_exc = httpx.HTTPStatusError(
+                    f"{response.status_code}",
+                    request=response.request,
+                    response=response,
+                )
             except (httpx.ConnectError, httpx.ConnectTimeout, httpx.ReadTimeout, httpx.PoolTimeout) as e:
                 last_exc = e
-                if attempt < self._retries:
-                    delay = self._backoff_factor * (2 ** attempt)
-                    logger.warning(
-                        "Request %s %s failed (attempt %d/%d): %s — retrying in %.1fs",
-                        method, path, attempt + 1, self._retries + 1, e, delay,
-                    )
-                    await asyncio.sleep(delay)
-            except httpx.HTTPStatusError:
-                raise  # 4xx/5xx — don't retry
+            if attempt < self._retries:
+                delay = self._backoff_factor * (2 ** attempt)
+                logger.warning(
+                    "Request %s %s failed (attempt %d/%d): %s — retrying in %.1fs",
+                    method, path, attempt + 1, self._retries + 1, last_exc, delay,
+                )
+                await asyncio.sleep(delay)
         raise last_exc  # type: ignore[misc]
 
     async def check(self, tool_name: str, args: dict | None = None, **kwargs) -> CheckResult:
