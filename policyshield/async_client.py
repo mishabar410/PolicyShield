@@ -51,10 +51,15 @@ class AsyncPolicyShieldClient:
             except (httpx.ConnectError, httpx.TimeoutException) as e:
                 last_exc = e
             if attempt < self._retries:
-                delay = self._backoff_factor * (2 ** attempt)
+                delay = self._backoff_factor * (2**attempt)
                 logger.warning(
                     "Request %s %s failed (attempt %d/%d): %s — retrying in %.1fs",
-                    method, path, attempt + 1, self._retries + 1, last_exc, delay,
+                    method,
+                    path,
+                    attempt + 1,
+                    self._retries + 1,
+                    last_exc,
+                    delay,
                 )
                 await asyncio.sleep(delay)
         raise last_exc  # type: ignore[misc]
@@ -87,4 +92,3 @@ class AsyncPolicyShieldClient:
 
     async def __aexit__(self, *args) -> None:
         await self.close()
-

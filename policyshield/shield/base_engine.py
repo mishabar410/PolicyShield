@@ -493,10 +493,7 @@ class BaseShieldEngine:
         with self._lock:
             # Evict stale entries by TTL first
             now = monotonic()
-            stale = [
-                k for k, ts in self._resolved_approvals_ts.items()
-                if now - ts > self._resolved_approvals_ttl
-            ]
+            stale = [k for k, ts in self._resolved_approvals_ts.items() if now - ts > self._resolved_approvals_ttl]
             for k in stale:
                 self._resolved_approvals.pop(k, None)
                 self._resolved_approvals_ts.pop(k, None)
@@ -638,7 +635,9 @@ class BaseShieldEngine:
         if output_bytes > self._max_post_check_bytes:
             logger.debug(
                 "Skipping PII scan for %s (output %d bytes > max %d)",
-                tool_name, output_bytes, self._max_post_check_bytes,
+                tool_name,
+                output_bytes,
+                self._max_post_check_bytes,
             )
         elif isinstance(result, str):
             pii_matches = self._pii.scan(result)

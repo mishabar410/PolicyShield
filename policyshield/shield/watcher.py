@@ -103,7 +103,7 @@ class RuleWatcher:
                     break  # Stop the watcher to avoid tight error loop
                 else:
                     # Exponential backoff: double the wait on each failure
-                    backoff = self._poll_interval * (2 ** self._consecutive_failures)
+                    backoff = self._poll_interval * (2**self._consecutive_failures)
                     logger.warning(
                         "Watcher error (%d/%d): %s — backoff %.1fs",
                         self._consecutive_failures,

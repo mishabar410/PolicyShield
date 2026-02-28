@@ -181,10 +181,10 @@ BUILTIN_PATTERNS: list[PIIPattern] = [
     PIIPattern(
         pii_type=PIIType.RU_PASSPORT,
         pattern=re.compile(
-            r"(?<!\d)"          # not preceded by a digit
-            r"\d{2}\s\d{2}"    # series with mandatory space: XX XX
-            r"\s\d{6}"         # number with mandatory space: XXXXXX
-            r"(?!\d)"          # not followed by a digit
+            r"(?<!\d)"  # not preceded by a digit
+            r"\d{2}\s\d{2}"  # series with mandatory space: XX XX
+            r"\s\d{6}"  # number with mandatory space: XXXXXX
+            r"(?!\d)"  # not followed by a digit
         ),
         label="ru_passport",
     ),
@@ -318,7 +318,7 @@ class PIIDetector:
             if match.span[0] <= prev.span[1]:
                 # Overlapping — extend span, keep whichever has larger coverage
                 if match.span[1] > prev.span[1]:
-                    extended_text = text[prev.span[0]:match.span[1]]
+                    extended_text = text[prev.span[0] : match.span[1]]
                     merged[-1] = PIIMatch(
                         pii_type=prev.pii_type,
                         span=(prev.span[0], match.span[1]),

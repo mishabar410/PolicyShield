@@ -62,4 +62,3 @@ class CanaryRouter:
         """Reset canary timer for a rule."""
         with self._lock:
             self._canary_start_times.pop(rule_id, None)
-

@@ -294,9 +294,7 @@ def _resolve_extends(rules: list[dict]) -> list[dict]:
     # Final check: any unresolved extends left?
     for rule in rules:
         if rule.get("extends"):
-            raise PolicyShieldParseError(
-                f"Circular or unresolvable extends in rule '{rule.get('id', '?')}'"
-            )
+            raise PolicyShieldParseError(f"Circular or unresolvable extends in rule '{rule.get('id', '?')}'")
 
     return rules
 
@@ -313,9 +311,7 @@ def _parse_output_rule(raw: dict, file_path: str | None = None) -> OutputRule:
         try:
             then = Verdict(raw["then"].upper())
         except (ValueError, AttributeError):
-            raise PolicyShieldParseError(
-                f"Invalid output_rule verdict '{raw['then']}'", file_path
-            )
+            raise PolicyShieldParseError(f"Invalid output_rule verdict '{raw['then']}'", file_path)
 
     return OutputRule(
         id=raw.get("id", f"output_{tool}"),
@@ -361,9 +357,7 @@ def _build_ruleset(data: dict, file_path: str) -> RuleSet:
     honeypots_data = data.get("honeypots")
 
     # Parse output_rules (optional)
-    output_rules = [
-        _parse_output_rule(r, file_path) for r in data.get("output_rules", [])
-    ]
+    output_rules = [_parse_output_rule(r, file_path) for r in data.get("output_rules", [])]
 
     ruleset = RuleSet(
         shield_name=shield_name,

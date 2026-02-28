@@ -169,8 +169,11 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
 
     # Only validate Content-Type on endpoints that strictly expect JSON bodies
     _json_only_paths = {
-        "/api/v1/check", "/api/v1/post-check", "/api/v1/check-approval",
-        "/api/v1/clear-taint", "/api/v1/respond-approval",
+        "/api/v1/check",
+        "/api/v1/post-check",
+        "/api/v1/check-approval",
+        "/api/v1/clear-taint",
+        "/api/v1/respond-approval",
     }
 
     @app.middleware("http")

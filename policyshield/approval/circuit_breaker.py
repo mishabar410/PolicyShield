@@ -63,4 +63,3 @@ class CircuitBreaker:
     @property
     def fallback_verdict(self) -> str:
         return self._config.fallback
-

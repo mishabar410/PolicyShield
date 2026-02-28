@@ -263,8 +263,7 @@ class GlobalRateLimiter:
             return
         self._last_cleanup = now
         stale = [
-            k for k, w in self._counters.items()
-            if not w.timestamps or (now - w.timestamps[-1]) > self._window * 2
+            k for k, w in self._counters.items() if not w.timestamps or (now - w.timestamps[-1]) > self._window * 2
         ]
         for k in stale:
             del self._counters[k]
@@ -356,10 +355,7 @@ class AdaptiveRateLimiter:
             return
         self._last_cleanup = now
         cutoff = now - self._window * 2
-        stale = [
-            sid for sid, hist in self._call_histories.items()
-            if not hist or hist[-1] < cutoff
-        ]
+        stale = [sid for sid, hist in self._call_histories.items() if not hist or hist[-1] < cutoff]
         for sid in stale:
             del self._call_histories[sid]
             self._effective_limits.pop(sid, None)
