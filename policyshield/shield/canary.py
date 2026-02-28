@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import threading
 from time import monotonic
 
 logger = logging.getLogger(__name__)
@@ -14,6 +15,7 @@ class CanaryRouter:
 
     def __init__(self) -> None:
         self._canary_start_times: dict[str, float] = {}  # rule_id → start time
+        self._lock = threading.Lock()
 
     def should_apply_canary(
         self,
@@ -38,16 +40,17 @@ class CanaryRouter:
         """
         # Auto-promote if enough time has passed
         if promote_after is not None:
-            start = self._canary_start_times.get(rule_id)
-            if start is None:
-                self._canary_start_times[rule_id] = monotonic()
-            elif monotonic() - start > promote_after:
-                logger.warning(
-                    "Canary rule '%s' auto-promoted to 100%% after %.0fs",
-                    rule_id,
-                    monotonic() - start,
-                )
-                return True  # Promoted to 100%
+            with self._lock:
+                start = self._canary_start_times.get(rule_id)
+                if start is None:
+                    self._canary_start_times[rule_id] = monotonic()
+                elif monotonic() - start > promote_after:
+                    logger.warning(
+                        "Canary rule '%s' auto-promoted to 100%% after %.0fs",
+                        rule_id,
+                        monotonic() - start,
+                    )
+                    return True  # Promoted to 100%
 
         # Deterministic hash bucketing
         bucket_key = f"{rule_id}:{session_id}"
@@ -57,4 +60,6 @@ class CanaryRouter:
 
     def reset(self, rule_id: str) -> None:
         """Reset canary timer for a rule."""
-        self._canary_start_times.pop(rule_id, None)
+        with self._lock:
+            self._canary_start_times.pop(rule_id, None)
+

@@ -71,6 +71,43 @@ def _snils_check(snils_str: str) -> bool:
     return expected == control
 
 
+def _date_check(date_str: str) -> bool:
+    """Basic plausibility check for date-of-birth strings.
+
+    Rejects matches with month > 12 or day > 31 to reduce false positives
+    on version numbers, filenames, etc.
+    """
+    import re as _re
+
+    # Extract numeric parts
+    parts = _re.split(r"[/.\-]", date_str)
+    if len(parts) != 3:
+        return False
+    try:
+        nums = [int(p) for p in parts]
+    except ValueError:
+        return False
+
+    # Determine which is year (4-digit part)
+    if nums[2] > 31:  # DD/MM/YYYY or MM/DD/YYYY
+        day_or_month_1, day_or_month_2, year = nums
+    elif nums[0] > 31:  # YYYY/MM/DD
+        year, day_or_month_1, day_or_month_2 = nums
+    else:
+        return True  # Ambiguous, accept by default
+
+    # At least one of the two non-year parts must be ≤ 12 (month)
+    # and both must be ≤ 31
+    if day_or_month_1 > 31 or day_or_month_2 > 31:
+        return False
+    if day_or_month_1 > 12 and day_or_month_2 > 12:
+        return False  # Neither can be a month
+    # Year should be reasonable for a birth date
+    if year < 1900 or year > 2100:
+        return False
+    return True
+
+
 # Built-in PII patterns
 BUILTIN_PATTERNS: list[PIIPattern] = [
     PIIPattern(
@@ -203,6 +240,10 @@ class PIIDetector:
                 # Extra validation for SNILS
                 if pii_pattern.pii_type == PIIType.SNILS:
                     if not _snils_check(matched_text):
+                        continue
+                # Extra validation for dates (reduce false positives)
+                if pii_pattern.pii_type == PIIType.DATE_OF_BIRTH:
+                    if not _date_check(matched_text):
                         continue
 
                 matches.append(

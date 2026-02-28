@@ -209,19 +209,19 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
                         "max_bytes": _max_request_size,
                     },
                 )
-            # Also verify actual body size (Content-Length can be spoofed).
-            # Note: body is already bounded by ASGI server limits (e.g. uvicorn
-            # --limit-request-body). This is a secondary check.
-            body = await request.body()
-            if len(body) > _max_request_size:
-                return JSONResponse(
-                    status_code=413,
-                    content={
-                        "error": "payload_too_large",
-                        "message": f"Request body exceeds {_max_request_size} bytes",
-                        "max_bytes": _max_request_size,
-                    },
-                )
+            # Only verify actual body size when Content-Length is missing/untrusted
+            # (Content-Length can be spoofed or absent with chunked encoding)
+            if not content_length or cl_int == 0:
+                body = await request.body()
+                if len(body) > _max_request_size:
+                    return JSONResponse(
+                        status_code=413,
+                        content={
+                            "error": "payload_too_large",
+                            "message": f"Request body exceeds {_max_request_size} bytes",
+                            "max_bytes": _max_request_size,
+                        },
+                    )
         return await call_next(request)
 
     # ── Middleware: Backpressure (307) ──
@@ -254,6 +254,9 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
 
     @app.middleware("http")
     async def timeout_middleware(request: Request, call_next):
+        # NOTE: asyncio.wait_for wraps the initial response construction only.
+        # For streaming responses, the timeout does NOT cover the body streaming
+        # phase. Use per-endpoint timeouts for streaming endpoints.
         if request.url.path.startswith("/api/"):
             try:
                 return await asyncio.wait_for(call_next(request), timeout=_request_timeout)
@@ -283,6 +286,8 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
         admin_paths = ("/api/v1/reload", "/api/v1/kill")
         if any(request.url.path.startswith(p) for p in admin_paths):
             client_ip = request.client.host if request.client else "unknown"
+            if not request.client:
+                _logger.warning("Admin rate-limit: request.client is None (proxy misconfiguration?)")
             if not _admin_limiter.is_allowed(client_ip):
                 return JSONResponse(
                     status_code=429,
@@ -302,6 +307,8 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
         check_paths = ("/api/v1/check", "/api/v1/post-check")
         if request.url.path in check_paths:
             client_key = request.client.host if request.client else "unknown"
+            if not request.client:
+                _logger.warning("API rate-limit: request.client is None (proxy misconfiguration?)")
             # Use API token prefix as key if available
             auth = request.headers.get("Authorization", "")
             if auth.startswith("Bearer "):

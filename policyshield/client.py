@@ -20,7 +20,15 @@ class CheckResult:
 
 
 class PolicyShieldClient:
-    """Synchronous PolicyShield HTTP client with retry and backoff."""
+    """Synchronous PolicyShield HTTP client with retry and backoff.
+
+    Recommended usage as context manager to ensure proper cleanup::
+
+        with PolicyShieldClient(token="...") as client:
+            result = client.check("tool_name", {"arg": "value"})
+
+    If used without ``with``, call :meth:`close` explicitly when done.
+    """
 
     def __init__(
         self,

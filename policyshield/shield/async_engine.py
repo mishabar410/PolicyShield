@@ -106,9 +106,12 @@ class AsyncShieldEngine(BaseShieldEngine):
                 message=self._kill_reason or "Kill switch is active",
             )
 
+        # Snapshot honeypot checker to avoid race with _swap_rules()
+        honeypot_checker = self._honeypot_checker
+
         # Honeypot check — always block, regardless of mode
-        if self._honeypot_checker is not None:
-            honeypot_match = self._honeypot_checker.check(tool_name)
+        if honeypot_checker is not None:
+            honeypot_match = honeypot_checker.check(tool_name)
             if honeypot_match:
                 return ShieldResult(
                     verdict=Verdict.BLOCK,
@@ -206,7 +209,8 @@ class AsyncShieldEngine(BaseShieldEngine):
 
         rule = match.rule
 
-        # Build verdict based on rule
+        # Build verdict based on rule (assign to result, don't early-return,
+        # so shadow evaluation always runs — mirrors _do_check_sync)
         if rule.then == Verdict.BLOCK:
             # PII detection on args (only for BLOCK to enrich the message)
             pii_matches = []
@@ -217,7 +221,7 @@ class AsyncShieldEngine(BaseShieldEngine):
             for pm in pii_matches:
                 self._session_mgr.add_taint(session_id, pm.pii_type)
 
-            return self._verdict_builder.block(
+            result = self._verdict_builder.block(
                 rule=rule,
                 tool_name=tool_name,
                 args=args,
@@ -228,7 +232,7 @@ class AsyncShieldEngine(BaseShieldEngine):
             redacted, pii_matches = await asyncio.to_thread(self._pii.redact_dict, args)
             for pm in pii_matches:
                 self._session_mgr.add_taint(session_id, pm.pii_type)
-            return self._verdict_builder.redact(
+            result = self._verdict_builder.redact(
                 rule=rule,
                 tool_name=tool_name,
                 args=args,

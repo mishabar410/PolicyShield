@@ -206,9 +206,12 @@ class BaseShieldEngine:
                 message=self._kill_reason or "Kill switch activated",
             )
 
+        # Snapshot honeypot checker to avoid race with _swap_rules()
+        honeypot_checker = self._honeypot_checker
+
         # Honeypot check — always block, regardless of mode
-        if self._honeypot_checker is not None:
-            honeypot_match = self._honeypot_checker.check(tool_name)
+        if honeypot_checker is not None:
+            honeypot_match = honeypot_checker.check(tool_name)
             if honeypot_match:
                 return ShieldResult(
                     verdict=Verdict.BLOCK,
@@ -552,8 +555,10 @@ class BaseShieldEngine:
             self._session_mgr.increment(session_id, tool_name)
 
         # Record event in ring buffer for chain rule tracking
-        buf = self._session_mgr.get_event_buffer(session_id)
-        buf.add(tool_name, result.verdict.value)
+        # Only record events for actually executed calls (not blocked/pending-approval)
+        if result.verdict not in (Verdict.BLOCK, Verdict.APPROVE):
+            buf = self._session_mgr.get_event_buffer(session_id)
+            buf.add(tool_name, result.verdict.value)
 
         # Record trace
         self._trace(result, session_id, tool_name, latency_ms, args)

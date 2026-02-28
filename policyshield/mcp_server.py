@@ -168,7 +168,14 @@ def create_mcp_server(engine: Any) -> Any:
 
             return [TextContent(type="text", text=json.dumps({"error": f"Unknown tool: {name}"}))]
 
-        except Exception as e:
+        except (KeyError, ValueError, TypeError) as e:
+            # Client errors: safe to return details
             return [TextContent(type="text", text=json.dumps({"error": str(e)}))]
+        except Exception:
+            # Internal errors: log but don't expose details
+            import logging
+
+            logging.getLogger(__name__).exception("Unexpected error in MCP tool call: %s", name)
+            return [TextContent(type="text", text=json.dumps({"error": "Internal server error"}))]
 
     return server

@@ -122,6 +122,8 @@ class ApprovalCache:
         elif strategy == ApprovalStrategy.PER_TOOL:
             return f"{session_id}:{tool_name}"
         else:
+            # ONCE is short-circuited in get()/put(), so this branch is only
+            # reachable if a new strategy is added without updating this method.
             return f"{session_id}:{rule_id}:{tool_name}"
 
     def _evict_if_needed(self) -> None:

@@ -209,6 +209,7 @@ class SessionState(BaseModel):
         """Clear PII taint from session."""
         self.pii_tainted = False
         self.taint_details = None
+        self.taints.clear()
 
 
 class TraceRecord(BaseModel):

@@ -61,6 +61,9 @@ def shield(
                     if on_block == "raise":
                         raise PermissionError(f"PolicyShield requires approval: {result.message}")
                     return None
+                # NOTE: _rebuild_args may not correctly reconstruct calls for
+                # functions with *args or **kwargs variadic signatures. In such
+                # cases, the fallback is kwargs-only rebuild.
                 if result.modified_args:
                     args, kwargs = _rebuild_args(func, result.modified_args, args, kwargs)
                 return await func(*args, **kwargs)

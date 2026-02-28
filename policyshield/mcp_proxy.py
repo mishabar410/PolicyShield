@@ -116,10 +116,11 @@ def create_mcp_proxy_server(engine: Any) -> Any:
         """List tools from the engine's ruleset."""
         tools = []
         for rule in engine.rules.rules:
-            if rule.when and rule.when.tool and rule.when.tool != "*":
+            tool_pattern = rule.when.get("tool") if isinstance(rule.when, dict) else None
+            if tool_pattern and tool_pattern != "*":
                 tools.append(
                     Tool(
-                        name=rule.when.tool,
+                        name=tool_pattern,
                         description=f"[PolicyShield: {rule.then.value}] {rule.message or rule.id}",
                         inputSchema={"type": "object"},
                     )
