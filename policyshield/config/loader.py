@@ -16,7 +16,7 @@ import yaml
 
 from policyshield.core.models import ShieldMode
 
-_ENV_RE = re.compile(r"\$\{([^}:]+)(?::-(.*?))?\}")
+_ENV_RE = re.compile(r"\$\{([^}:]+)(?::-([^}]*))?\}")
 _SCHEMA_PATH = Path(__file__).parent / "schema.json"
 
 

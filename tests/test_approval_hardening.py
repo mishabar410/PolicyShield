@@ -162,7 +162,7 @@ class TestArgsSanitization:
         assert result["count"] == "5"
 
     def test_api_key_redacted(self):
-        result = sanitize_args({"key": "sk-abcdefghijklmnopqrstuvwxyz"})
+        result = sanitize_args({"key": "sk-abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKL"})
         assert "REDACTED" in result["key"]
 
 

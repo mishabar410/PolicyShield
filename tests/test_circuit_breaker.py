@@ -29,7 +29,7 @@ class TestCircuitBreaker:
         cb.record_failure()
         assert cb.state == CircuitState.OPEN
         time.sleep(0.15)
-        assert cb.state == CircuitState.HALF_OPEN
+        assert cb.check_state() == CircuitState.HALF_OPEN
 
     def test_closes_on_success(self):
         cb = CircuitBreaker(CircuitBreakerConfig(failure_threshold=1))

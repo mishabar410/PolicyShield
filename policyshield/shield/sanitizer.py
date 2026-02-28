@@ -206,7 +206,9 @@ def _flatten_recurse(value: Any, parts: list[str], _depth: int = 0) -> None:
     if _depth > 50:  # prevent stack overflow on deeply nested input
         return
     if isinstance(value, dict):
-        for v in value.values():
+        for k, v in value.items():
+            if isinstance(k, str):
+                parts.append(k)
             _flatten_recurse(v, parts, _depth + 1)
     elif isinstance(value, list):
         for item in value:

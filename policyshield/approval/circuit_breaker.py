@@ -33,6 +33,12 @@ class CircuitBreaker:
 
     @property
     def state(self) -> CircuitState:
+        """Return current state without side effects."""
+        with self._lock:
+            return self._state
+
+    def check_state(self) -> CircuitState:
+        """Check and transition state (OPEN → HALF_OPEN after timeout)."""
         with self._lock:
             if self._state == CircuitState.OPEN:
                 if monotonic() - self._last_failure_time > self._config.reset_timeout:
@@ -40,7 +46,7 @@ class CircuitBreaker:
             return self._state
 
     def is_available(self) -> bool:
-        return self.state != CircuitState.OPEN
+        return self.check_state() != CircuitState.OPEN
 
     def record_success(self) -> None:
         with self._lock:
@@ -57,3 +63,4 @@ class CircuitBreaker:
     @property
     def fallback_verdict(self) -> str:
         return self._config.fallback
+

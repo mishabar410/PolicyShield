@@ -3,6 +3,11 @@
 Sits between an MCP client (e.g. Claude Code) and an upstream MCP server,
 enforcing PolicyShield rules on every tool call.
 
+.. note::
+    This is currently a **check-only** proxy — it evaluates PolicyShield rules
+    but does not forward calls to an actual upstream MCP process.  The upstream
+    command infrastructure is reserved for a future release.
+
 Usage:
     policyshield mcp-proxy --upstream "node server.js" --rules rules.yaml
 """

@@ -6,6 +6,7 @@ post-checking, kill switch, reload, and constraints queries.
 
 from __future__ import annotations
 
+import asyncio
 import json
 from typing import Any
 
@@ -145,15 +146,15 @@ def create_mcp_server(engine: Any) -> Any:
 
             elif name == "kill_switch":
                 reason = arguments.get("reason", "MCP kill switch")
-                engine.kill(reason)
+                await asyncio.to_thread(engine.kill, reason)
                 return [TextContent(type="text", text=json.dumps({"status": "killed", "reason": reason}))]
 
             elif name == "resume":
-                engine.resume()
+                await asyncio.to_thread(engine.resume)
                 return [TextContent(type="text", text=json.dumps({"status": "resumed"}))]
 
             elif name == "reload":
-                engine.reload_rules()
+                await asyncio.to_thread(engine.reload_rules)
                 return [
                     TextContent(
                         type="text",

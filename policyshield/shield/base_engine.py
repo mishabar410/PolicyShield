@@ -102,7 +102,10 @@ class BaseShieldEngine:
         self._max_approval_meta: int = 10_000
         # Resolved approval statuses for idempotent polling
         self._resolved_approvals: dict[str, dict] = {}
+        self._resolved_approvals_ts: dict[str, float] = {}
+        self._resolved_approvals_ttl: float = 3600.0  # 1 hour
         self._max_resolved_approvals = 10_000
+        self._max_post_check_bytes = 256 * 1024  # 256KB — skip PII scan above this
 
         # Kill switch — atomic, lock-free via threading.Event
         self._killed = threading.Event()  # Not set = normal operation
@@ -483,12 +486,24 @@ class BaseShieldEngine:
             result = {"status": "denied", "responder": resp.responder}
 
         with self._lock:
-            # Evict oldest entries if cache is full
+            # Evict stale entries by TTL first
+            now = monotonic()
+            stale = [
+                k for k, ts in self._resolved_approvals_ts.items()
+                if now - ts > self._resolved_approvals_ttl
+            ]
+            for k in stale:
+                self._resolved_approvals.pop(k, None)
+                self._resolved_approvals_ts.pop(k, None)
+
+            # Then evict oldest quarter if still over limit
             if len(self._resolved_approvals) >= self._max_resolved_approvals:
                 to_remove = list(self._resolved_approvals.keys())[: len(self._resolved_approvals) // 4]
                 for k in to_remove:
                     del self._resolved_approvals[k]
+                    self._resolved_approvals_ts.pop(k, None)
             self._resolved_approvals[approval_id] = result
+            self._resolved_approvals_ts[approval_id] = now
 
             # Populate approval cache for batch strategies
             if self._approval_cache is not None and approval_id in self._approval_meta:
@@ -611,7 +626,14 @@ class BaseShieldEngine:
         pii_matches: list = []
         redacted_output: str | None = None
 
-        if isinstance(result, str):
+        # Skip expensive PII scanning for oversized outputs
+        output_bytes = len(output_str.encode("utf-8", errors="replace"))
+        if output_bytes > self._max_post_check_bytes:
+            logger.debug(
+                "Skipping PII scan for %s (output %d bytes > max %d)",
+                tool_name, output_bytes, self._max_post_check_bytes,
+            )
+        elif isinstance(result, str):
             pii_matches = self._pii.scan(result)
             if pii_matches:
                 redacted_output = self._pii.redact_text(result)

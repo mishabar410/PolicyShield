@@ -86,7 +86,9 @@ class AsyncShieldEngine(BaseShieldEngine):
         if self._otel:
             self._otel.on_check_end(span_ctx, result, latency_ms)
 
-        return self._apply_post_check(result, session_id, tool_name, latency_ms, args)
+        return await asyncio.to_thread(
+            self._apply_post_check, result, session_id, tool_name, latency_ms, args
+        )
 
     async def _do_check(
         self,

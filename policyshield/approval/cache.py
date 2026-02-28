@@ -18,12 +18,20 @@ class ApprovalStrategy(str, Enum):
 
 
 class ApprovalCache:
-    """Cache for approval decisions to avoid repeated prompts."""
+    """Cache for approval decisions to avoid repeated prompts.
 
-    def __init__(self, strategy: ApprovalStrategy = ApprovalStrategy.PER_RULE):
+    Evicts oldest entries when cache exceeds max_size.
+    """
+
+    def __init__(
+        self,
+        strategy: ApprovalStrategy = ApprovalStrategy.PER_RULE,
+        max_size: int = 10_000,
+    ):
         self._strategy = strategy
         self._cache: dict[str, ApprovalResponse] = {}
         self._lock = threading.Lock()
+        self._max_size = max_size
 
     @property
     def strategy(self) -> ApprovalStrategy:
@@ -59,6 +67,7 @@ class ApprovalCache:
         key = self._make_key(tool_name, rule_id, session_id, s)
         with self._lock:
             self._cache[key] = response
+            self._evict_if_needed()
 
     def clear(self, session_id: str | None = None) -> None:
         """Clear cache, optionally for a specific session only.
@@ -109,3 +118,15 @@ class ApprovalCache:
             return f"{session_id}:{tool_name}"
         else:
             return f"{session_id}:{rule_id}:{tool_name}"
+
+    def _evict_if_needed(self) -> None:
+        """Remove oldest quarter of entries when cache exceeds max_size.
+
+        Must be called under self._lock.
+        """
+        if len(self._cache) <= self._max_size:
+            return
+        evict_count = len(self._cache) // 4
+        keys_to_remove = list(self._cache.keys())[:evict_count]
+        for k in keys_to_remove:
+            del self._cache[k]

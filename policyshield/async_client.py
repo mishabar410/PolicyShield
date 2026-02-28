@@ -48,7 +48,7 @@ class AsyncPolicyShieldClient:
                     request=response.request,
                     response=response,
                 )
-            except (httpx.ConnectError, httpx.ConnectTimeout, httpx.ReadTimeout, httpx.PoolTimeout) as e:
+            except (httpx.ConnectError, httpx.TimeoutException) as e:
                 last_exc = e
             if attempt < self._retries:
                 delay = self._backoff_factor * (2 ** attempt)
@@ -63,6 +63,7 @@ class AsyncPolicyShieldClient:
         """Async check a tool call against PolicyShield rules."""
         payload = {"tool_name": tool_name, "args": args or {}, **kwargs}
         resp = await self._request("POST", "/check", json=payload)
+        resp.raise_for_status()
         data = resp.json()
         return CheckResult(
             verdict=data.get("verdict", ""),

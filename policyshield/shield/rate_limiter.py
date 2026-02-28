@@ -240,11 +240,14 @@ class GlobalRateLimiter:
         self._window = window
         self._counters: dict[str, _SlidingWindow] = {}
         self._lock = threading.Lock()
+        self._last_cleanup = 0.0
+        self._cleanup_interval = 60.0
 
     def check(self, session_id: str) -> bool:
         """Returns True if the call is allowed."""
         now = time.monotonic()
         with self._lock:
+            self._cleanup_stale(now)
             if session_id not in self._counters:
                 self._counters[session_id] = _SlidingWindow()
             counter = self._counters[session_id]
@@ -253,6 +256,18 @@ class GlobalRateLimiter:
                 return False
             counter.add(now)
             return True
+
+    def _cleanup_stale(self, now: float) -> None:
+        """Remove sessions with no recent activity."""
+        if now - self._last_cleanup < self._cleanup_interval:
+            return
+        self._last_cleanup = now
+        stale = [
+            k for k, w in self._counters.items()
+            if not w.timestamps or (now - w.timestamps[-1]) > self._window * 2
+        ]
+        for k in stale:
+            del self._counters[k]
 
 
 class AdaptiveRateLimiter:
@@ -278,6 +293,8 @@ class AdaptiveRateLimiter:
         self._effective_limits: dict[str, int] = {}
         self._last_tighten: dict[str, float] = {}
         self._lock = threading.Lock()
+        self._last_cleanup = 0.0
+        self._cleanup_interval = 60.0
 
     @property
     def effective_limit(self) -> int:
@@ -300,6 +317,7 @@ class AdaptiveRateLimiter:
         now = time.monotonic()
 
         with self._lock:
+            self._cleanup_stale_sessions(now)
             history = self._call_histories[session_id]
             cutoff = now - self._window
             history[:] = [t for t in history if t > cutoff]
@@ -331,3 +349,18 @@ class AdaptiveRateLimiter:
 
             history.append(now)
             return True, {"rate": current_rate + 1, "limit": eff_limit}
+
+    def _cleanup_stale_sessions(self, now: float) -> None:
+        """Remove sessions with no recent activity to prevent memory leaks."""
+        if now - self._last_cleanup < self._cleanup_interval:
+            return
+        self._last_cleanup = now
+        cutoff = now - self._window * 2
+        stale = [
+            sid for sid, hist in self._call_histories.items()
+            if not hist or hist[-1] < cutoff
+        ]
+        for sid in stale:
+            del self._call_histories[sid]
+            self._effective_limits.pop(sid, None)
+            self._last_tighten.pop(sid, None)

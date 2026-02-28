@@ -211,12 +211,6 @@ class TraceRecorder:
         """Return the current trace file path."""
         return self._file_path
 
-    def __enter__(self) -> TraceRecorder:
-        return self
-
-    def __exit__(self, *args) -> None:
-        self.flush()
-
     def _should_rotate(self) -> bool:
         """Check if current trace file needs rotation."""
         if self._file_path is None or not self._file_path.exists():

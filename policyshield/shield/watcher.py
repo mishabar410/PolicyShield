@@ -46,9 +46,9 @@ class RuleWatcher:
         if self._path.is_file():
             self._mtimes[self._path] = self._path.stat().st_mtime
         elif self._path.is_dir():
-            for f in self._path.glob("*.yaml"):
+            for f in self._path.rglob("*.yaml"):
                 self._mtimes[f] = f.stat().st_mtime
-            for f in self._path.glob("*.yml"):
+            for f in self._path.rglob("*.yml"):
                 self._mtimes[f] = f.stat().st_mtime
 
     def start(self) -> None:
@@ -114,9 +114,9 @@ class RuleWatcher:
         if self._path.is_file():
             current[self._path] = self._path.stat().st_mtime
         elif self._path.is_dir():
-            for f in self._path.glob("*.yaml"):
+            for f in self._path.rglob("*.yaml"):
                 current[f] = f.stat().st_mtime
-            for f in self._path.glob("*.yml"):
+            for f in self._path.rglob("*.yml"):
                 current[f] = f.stat().st_mtime
 
         changed = current != self._mtimes
@@ -126,9 +126,6 @@ class RuleWatcher:
 
     def _reload(self) -> None:
         """Attempt to reload rules and invoke callback."""
-        try:
-            new_ruleset = load_rules(self._path)
-            self._callback(new_ruleset)
-            logger.info("Rules hot-reloaded from %s", self._path)
-        except Exception as e:
-            logger.warning("Hot reload failed (keeping old rules): %s", e)
+        new_ruleset = load_rules(self._path)
+        self._callback(new_ruleset)
+        logger.info("Rules hot-reloaded from %s", self._path)

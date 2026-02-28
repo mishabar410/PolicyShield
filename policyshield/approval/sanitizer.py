@@ -6,7 +6,7 @@ import re
 
 _SECRET_PATTERNS = [
     (re.compile(r"(?:AKIA|ASIA)[0-9A-Z]{16}", re.I), "[REDACTED_AWS_KEY]"),
-    (re.compile(r"sk-[A-Za-z0-9]{20,}"), "[REDACTED_API_KEY]"),
+    (re.compile(r"\bsk-(?:proj-|ant-)?[A-Za-z0-9]{32,}\b"), "[REDACTED_API_KEY]"),
     (
         re.compile(r"(?:password|passwd|pwd|secret|token)\s*[:=]\s*\S+", re.I),
         "[REDACTED]",

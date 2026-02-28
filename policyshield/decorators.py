@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import asyncio
 import functools
+import inspect
 import threading
 from typing import Any, Callable
 
@@ -50,7 +51,8 @@ def shield(
 
             @functools.wraps(func)
             async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
-                result = await engine.check(name, kwargs, session_id=session_id)
+                all_kwargs = _bind_args(func, args, kwargs)
+                result = await engine.check(name, all_kwargs, session_id=session_id)
                 if result.verdict == Verdict.BLOCK:
                     if on_block == "raise":
                         raise PermissionError(f"PolicyShield blocked: {result.message}")
@@ -68,7 +70,8 @@ def shield(
 
             @functools.wraps(func)
             def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
-                result = engine.check(name, kwargs, session_id=session_id)
+                all_kwargs = _bind_args(func, args, kwargs)
+                result = engine.check(name, all_kwargs, session_id=session_id)
                 if result.verdict == Verdict.BLOCK:
                     if on_block == "raise":
                         raise PermissionError(f"PolicyShield blocked: {result.message}")
@@ -118,3 +121,18 @@ def _get_default_engine() -> Any:
         rules_path = os.environ.get("POLICYSHIELD_RULES", "policies/rules.yaml")
         _default_engine = ShieldEngine(rules=rules_path)
         return _default_engine
+
+
+def _bind_args(func: Callable, args: tuple, kwargs: dict) -> dict:
+    """Bind positional and keyword args using the function's signature.
+
+    Returns a merged dict so the engine can check all argument values.
+    """
+    try:
+        sig = inspect.signature(func)
+        bound = sig.bind(*args, **kwargs)
+        bound.apply_defaults()
+        return dict(bound.arguments)
+    except (ValueError, TypeError):
+        # Fallback: return kwargs only (e.g. for builtins without signature)
+        return dict(kwargs)

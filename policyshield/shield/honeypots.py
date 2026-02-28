@@ -52,7 +52,7 @@ class HoneypotChecker:
     """Checks tool calls against configured honeypots."""
 
     def __init__(self, honeypots: list[HoneypotConfig]) -> None:
-        self._lookup: dict[str, HoneypotConfig] = {h.name: h for h in honeypots}
+        self._lookup: dict[str, HoneypotConfig] = {h.name.lower(): h for h in honeypots}
 
     @classmethod
     def from_config(cls, config_list: list[dict[str, Any]]) -> HoneypotChecker:
@@ -68,9 +68,9 @@ class HoneypotChecker:
         Returns:
             HoneypotMatch if triggered, None otherwise.
         """
-        if tool_name in self._lookup:
+        if tool_name.lower() in self._lookup:
             match = HoneypotMatch(
-                honeypot=self._lookup[tool_name],
+                honeypot=self._lookup[tool_name.lower()],
                 tool_name=tool_name,
             )
             logger.critical(
