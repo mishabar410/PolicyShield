@@ -50,7 +50,71 @@ Tool Call → Sanitizer → Regex Rules → [LLM Guard] → Verdict
 - Fallback: если LLM недоступен → regex-only?
 - Конфиг: `llm_guard: { enabled: true, model: gpt-4o-mini, timeout: 2s, cache_ttl: 300 }`
 
-### 2. Conditional Rules
+### 2. Natural Language → Policy Compiler
+
+LLM компилирует человеческие описания «что нельзя» в структурированные YAML-правила.
+
+**Пользовательский ввод** (plain text или markdown):
+```
+Никогда не удалять production базы данных.
+Файлы .env запрещены для чтения вне CI.
+Деплой только в рабочее время, только для admin.
+Email с PII — блокировать и логировать.
+```
+
+**Результат** (сгенерированный YAML):
+```yaml
+rules:
+  - id: block-prod-db-delete
+    when:
+      tool: delete_database
+      args_match:
+        database: "*prod*"
+    then: BLOCK
+    severity: critical
+    message: "Production database deletion is prohibited"
+
+  - id: block-dotenv-read
+    when:
+      tool: read_file
+      args_match:
+        path: "*.env"
+      context:
+        environment: "!ci"
+    then: BLOCK
+    message: ".env files can only be read in CI"
+
+  - id: deploy-office-hours-admin
+    when:
+      tool: deploy
+      context:
+        time_of_day: "!09:00-18:00"
+        user_role: "!admin"
+    then: BLOCK
+    message: "Deploy allowed only Mon-Fri 9-18 by admins"
+
+  - id: block-pii-email
+    when:
+      tool: send_email
+    then: REDACT
+    pii_action: block_and_log
+    message: "PII detected in email — blocked"
+```
+
+**Реализация:**
+- [ ] CLI: `policyshield compile "описание на человеческом языке" -o rules.yaml`
+- [ ] CLI: `policyshield compile --file restrictions.md -o rules.yaml`
+- [ ] Двухстадийный pipeline: LLM генерирует → `policyshield validate` проверяет
+- [ ] Diff mode: `policyshield compile --diff` — показать что изменится vs текущие правила
+- [ ] Iterative refinement: если validate fails → LLM исправляет автоматически
+- [ ] Model: `gpt-4o` для точности, `gpt-4o-mini` для скорости
+- [ ] Prompt template с примерами existing rules для consistency
+- [ ] Support conditional rules (time/role) в output
+
+**Ключевое преимущество:**
+Не надо знать YAML-формат PolicyShield — пишешь на человеческом языке, получаешь production-ready правила.
+
+### 3. Conditional Rules
 
 ```yaml
 rules:
@@ -77,7 +141,7 @@ rules:
 - [ ] Time parsing (timezone-aware)
 - [ ] Wildcard tool matching (`delete_*`)
 
-### 3. Bounded Session Storage
+### 4. Bounded Session Storage
 
 Сейчас: `InMemorySessionManager` растёт бесконечно.
 
@@ -86,7 +150,7 @@ rules:
 - [ ] Redis backend как альтернатива
 - [ ] Метрики: active_sessions, evicted_sessions_total
 
-### 4. Production Deployment Guide
+### 5. Production Deployment Guide
 
 - [ ] `docs/deployment/` directory
 - [ ] Docker production Dockerfile (multi-stage, non-root)
@@ -292,9 +356,10 @@ policyshield install-pack coding-agent-security
 
 ### Phase 2: v1.0 (2-3 недели)
 6. LLM Guard: prompt injection + semantic PII
-7. Web UI dashboard (HTMX)
-8. OpenAI Agents SDK integration
-9. Anthropic tool_use integration
+7. NL → Policy Compiler
+8. Web UI dashboard (HTMX)
+9. OpenAI Agents SDK integration
+10. Anthropic tool_use integration
 
 ### Phase 3: v1.1+ (ongoing)
 10. RBAC
