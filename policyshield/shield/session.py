@@ -156,8 +156,18 @@ class SessionManager:
             del self._sessions[sid]
 
     def _evict_oldest(self) -> None:
-        """Remove the oldest session. Must be called with lock held."""
+        """Remove the least-recently-used session. Must be called with lock held.
+
+        Evicts the session with the fewest total calls (least active),
+        falling back to oldest creation time for ties.
+        """
         if not self._sessions:
             return
-        oldest_id = min(self._sessions, key=lambda sid: self._sessions[sid].created_at)
-        del self._sessions[oldest_id]
+        lru_id = min(
+            self._sessions,
+            key=lambda sid: (
+                self._sessions[sid].total_calls,
+                self._sessions[sid].created_at,
+            ),
+        )
+        del self._sessions[lru_id]

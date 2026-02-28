@@ -49,6 +49,8 @@ class EventRingBuffer:
     ) -> list[ToolEvent]:
         """Find recent events matching criteria.
 
+        Returns matching events in chronological order (oldest first).
+
         Args:
             tool: Tool name to search for.
             within_seconds: Only events within this many seconds from now.

@@ -76,6 +76,7 @@ class AsyncPolicyShieldClient:
     async def health(self) -> dict:
         """Check PolicyShield server health."""
         resp = await self._request("GET", "/health")
+        resp.raise_for_status()
         return resp.json()
 
     async def close(self) -> None:

@@ -62,7 +62,7 @@ def shield(
                         raise PermissionError(f"PolicyShield requires approval: {result.message}")
                     return None
                 if result.modified_args:
-                    kwargs.update(result.modified_args)
+                    args, kwargs = _rebuild_args(func, result.modified_args, args, kwargs)
                 return await func(*args, **kwargs)
 
             return async_wrapper
@@ -81,7 +81,7 @@ def shield(
                         raise PermissionError(f"PolicyShield requires approval: {result.message}")
                     return None
                 if result.modified_args:
-                    kwargs.update(result.modified_args)
+                    args, kwargs = _rebuild_args(func, result.modified_args, args, kwargs)
                 return func(*args, **kwargs)
 
             return sync_wrapper
@@ -136,3 +136,39 @@ def _bind_args(func: Callable, args: tuple, kwargs: dict) -> dict:
     except (ValueError, TypeError):
         # Fallback: return kwargs only (e.g. for builtins without signature)
         return dict(kwargs)
+
+
+def _rebuild_args(
+    func: Callable,
+    modified_args: dict,
+    original_args: tuple,
+    original_kwargs: dict,
+) -> tuple[tuple, dict]:
+    """Rebuild positional and keyword args from modified_args.
+
+    Prevents 'got multiple values for argument' TypeError by correctly
+    placing modified values into positional or keyword slots.
+    """
+    try:
+        sig = inspect.signature(func)
+        params = list(sig.parameters.keys())
+        new_args = list(original_args)
+        new_kwargs = dict(original_kwargs)
+
+        for key, value in modified_args.items():
+            if key in params:
+                idx = params.index(key)
+                if idx < len(new_args):
+                    # Was passed as positional — update in-place
+                    new_args[idx] = value
+                else:
+                    new_kwargs[key] = value
+            else:
+                new_kwargs[key] = value
+
+        return tuple(new_args), new_kwargs
+    except (ValueError, TypeError):
+        # Fallback: just update kwargs (legacy behavior)
+        new_kwargs = dict(original_kwargs)
+        new_kwargs.update(modified_args)
+        return original_args, new_kwargs

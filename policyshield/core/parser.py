@@ -162,7 +162,10 @@ def _load_rules_from_dir(dir_path: Path) -> RuleSet:
     Each file is parsed exactly once. Rules, taint_chain, honeypots,
     and output_rules are collected from all files in a single pass.
     """
-    yaml_files = sorted(dir_path.glob("*.yaml")) + sorted(dir_path.glob("*.yml"))
+    yaml_files = sorted(
+        list(dir_path.glob("*.yaml")) + list(dir_path.glob("*.yml")),
+        key=lambda f: f.stem,
+    )
     if not yaml_files:
         raise PolicyShieldParseError(f"No YAML files found in {dir_path}")
 
@@ -254,25 +257,48 @@ def _resolve_includes(data: dict, base_dir: Path, _visited: set[Path] | None = N
 
 
 def _resolve_extends(rules: list[dict]) -> list[dict]:
-    """Resolve ``extends:`` — child rule inherits parent fields."""
+    """Resolve ``extends:`` — child rule inherits parent fields.
+
+    Iterates until stable to support multi-level inheritance (A → B → C)
+    regardless of rule ordering in the YAML file.
+    """
     rules_by_id = {r["id"]: r for r in rules if "id" in r}
-    resolved = []
+    max_iterations = len(rules) + 1  # Prevent infinite loops
 
+    for _ in range(max_iterations):
+        changed = False
+        resolved = []
+        for rule in rules:
+            extends = rule.get("extends")
+            if extends:
+                parent = rules_by_id.get(extends)
+                if parent is None:
+                    raise PolicyShieldParseError(f"Rule extends unknown parent: {extends}")
+                # If parent itself still has extends, skip this round
+                if parent.get("extends"):
+                    resolved.append(rule)
+                    continue
+                # Merge: parent values as defaults, child overrides
+                merged = {**parent, **rule}
+                merged["id"] = rule["id"]  # Keep child's ID
+                merged.pop("extends", None)
+                resolved.append(merged)
+                rules_by_id[rule["id"]] = merged  # Update for downstream children
+                changed = True
+            else:
+                resolved.append(rule)
+        rules = resolved
+        if not changed:
+            break
+
+    # Final check: any unresolved extends left?
     for rule in rules:
-        extends = rule.get("extends")
-        if extends:
-            parent = rules_by_id.get(extends)
-            if parent is None:
-                raise PolicyShieldParseError(f"Rule extends unknown parent: {extends}")
-            # Merge: parent values as defaults, child overrides
-            merged = {**parent, **rule}
-            merged["id"] = rule["id"]  # Keep child's ID
-            merged.pop("extends", None)
-            resolved.append(merged)
-        else:
-            resolved.append(rule)
+        if rule.get("extends"):
+            raise PolicyShieldParseError(
+                f"Circular or unresolvable extends in rule '{rule.get('id', '?')}'"
+            )
 
-    return resolved
+    return rules
 
 
 def _parse_output_rule(raw: dict, file_path: str | None = None) -> OutputRule:

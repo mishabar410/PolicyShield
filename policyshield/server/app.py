@@ -196,7 +196,11 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
         if request.method in ("POST", "PUT", "PATCH"):
             # Quick reject by header
             content_length = request.headers.get("content-length")
-            if content_length and int(content_length) > _max_request_size:
+            try:
+                cl_int = int(content_length) if content_length else 0
+            except (ValueError, TypeError):
+                cl_int = 0
+            if cl_int > _max_request_size:
                 return JSONResponse(
                     status_code=413,
                     content={
@@ -205,7 +209,9 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
                         "max_bytes": _max_request_size,
                     },
                 )
-            # Also verify actual body size (Content-Length can be spoofed)
+            # Also verify actual body size (Content-Length can be spoofed).
+            # Note: body is already bounded by ASGI server limits (e.g. uvicorn
+            # --limit-request-body). This is a secondary check.
             body = await request.body()
             if len(body) > _max_request_size:
                 return JSONResponse(
@@ -352,7 +358,7 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
         if idem_key:
             cached = _idem_cache.get(idem_key)
             if cached:
-                return JSONResponse(content=cached)  # type: ignore[return-value]
+                return CheckResponse(**cached)
         result = await engine.check(
             tool_name=req.tool_name,
             args=req.args,

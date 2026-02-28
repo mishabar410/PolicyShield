@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import threading
+from collections import OrderedDict
 from enum import Enum
 
 from policyshield.approval.base import ApprovalResponse
@@ -29,7 +30,7 @@ class ApprovalCache:
         max_size: int = 10_000,
     ):
         self._strategy = strategy
-        self._cache: dict[str, ApprovalResponse] = {}
+        self._cache: OrderedDict[str, ApprovalResponse] = OrderedDict()
         self._lock = threading.Lock()
         self._max_size = max_size
 
@@ -50,7 +51,10 @@ class ApprovalCache:
             return None  # never cache for ONCE
         key = self._make_key(tool_name, rule_id, session_id, s)
         with self._lock:
-            return self._cache.get(key)
+            resp = self._cache.get(key)
+            if resp is not None:
+                self._cache.move_to_end(key)  # Mark as recently used
+            return resp
 
     def put(
         self,
@@ -67,6 +71,7 @@ class ApprovalCache:
         key = self._make_key(tool_name, rule_id, session_id, s)
         with self._lock:
             self._cache[key] = response
+            self._cache.move_to_end(key)  # Mark as recently used
             self._evict_if_needed()
 
     def clear(self, session_id: str | None = None) -> None:

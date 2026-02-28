@@ -74,7 +74,18 @@ class RemoteRuleLoader:
                 return None  # Not modified
 
             if resp.status_code >= 400:
-                logger.error("Remote rules fetch failed: HTTP %d", resp.status_code)
+                if resp.status_code < 500:
+                    # 4xx = client error (bad URL, auth) — won't resolve on retry
+                    logger.critical(
+                        "Remote rules fetch failed: HTTP %d (client error — check URL/auth)",
+                        resp.status_code,
+                    )
+                else:
+                    # 5xx = server error — may be transient
+                    logger.warning(
+                        "Remote rules fetch failed: HTTP %d (server error — will retry)",
+                        resp.status_code,
+                    )
                 return None
 
             body = resp.content

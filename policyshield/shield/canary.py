@@ -42,6 +42,11 @@ class CanaryRouter:
             if start is None:
                 self._canary_start_times[rule_id] = monotonic()
             elif monotonic() - start > promote_after:
+                logger.warning(
+                    "Canary rule '%s' auto-promoted to 100%% after %.0fs",
+                    rule_id,
+                    monotonic() - start,
+                )
                 return True  # Promoted to 100%
 
         # Deterministic hash bucketing

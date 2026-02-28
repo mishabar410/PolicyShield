@@ -95,18 +95,23 @@ class RuleWatcher:
                 self._consecutive_failures += 1
                 self._last_error = str(e)
                 if self._consecutive_failures >= self._max_consecutive_failures:
-                    logger.error(
-                        "Watcher: %d consecutive failures, last error: %s",
+                    logger.critical(
+                        "Watcher: %d consecutive failures — stopping watcher. Last error: %s",
                         self._consecutive_failures,
                         e,
                     )
+                    break  # Stop the watcher to avoid tight error loop
                 else:
+                    # Exponential backoff: double the wait on each failure
+                    backoff = self._poll_interval * (2 ** self._consecutive_failures)
                     logger.warning(
-                        "Watcher error (%d/%d): %s",
+                        "Watcher error (%d/%d): %s — backoff %.1fs",
                         self._consecutive_failures,
                         self._max_consecutive_failures,
                         e,
+                        backoff,
                     )
+                    self._stop_event.wait(backoff)
 
     def _has_changes(self) -> bool:
         """Check if any YAML file has been modified."""

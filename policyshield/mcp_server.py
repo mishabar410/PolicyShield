@@ -110,7 +110,7 @@ def create_mcp_server(engine: Any) -> Any:
                     session_id=arguments.get("session_id", "default"),
                     sender=arguments.get("sender"),
                 )
-                payload = {
+                payload: dict[str, Any] = {
                     "verdict": result.verdict.value,
                     "message": result.message,
                     "rule_id": result.rule_id,
@@ -123,17 +123,17 @@ def create_mcp_server(engine: Any) -> Any:
                 return [TextContent(type="text", text=json.dumps(payload))]
 
             elif name == "post_check":
-                result = await engine.post_check(
+                post_result = await engine.post_check(
                     arguments["tool_name"],
                     arguments.get("result", ""),
                     session_id=arguments.get("session_id", "default"),
                 )
-                payload = {
-                    "pii_found": len(result.pii_matches) > 0,
-                    "pii_types": [m.pii_type.value for m in result.pii_matches],
-                    "redacted_output": result.redacted_output,
+                post_payload: dict[str, Any] = {
+                    "pii_found": len(post_result.pii_matches) > 0,
+                    "pii_types": [m.pii_type.value for m in post_result.pii_matches],
+                    "redacted_output": post_result.redacted_output,
                 }
-                return [TextContent(type="text", text=json.dumps(payload))]
+                return [TextContent(type="text", text=json.dumps(post_payload))]
 
             elif name == "health":
                 info = {

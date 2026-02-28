@@ -100,9 +100,10 @@ class TelegramApprovalBackend(ApprovalBackend):
                     self._message_ids[request.request_id] = msg_id
         except Exception:
             logger.exception("Failed to send Telegram approval request")
-
-        # Start polling if not already running
-        self._ensure_polling()
+        finally:
+            # Always start polling — even if message send failed,
+            # so the request can be resolved via respond() API
+            self._ensure_polling()
 
     def wait_for_response(self, request_id: str, timeout: float = 300.0) -> ApprovalResponse | None:
         event = self._events.get(request_id)

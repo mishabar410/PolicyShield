@@ -93,7 +93,11 @@ BUILTIN_PATTERNS: list[PIIPattern] = [
         pii_type=PIIType.CREDIT_CARD,
         pattern=re.compile(
             r"\b"
-            r"\d{4}[- ]?\d{4}[- ]?\d{4}[- ]?\d{1,7}"
+            r"(?:"
+            r"\d{4}[- ]\d{4}[- ]\d{4}[- ]\d{1,7}"  # with separators
+            r"|"
+            r"(?:4\d{3}|5[1-5]\d{2}|3[47]\d{2}|6(?:011|5\d{2}))\d{8,12}"  # known prefixes (Visa/MC/Amex/Discover)
+            r")"
             r"\b"
         ),
         label="credit_card",

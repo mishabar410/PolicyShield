@@ -159,13 +159,15 @@ class BaseShieldEngine:
         Args:
             reason: Human-readable reason for the kill switch activation.
         """
-        self._kill_reason = reason
-        self._killed.set()
+        with self._lock:
+            self._kill_reason = reason
+            self._killed.set()
 
     def resume(self) -> None:
         """Deactivate kill switch — resume normal operation."""
-        self._killed.clear()
-        self._kill_reason = ""
+        with self._lock:
+            self._killed.clear()
+            self._kill_reason = ""
 
     @property
     def is_killed(self) -> bool:
