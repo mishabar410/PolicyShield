@@ -36,21 +36,25 @@ class SessionManager:
             The SessionState for this session.
         """
         with self._lock:
-            self._evict_expired()
-            if session_id in self._sessions:
-                return self._sessions[session_id]
+            return self._get_or_create_unlocked(session_id)
 
-            # Evict oldest if at capacity
-            if len(self._sessions) >= self._max_sessions:
-                self._evict_oldest()
+    def _get_or_create_unlocked(self, session_id: str) -> SessionState:
+        """Get or create session — caller must hold self._lock."""
+        self._evict_expired()
+        if session_id in self._sessions:
+            return self._sessions[session_id]
 
-            session = SessionState(
-                session_id=session_id,
-                created_at=datetime.now(timezone.utc),
-                event_buffer=EventRingBuffer(),
-            )
-            self._sessions[session_id] = session
-            return session
+        # Evict oldest if at capacity
+        if len(self._sessions) >= self._max_sessions:
+            self._evict_oldest()
+
+        session = SessionState(
+            session_id=session_id,
+            created_at=datetime.now(timezone.utc),
+            event_buffer=EventRingBuffer(),
+        )
+        self._sessions[session_id] = session
+        return session
 
     def get(self, session_id: str) -> SessionState | None:
         """Get a session by ID, or None if expired/missing.
@@ -78,17 +82,18 @@ class SessionManager:
         Returns:
             Updated SessionState.
         """
-        session = self.get_or_create(session_id)
         with self._lock:
+            session = self._get_or_create_unlocked(session_id)
             session.increment(tool_name)
         return session
 
     def get_event_buffer(self, session_id: str) -> EventRingBuffer:
         """Get the event buffer for a session (lazy-initializes if needed)."""
-        session = self.get_or_create(session_id)
-        if session.event_buffer is None:
-            session.event_buffer = EventRingBuffer()
-        return session.event_buffer  # type: ignore[return-value]
+        with self._lock:
+            session = self._get_or_create_unlocked(session_id)
+            if session.event_buffer is None:
+                session.event_buffer = EventRingBuffer()
+            return session.event_buffer  # type: ignore[return-value]
 
     def add_taint(self, session_id: str, pii_type: PIIType) -> None:
         """Mark a session as tainted with a PII type.
@@ -97,8 +102,8 @@ class SessionManager:
             session_id: Session identifier.
             pii_type: The PII type detected.
         """
-        session = self.get_or_create(session_id)
         with self._lock:
+            session = self._get_or_create_unlocked(session_id)
             session.taints.add(pii_type)
 
     def remove(self, session_id: str) -> bool:

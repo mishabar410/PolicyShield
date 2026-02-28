@@ -67,7 +67,7 @@ dev = [
     "tomli; python_version < '3.11'",
 ]
 all = [
-    "policyshield[langchain,crewai,otel,dashboard,prometheus,docs,dev]",
+    "policyshield[langchain,crewai,otel,dashboard,server,ai,prometheus,docs,dev]",
 ]
 
 [project.scripts]

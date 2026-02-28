@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 from collections import deque
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -21,11 +22,12 @@ class EventRingBuffer:
     """Fixed-size ring buffer for tool call events.
 
     Uses collections.deque with maxlen for O(1) append.
-    Thread safety is handled by the caller (SessionManager).
+    Thread-safe: all mutations and reads are protected by a lock.
     """
 
     def __init__(self, max_size: int = 100) -> None:
         self._buffer: deque[ToolEvent] = deque(maxlen=max_size)
+        self._lock = threading.Lock()
 
     def add(self, tool: str, verdict: str, args_summary: str = "") -> None:
         """Record a tool event."""
@@ -35,7 +37,8 @@ class EventRingBuffer:
             verdict=verdict,
             args_summary=args_summary[:200],  # Truncate args
         )
-        self._buffer.append(event)
+        with self._lock:
+            self._buffer.append(event)
 
     def find_recent(
         self,
@@ -55,8 +58,11 @@ class EventRingBuffer:
             List of matching events (oldest first).
         """
         now = datetime.now(timezone.utc)
+        # Snapshot under lock, filter outside
+        with self._lock:
+            events = list(self._buffer)
         results = []
-        for event in self._buffer:
+        for event in events:
             if event.tool != tool:
                 continue
             if verdict is not None and event.verdict != verdict:
@@ -80,10 +86,14 @@ class EventRingBuffer:
     @property
     def events(self) -> list[ToolEvent]:
         """Return all events in order (oldest first)."""
-        return list(self._buffer)
+        with self._lock:
+            return list(self._buffer)
 
     def __len__(self) -> int:
-        return len(self._buffer)
+        with self._lock:
+            return len(self._buffer)
 
     def clear(self) -> None:
-        self._buffer.clear()
+        with self._lock:
+            self._buffer.clear()
+

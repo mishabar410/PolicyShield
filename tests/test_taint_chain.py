@@ -89,7 +89,7 @@ class TestTaintChain:
     def test_session_tainted_flag_in_post_check_result(self) -> None:
         """Post-check result should indicate session was tainted."""
         engine = _make_engine()
-        result = engine.post_check("tool", "call me at 555-123-4567", session_id="s2")
+        result = engine.post_check("tool", "call me at +1-555-123-4567", session_id="s2")
         assert result.session_tainted is True
 
     def test_taint_details_contain_pii_types(self) -> None:
@@ -105,7 +105,7 @@ class TestTaintChain:
     def test_multiple_pii_types_in_taint(self) -> None:
         """Multiple PII types should be tracked."""
         engine = _make_engine()
-        engine.post_check("search", "email: john@corp.com, phone: 555-123-4567", session_id="s4")
+        engine.post_check("search", "email: john@corp.com, phone: +1-555-123-4567", session_id="s4")
 
         session = engine.session_manager.get("s4")
         assert session is not None

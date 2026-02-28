@@ -194,7 +194,7 @@ post_r = api(
     {
         "tool_name": "read",
         "args": {"path": "contacts.txt"},
-        "result": "Name: John Smith, Email: john@acme.com, SSN: 123-45-6789, Phone: 555-123-4567",
+        "result": "Name: John Smith, Email: john@acme.com, SSN: 123-45-6789, Phone: +1-555-123-4567",
         "session_id": "s7",
     },
 )

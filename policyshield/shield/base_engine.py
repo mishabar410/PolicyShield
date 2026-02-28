@@ -659,17 +659,7 @@ class BaseShieldEngine:
             logger.warning("reload_rules called but no path available")
             return
         new_ruleset = load_rules(reload_path)
-        with self._lock:
-            self._rule_set = new_ruleset
-            self._matcher = MatcherEngine(self._rule_set)
-            # Refresh honeypot checker from reloaded rules
-            honeypot_config = new_ruleset.honeypots
-            if honeypot_config:
-                from policyshield.shield.honeypots import HoneypotChecker
-
-                self._honeypot_checker = HoneypotChecker.from_config(honeypot_config)
-            else:
-                self._honeypot_checker = None
+        self._swap_rules(new_ruleset)
         logger.info("Rules reloaded from %s (%d rules)", reload_path, len(new_ruleset.rules))
 
     def start_watching(self, poll_interval: float = 2.0) -> None:
@@ -698,6 +688,11 @@ class BaseShieldEngine:
 
     def _hot_reload_callback(self, new_ruleset: RuleSet) -> None:
         """Callback for the watcher to swap rules."""
+        self._swap_rules(new_ruleset)
+        logger.info("Hot-reloaded %d rules", len(new_ruleset.rules))
+
+    def _swap_rules(self, new_ruleset: RuleSet) -> None:
+        """Atomically replace active ruleset and rebuild dependent objects."""
         with self._lock:
             self._rule_set = new_ruleset
             self._matcher = MatcherEngine(new_ruleset)
@@ -709,7 +704,6 @@ class BaseShieldEngine:
                 self._honeypot_checker = HoneypotChecker.from_config(honeypot_config)
             else:
                 self._honeypot_checker = None
-        logger.info("Hot-reloaded %d rules", len(new_ruleset.rules))
 
     # ------------------------------------------------------------------ #
     #  Properties                                                         #

@@ -81,11 +81,11 @@ BUILTIN_PATTERNS: list[PIIPattern] = [
     PIIPattern(
         pii_type=PIIType.PHONE,
         pattern=re.compile(
-            r"(?:\+\d{1,3}[-.\s]?)?"  # optional country code
-            r"\(?\d{1,4}\)?"  # area code
-            r"[-.\s]?\d{1,4}"  # first group
-            r"[-.\s]?\d{1,4}"  # second group
-            r"(?:[-.\s]?\d{1,4})?"  # optional third group
+            r"(?:\+\d{1,3}[-.\s]?)"  # required country code (e.g. +7, +1, +44)
+            r"\(?\d{2,4}\)?"  # area code
+            r"[-.\s]?\d{2,4}"  # first group
+            r"[-.\s]?\d{2,4}"  # second group
+            r"(?:[-.\s]?\d{1,4})?"  # optional extension
         ),
         label="phone",
     ),
@@ -118,7 +118,7 @@ BUILTIN_PATTERNS: list[PIIPattern] = [
     ),
     PIIPattern(
         pii_type=PIIType.PASSPORT,
-        pattern=re.compile(r"\b[A-Z]{1,2}\d{7,9}\b"),
+        pattern=re.compile(r"\b[A-Z]{2}\d{7}\b"),  # EU format: exactly 2 letters + 7 digits
         label="passport",
     ),
     PIIPattern(
@@ -139,7 +139,12 @@ BUILTIN_PATTERNS: list[PIIPattern] = [
     ),
     PIIPattern(
         pii_type=PIIType.RU_PASSPORT,
-        pattern=re.compile(r"\b\d{2}\s?\d{2}\s?\d{6}\b"),
+        pattern=re.compile(
+            r"(?<!\d)"          # not preceded by a digit
+            r"\d{2}\s\d{2}"    # series with mandatory space: XX XX
+            r"\s\d{6}"         # number with mandatory space: XXXXXX
+            r"(?!\d)"          # not followed by a digit
+        ),
         label="ru_passport",
     ),
     PIIPattern(

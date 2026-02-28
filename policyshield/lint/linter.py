@@ -62,12 +62,14 @@ class RuleLinter:
         return warnings
 
     def check_invalid_regex(self, ruleset: RuleSet) -> list[LintWarning]:
-        """Check for invalid regex patterns in args_match."""
+        """Check for invalid regex patterns in args/args_match."""
         warnings: list[LintWarning] = []
         for rule in ruleset.rules:
-            args_match = rule.when.get("args_match", {})
+            # Support both 'args' and 'args_match' keys (matcher uses either)
+            args_match = rule.when.get("args") or rule.when.get("args_match") or {}
             if not isinstance(args_match, dict):
                 continue
+            key_name = "args" if "args" in rule.when else "args_match"
             for field, matcher in args_match.items():
                 # Extract the regex pattern
                 pattern = None
@@ -84,7 +86,7 @@ class RuleLinter:
                                 level="ERROR",
                                 rule_id=rule.id,
                                 check="invalid_regex",
-                                message=f"Invalid regex in args_match.{field}: '{pattern}' ({e})",
+                                message=f"Invalid regex in {key_name}.{field}: '{pattern}' ({e})",
                             )
                         )
         return warnings

@@ -79,7 +79,7 @@ class TestShieldDecorator:
         def exec_it(cmd="ls"):
             return cmd
 
-        with pytest.raises(PermissionError, match="BLOCKED"):
+        with pytest.raises(PermissionError, match="PolicyShield BLOCK"):
             exec_it()
 
     def test_sync_block_return_none(self, tmp_path):
@@ -126,7 +126,7 @@ class TestShieldDecorator:
         async def async_exec(cmd="ls"):
             return cmd
 
-        with pytest.raises(PermissionError, match="BLOCKED"):
+        with pytest.raises(PermissionError, match="PolicyShield BLOCK"):
             await async_exec()
 
 

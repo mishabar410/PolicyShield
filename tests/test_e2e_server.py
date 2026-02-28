@@ -106,7 +106,7 @@ class TestE2EServer:
             "/api/v1/check",
             json={
                 "tool_name": "message",
-                "args": {"text": "Call me at 555-867-5309"},
+                "args": {"text": "Call me at +1-555-867-5309"},
                 "session_id": "e2e-5",
             },
         )
@@ -137,7 +137,7 @@ class TestE2EServer:
             json={
                 "tool_name": "exec",
                 "args": {"command": "echo"},
-                "result": "Output contains alice@corp.com and 555-123-4567",
+                "result": "Output contains alice@corp.com and +1-555-123-4567",
                 "session_id": "e2e-6",
             },
         )

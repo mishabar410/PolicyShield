@@ -50,9 +50,9 @@ def shield(
             @functools.wraps(func)
             async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
                 result = await engine.check(name, kwargs, session_id=session_id)
-                if result.verdict == Verdict.BLOCK:
+                if result.verdict in (Verdict.BLOCK, Verdict.APPROVE):
                     if on_block == "raise":
-                        raise PermissionError(f"PolicyShield BLOCKED: {result.message}")
+                        raise PermissionError(f"PolicyShield {result.verdict.value}: {result.message}")
                     return None
                 if result.modified_args:
                     kwargs.update(result.modified_args)
@@ -64,9 +64,9 @@ def shield(
             @functools.wraps(func)
             def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
                 result = engine.check(name, kwargs, session_id=session_id)
-                if result.verdict == Verdict.BLOCK:
+                if result.verdict in (Verdict.BLOCK, Verdict.APPROVE):
                     if on_block == "raise":
-                        raise PermissionError(f"PolicyShield BLOCKED: {result.message}")
+                        raise PermissionError(f"PolicyShield {result.verdict.value}: {result.message}")
                     return None
                 if result.modified_args:
                     kwargs.update(result.modified_args)

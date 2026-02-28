@@ -14,6 +14,8 @@ from typing import Any
 from policyshield.approval.base import ApprovalRequest
 from policyshield.approval.cache import ApprovalStrategy
 from policyshield.core.exceptions import PolicyShieldError
+from time import monotonic
+
 from policyshield.core.models import PostCheckResult, ShieldMode, ShieldResult, Verdict
 from policyshield.shield.base_engine import BaseShieldEngine, logger
 
@@ -123,6 +125,23 @@ class AsyncShieldEngine(BaseShieldEngine):
                 )
             args = san_result.sanitized_args
 
+        # Plugin detectors (mirror _do_check_sync)
+        from policyshield.plugins import DetectorResult as _DR
+        from policyshield.plugins import get_detectors as _get_detectors
+
+        for pname, detector_fn in _get_detectors().items():
+            try:
+                det_result = await asyncio.to_thread(detector_fn, tool_name=tool_name, args=args)
+                if isinstance(det_result, _DR) and det_result.detected:
+                    logger.warning("Plugin detector '%s' triggered: %s", pname, det_result.message)
+                    return ShieldResult(
+                        verdict=Verdict.BLOCK,
+                        rule_id=f"__plugin__{pname}",
+                        message=det_result.message,
+                    )
+            except Exception as e:
+                logger.warning("Plugin detector '%s' error: %s", pname, e)
+
         # Rate limit check
         if self._rate_limiter is not None:
             rl_result = self._rate_limiter.check(tool_name, session_id)
@@ -215,9 +234,44 @@ class AsyncShieldEngine(BaseShieldEngine):
                 pii_matches=pii_matches,
             )
         elif rule.then == Verdict.APPROVE:
-            return await self._handle_approval(rule, tool_name, args, session_id)
+            result = await self._handle_approval(rule, tool_name, args, session_id)
         else:
-            return self._verdict_builder.allow(rule=rule, args=args)
+            result = self._verdict_builder.allow(rule=rule, args=args)
+
+        # Shadow evaluation (non-blocking, log-only) — mirrors _do_check_sync
+        with self._lock:
+            shadow_matcher = self._shadow_matcher
+
+        if shadow_matcher is not None:
+            try:
+                shadow_match = await asyncio.to_thread(
+                    shadow_matcher.find_best_match,
+                    tool_name=tool_name,
+                    args=args,
+                    session_state=session_state,
+                    sender=sender,
+                    event_buffer=event_buffer,
+                )
+                shadow_verdict = shadow_match.rule.then if shadow_match else Verdict.ALLOW
+                if shadow_match and shadow_match.rule.then != result.verdict:
+                    logger.info(
+                        "SHADOW: tool=%s verdict_diff: current=%s shadow=%s (rule=%s)",
+                        tool_name,
+                        result.verdict.value,
+                        shadow_verdict.value,
+                        shadow_match.rule.id,
+                    )
+                if self._tracer:
+                    self._tracer.record(
+                        session_id=session_id,
+                        tool=tool_name,
+                        verdict=shadow_verdict if shadow_match else Verdict.ALLOW,
+                        rule_id=f"__shadow__{shadow_match.rule.id}" if shadow_match else "__shadow__",
+                    )
+            except Exception as e:
+                logger.warning("Shadow evaluation error: %s", e)
+
+        return result
 
     async def _handle_approval(
         self,
@@ -277,6 +331,8 @@ class AsyncShieldEngine(BaseShieldEngine):
                 "session_id": session_id,
                 "strategy": strategy,
             }
+            self._approval_meta_ts[req.request_id] = monotonic()
+            self._cleanup_approval_meta()
 
         # Return APPROVE verdict with the approval_id for async polling
         return ShieldResult(

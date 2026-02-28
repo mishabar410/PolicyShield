@@ -7,7 +7,7 @@ from pathlib import Path
 import yaml
 
 from policyshield.core.exceptions import PolicyShieldParseError
-from policyshield.core.models import RuleConfig, RuleSet, TaintChainConfig, Verdict
+from policyshield.core.models import OutputRule, RuleConfig, RuleSet, TaintChainConfig, Verdict
 
 # Valid keys for the 'when' clause — anything else is likely a typo
 _VALID_WHEN_KEYS = {"tool", "args", "args_match", "sender", "session", "chain"}
@@ -93,15 +93,15 @@ def _parse_rule(raw: dict, file_path: str | None = None) -> RuleConfig:
         severity_value = severity_value.upper()
 
     # Support both 'when' block and top-level 'tool' key
-    when = raw.get("when", {})
+    # Shallow copy to avoid mutating the original YAML dict
+    when = dict(raw.get("when", {}))
     if not when and "tool" in raw:
         when = {"tool": raw["tool"]}
     when = _validated_when(when, raw["id"], file_path)
 
     # Extract chain from 'when' clause (YAML: when.chain) or top-level
-    chain = None
-    if isinstance(when, dict) and "chain" in when:
-        chain = when.pop("chain")
+    # Use pop on the COPY — original raw dict stays intact
+    chain = when.pop("chain", None)
     if chain is None:
         chain = raw.get("chain")
 
@@ -157,18 +157,28 @@ def _load_rules_from_file(file_path: Path) -> RuleSet:
 
 
 def _load_rules_from_dir(dir_path: Path) -> RuleSet:
-    """Load and merge rules from all YAML files in a directory."""
+    """Load and merge rules from all YAML files in a directory.
+
+    Each file is parsed exactly once. Rules, taint_chain, honeypots,
+    and output_rules are collected from all files in a single pass.
+    """
     yaml_files = sorted(dir_path.glob("*.yaml")) + sorted(dir_path.glob("*.yml"))
     if not yaml_files:
         raise PolicyShieldParseError(f"No YAML files found in {dir_path}")
 
     all_rules: list[RuleConfig] = []
+    all_output_rules: list[OutputRule] = []
     shield_name = ""
     version = 1
     default_verdict = Verdict.ALLOW
+    taint_chain = TaintChainConfig()
+    honeypots_data = None
 
+    # Single pass: parse each file once
     for f in yaml_files:
         data = parse_rule_file(f)
+
+        # Metadata (first file wins for shield_name)
         if not shield_name and "shield_name" in data:
             shield_name = data["shield_name"]
         if "version" in data:
@@ -179,27 +189,27 @@ def _load_rules_from_dir(dir_path: Path) -> RuleSet:
                 default_verdict = Verdict(dv)
             except ValueError:
                 raise PolicyShieldParseError(f"Invalid default_verdict '{dv}'", str(f))
-        raw_rules = data.get("rules", [])
-        for raw in raw_rules:
+
+        # Rules
+        for raw in data.get("rules", []):
             all_rules.append(_parse_rule(raw, str(f)))
 
-    if not shield_name:
-        shield_name = dir_path.name
-
-    # Parse taint_chain config (use last file that defines it)
-    taint_chain = TaintChainConfig()
-    for f in yaml_files:
-        data = parse_rule_file(f)
+        # Taint chain (last file wins)
         tc_data = data.get("taint_chain")
         if tc_data:
             taint_chain = TaintChainConfig(**tc_data)
-    # Parse honeypots config (use last file that defines it)
-    honeypots_data = None
-    for f in yaml_files:
-        data = parse_rule_file(f)
+
+        # Honeypots (last file wins)
         hp_data = data.get("honeypots")
         if hp_data:
             honeypots_data = hp_data
+
+        # Output rules
+        for raw_or in data.get("output_rules", []):
+            all_output_rules.append(_parse_output_rule(raw_or, str(f)))
+
+    if not shield_name:
+        shield_name = dir_path.name
 
     ruleset = RuleSet(
         shield_name=shield_name,
@@ -208,6 +218,7 @@ def _load_rules_from_dir(dir_path: Path) -> RuleSet:
         default_verdict=default_verdict,
         taint_chain=taint_chain,
         honeypots=honeypots_data,
+        output_rules=all_output_rules,
     )
     validate_rule_set(ruleset)
     return ruleset
@@ -258,6 +269,19 @@ def _resolve_extends(rules: list[dict]) -> list[dict]:
     return resolved
 
 
+def _parse_output_rule(raw: dict, file_path: str | None = None) -> OutputRule:
+    """Parse a single output_rule dict into an OutputRule."""
+    tool = raw.get("tool", "")
+    if not tool:
+        raise PolicyShieldParseError("Output rule missing 'tool' field", file_path)
+    return OutputRule(
+        tool=tool,
+        block_patterns=raw.get("block_patterns", []),
+        redact_patterns=raw.get("redact_patterns", []),
+        pii_action=raw.get("pii_action", "redact"),
+    )
+
+
 def _build_ruleset(data: dict, file_path: str) -> RuleSet:
     """Build a RuleSet from a parsed YAML dict."""
     raw_rules = data.get("rules", [])
@@ -291,6 +315,11 @@ def _build_ruleset(data: dict, file_path: str) -> RuleSet:
     # Parse honeypots config (optional)
     honeypots_data = data.get("honeypots")
 
+    # Parse output_rules (optional)
+    output_rules = [
+        _parse_output_rule(r, file_path) for r in data.get("output_rules", [])
+    ]
+
     ruleset = RuleSet(
         shield_name=shield_name,
         version=version,
@@ -298,6 +327,7 @@ def _build_ruleset(data: dict, file_path: str) -> RuleSet:
         default_verdict=default_verdict,
         taint_chain=taint_chain,
         honeypots=honeypots_data,
+        output_rules=output_rules,
     )
     validate_rule_set(ruleset)
     return ruleset

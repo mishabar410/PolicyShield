@@ -167,19 +167,25 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
             )
         return await call_next(request)
 
-    # ── Middleware: Content-Type validation (304) ──
+    # Only validate Content-Type on endpoints that strictly expect JSON bodies
+    _json_only_paths = {
+        "/api/v1/check", "/api/v1/post-check", "/api/v1/check-approval",
+        "/api/v1/clear-taint", "/api/v1/respond-approval",
+    }
+
     @app.middleware("http")
     async def content_type_check(request: Request, call_next):
         if request.method in ("POST", "PUT", "PATCH"):
-            ct = request.headers.get("content-type", "")
-            if ct and "application/json" not in ct and request.url.path.startswith("/api/"):
-                return JSONResponse(
-                    status_code=415,
-                    content={
-                        "error": "unsupported_media_type",
-                        "expected": "application/json",
-                    },
-                )
+            if request.url.path in _json_only_paths:
+                ct = request.headers.get("content-type", "")
+                if ct and "application/json" not in ct:
+                    return JSONResponse(
+                        status_code=415,
+                        content={
+                            "error": "unsupported_media_type",
+                            "expected": "application/json",
+                        },
+                    )
         return await call_next(request)
 
     # ── Middleware: Payload size limit (305) ──
@@ -207,7 +213,10 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
     @app.middleware("http")
     async def backpressure_middleware(request: Request, call_next):
         if request.url.path in ("/api/v1/check", "/api/v1/post-check"):
-            if _semaphore.locked():
+            try:
+                # Atomic try-acquire with tiny timeout (no TOCTOU race)
+                await asyncio.wait_for(_semaphore.acquire(), timeout=0.01)
+            except asyncio.TimeoutError:
                 return JSONResponse(
                     status_code=503,
                     content={
@@ -216,8 +225,10 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
                         "message": "Too many concurrent requests",
                     },
                 )
-            async with _semaphore:
+            try:
                 return await call_next(request)
+            finally:
+                _semaphore.release()
         return await call_next(request)
 
     # ── Middleware: Request timeout (308) ──

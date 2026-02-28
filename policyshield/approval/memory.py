@@ -103,9 +103,9 @@ class InMemoryBackend(ApprovalBackend):
             return None
 
         with self._lock:
-            # Clean up event after consuming the response
-            self._events.pop(request_id, None)
-            return self._responses.pop(request_id, None)
+            # Don't remove response — it must remain available for concurrent
+            # poll calls. Cleanup is handled by _run_gc.
+            return self._responses.get(request_id)
 
     def respond(
         self,
