@@ -36,7 +36,9 @@ class TestRemoteLoaderFetchOnce:
         mock_resp.headers = {}
 
         with patch("httpx.Client") as mock_client:
-            mock_client.return_value.__enter__ = MagicMock(return_value=MagicMock(get=MagicMock(return_value=mock_resp)))
+            mock_client.return_value.__enter__ = MagicMock(
+                return_value=MagicMock(get=MagicMock(return_value=mock_resp))
+            )
             mock_client.return_value.__exit__ = MagicMock(return_value=False)
             result = loader.fetch_once()
 
@@ -51,7 +53,9 @@ class TestRemoteLoaderFetchOnce:
         mock_resp.status_code = 304
 
         with patch("httpx.Client") as mock_client:
-            mock_client.return_value.__enter__ = MagicMock(return_value=MagicMock(get=MagicMock(return_value=mock_resp)))
+            mock_client.return_value.__enter__ = MagicMock(
+                return_value=MagicMock(get=MagicMock(return_value=mock_resp))
+            )
             mock_client.return_value.__exit__ = MagicMock(return_value=False)
             result = loader.fetch_once()
 
@@ -64,7 +68,9 @@ class TestRemoteLoaderFetchOnce:
         mock_resp.status_code = 403
 
         with patch("httpx.Client") as mock_client:
-            mock_client.return_value.__enter__ = MagicMock(return_value=MagicMock(get=MagicMock(return_value=mock_resp)))
+            mock_client.return_value.__enter__ = MagicMock(
+                return_value=MagicMock(get=MagicMock(return_value=mock_resp))
+            )
             mock_client.return_value.__exit__ = MagicMock(return_value=False)
             result = loader.fetch_once()
 
@@ -77,7 +83,9 @@ class TestRemoteLoaderFetchOnce:
         mock_resp.status_code = 500
 
         with patch("httpx.Client") as mock_client:
-            mock_client.return_value.__enter__ = MagicMock(return_value=MagicMock(get=MagicMock(return_value=mock_resp)))
+            mock_client.return_value.__enter__ = MagicMock(
+                return_value=MagicMock(get=MagicMock(return_value=mock_resp))
+            )
             mock_client.return_value.__exit__ = MagicMock(return_value=False)
             result = loader.fetch_once()
 
@@ -107,7 +115,9 @@ class TestRemoteLoaderFetchOnce:
         mock_resp.headers = {}
 
         with patch("httpx.Client") as mock_client:
-            mock_client.return_value.__enter__ = MagicMock(return_value=MagicMock(get=MagicMock(return_value=mock_resp)))
+            mock_client.return_value.__enter__ = MagicMock(
+                return_value=MagicMock(get=MagicMock(return_value=mock_resp))
+            )
             mock_client.return_value.__exit__ = MagicMock(return_value=False)
 
             result1 = loader.fetch_once()
@@ -129,7 +139,9 @@ class TestRemoteLoaderFetchOnce:
         mock_resp.headers = {"X-PolicyShield-Signature": sig}
 
         with patch("httpx.Client") as mock_client:
-            mock_client.return_value.__enter__ = MagicMock(return_value=MagicMock(get=MagicMock(return_value=mock_resp)))
+            mock_client.return_value.__enter__ = MagicMock(
+                return_value=MagicMock(get=MagicMock(return_value=mock_resp))
+            )
             mock_client.return_value.__exit__ = MagicMock(return_value=False)
             result = loader.fetch_once()
 
@@ -144,7 +156,9 @@ class TestRemoteLoaderFetchOnce:
         mock_resp.headers = {"X-PolicyShield-Signature": "sha256=bad"}
 
         with patch("httpx.Client") as mock_client:
-            mock_client.return_value.__enter__ = MagicMock(return_value=MagicMock(get=MagicMock(return_value=mock_resp)))
+            mock_client.return_value.__enter__ = MagicMock(
+                return_value=MagicMock(get=MagicMock(return_value=mock_resp))
+            )
             mock_client.return_value.__exit__ = MagicMock(return_value=False)
             result = loader.fetch_once()
 

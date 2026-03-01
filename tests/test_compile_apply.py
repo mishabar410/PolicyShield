@@ -136,9 +136,7 @@ class TestCompileEndpoint:
 
     def test_compile_success(self):
         """Compile endpoint returns YAML when compilation succeeds."""
-        engine = AsyncShieldEngine(
-            RuleSet(shield_name="t", version=1, rules=[])
-        )
+        engine = AsyncShieldEngine(RuleSet(shield_name="t", version=1, rules=[]))
         app = create_app(engine)
         client = TestClient(app)
 
@@ -162,9 +160,7 @@ class TestCompileEndpoint:
 
     def test_compile_failure(self):
         """Compile endpoint returns errors when compilation fails."""
-        engine = AsyncShieldEngine(
-            RuleSet(shield_name="t", version=1, rules=[])
-        )
+        engine = AsyncShieldEngine(RuleSet(shield_name="t", version=1, rules=[]))
         app = create_app(engine)
         client = TestClient(app)
 
@@ -263,9 +259,7 @@ class TestCompileAndApplyEndpoint:
 
     def test_compile_and_apply_no_rules_path(self):
         """Engine without rules_path returns error."""
-        engine = AsyncShieldEngine(
-            RuleSet(shield_name="t", version=1, rules=[])
-        )
+        engine = AsyncShieldEngine(RuleSet(shield_name="t", version=1, rules=[]))
         app = create_app(engine)
         client = TestClient(app)
 
@@ -305,9 +299,13 @@ class TestStatusEndpoint:
 
     def test_status_response(self):
         engine = AsyncShieldEngine(
-            RuleSet(shield_name="status-test", version=2, rules=[
-                RuleConfig(id="r1", when={"tool": "t"}, then=Verdict.BLOCK),
-            ])
+            RuleSet(
+                shield_name="status-test",
+                version=2,
+                rules=[
+                    RuleConfig(id="r1", when={"tool": "t"}, then=Verdict.BLOCK),
+                ],
+            )
         )
         app = create_app(engine)
         client = TestClient(app)
@@ -319,9 +317,7 @@ class TestStatusEndpoint:
         assert data["rules_count"] == 1
 
     def test_status_reflects_kill_switch(self):
-        engine = AsyncShieldEngine(
-            RuleSet(shield_name="t", version=1, rules=[])
-        )
+        engine = AsyncShieldEngine(RuleSet(shield_name="t", version=1, rules=[]))
         app = create_app(engine)
         client = TestClient(app)
 
