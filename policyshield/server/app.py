@@ -375,6 +375,7 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
             args=req.args,
             session_id=req.session_id,
             sender=req.sender,
+            context=req.context,
         )
         _logger.info(
             "Check request_id=%s tool=%s verdict=%s",

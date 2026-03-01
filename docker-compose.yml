@@ -1,23 +1,31 @@
+# PolicyShield — Docker Compose (production + dev)
+# Usage: docker compose up -d
+
+version: "3.9"
+
 services:
   policyshield:
     build: .
+    ports:
+      - "${POLICYSHIELD_PORT:-8100}:8100"
     volumes:
       - ./policies:/app/policies:ro
-      - ./traces:/app/traces
-    command: ["validate", "policies/"]
-
-  lint:
-    build: .
-    volumes:
-      - ./policies:/app/policies:ro
-    command: ["lint", "policies/rules.yaml"]
-
-  test:
-    build: .
-    volumes:
-      - ./policies:/app/policies:ro
-      - ./tests:/app/tests:ro
-    command: ["test", "tests/"]
+      - policyshield-traces:/app/traces
+    environment:
+      - POLICYSHIELD_MODE=${POLICYSHIELD_MODE:-enforce}
+      - POLICYSHIELD_FAIL_MODE=${POLICYSHIELD_FAIL_MODE:-closed}
+      - POLICYSHIELD_TOKEN=${POLICYSHIELD_TOKEN:-}
+      - POLICYSHIELD_TRACE_DIR=/app/traces
+      - POLICYSHIELD_TELEGRAM_TOKEN=${POLICYSHIELD_TELEGRAM_TOKEN:-}
+      - POLICYSHIELD_TELEGRAM_CHAT_ID=${POLICYSHIELD_TELEGRAM_CHAT_ID:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8100/api/v1/health').raise_for_status()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   policyshield-server:
     build:
@@ -26,13 +34,31 @@ services:
     ports:
       - "8100:8100"
     volumes:
-      - ./policies/:/app/rules/:ro
+      - ./policies:/app/policies:ro
     environment:
-      POLICYSHIELD_MODE: enforce
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8100/api/v1/health"]
-      interval: 10s
-      timeout: 3s
-      retries: 3
+      - POLICYSHIELD_MODE=${POLICYSHIELD_MODE:-enforce}
+      - POLICYSHIELD_TOKEN=${POLICYSHIELD_TOKEN:-}
 
+  lint:
+    build: .
+    entrypoint: ["python", "-m", "ruff", "check", "."]
+    volumes:
+      - .:/app
+
+  test:
+    build: .
+    entrypoint: ["python", "-m", "pytest", "-x", "--tb=short"]
+    volumes:
+      - .:/app
+
+  # Optional: Redis for distributed session storage
+  # redis:
+  #   image: redis:7-alpine
+  #   ports:
+  #     - "6379:6379"
+  #   volumes:
+  #     - redis-data:/data
+
+volumes:
+  policyshield-traces:
+  # redis-data:

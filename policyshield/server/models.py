@@ -25,6 +25,7 @@ class CheckRequest(BaseModel):
     session_id: str = Field(default="default", min_length=1, max_length=256)
     sender: str | None = Field(default=None, max_length=256)
     request_id: str | None = Field(default=None, max_length=128)
+    context: dict | None = Field(default=None, description="Optional context for context-based rule conditions")
 
     @field_validator("args")
     @classmethod

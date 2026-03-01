@@ -48,6 +48,7 @@ class BaseShieldEngine:
         fail_open: bool = True,
         otel_exporter: Any = None,
         sanitizer: Any = None,
+        llm_guard: Any = None,
     ):
         """Initialize engine components.
 
@@ -93,6 +94,7 @@ class BaseShieldEngine:
         self._engine_timeout = float(os.environ.get("POLICYSHIELD_ENGINE_TIMEOUT", 5.0))
         self._otel = otel_exporter
         self._sanitizer = sanitizer
+        self._llm_guard = llm_guard
         self._lock = threading.Lock()
         self._watcher: Any = None
         # Approval metadata for cache population after resolution
@@ -196,6 +198,7 @@ class BaseShieldEngine:
         args: dict,
         session_id: str,
         sender: str | None,
+        context: dict | None = None,
     ) -> ShieldResult:
         """Synchronous check logic: kill_switch → sanitize → rate-limit → taint → match → PII → verdict."""
         # Kill switch — absolute first check, overrides everything
@@ -285,6 +288,7 @@ class BaseShieldEngine:
                 session_state=session_state,
                 sender=sender,
                 event_buffer=event_buffer,
+                context=context,
             )
         except Exception as e:
             logger.error("Matcher error: %s", e)

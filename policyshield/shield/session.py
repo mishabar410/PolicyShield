@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 
 from policyshield.core.models import PIIType, SessionState
 from policyshield.shield.ring_buffer import EventRingBuffer
+from policyshield.shield.session_backend import InMemorySessionBackend, SessionBackend
 
 
 class SessionManager:
@@ -20,6 +21,7 @@ class SessionManager:
         self,
         ttl_seconds: int = 3600,
         max_sessions: int = 1000,
+        backend: SessionBackend | None = None,
     ):
         self._ttl_seconds = ttl_seconds
         self._max_sessions = max_sessions
@@ -27,6 +29,9 @@ class SessionManager:
         self._lock = threading.Lock()
         self._eviction_counter = 0
         self._eviction_every_n = 100
+        self._backend = backend or InMemorySessionBackend(
+            max_size=max_sessions, ttl_seconds=ttl_seconds
+        )
 
     def get_or_create(self, session_id: str) -> SessionState:
         """Get an existing session or create a new one.
@@ -135,10 +140,12 @@ class SessionManager:
         """
         with self._lock:
             self._evict_expired()
+            backend_stats = self._backend.stats()
             return {
                 "active_sessions": len(self._sessions),
                 "max_sessions": self._max_sessions,
                 "ttl_seconds": self._ttl_seconds,
+                "backend": backend_stats,
             }
 
     def _is_expired(self, session: SessionState) -> bool:

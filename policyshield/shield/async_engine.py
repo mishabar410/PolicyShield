@@ -37,6 +37,7 @@ class AsyncShieldEngine(BaseShieldEngine):
         args: dict | None = None,
         session_id: str = "default",
         sender: str | None = None,
+        context: dict | None = None,
     ) -> ShieldResult:
         """Async pre-call check: match rules, detect PII, build verdict.
 
@@ -45,6 +46,7 @@ class AsyncShieldEngine(BaseShieldEngine):
             args: Arguments to the tool call.
             session_id: Session identifier.
             sender: Identity of the caller.
+            context: Optional context dict for context-based conditions.
 
         Returns:
             ShieldResult with the verdict and details.
@@ -62,7 +64,7 @@ class AsyncShieldEngine(BaseShieldEngine):
 
         try:
             result = await asyncio.wait_for(
-                self._do_check(tool_name, args, session_id, sender),
+                self._do_check(tool_name, args, session_id, sender, context),
                 timeout=self._engine_timeout,
             )
         except asyncio.TimeoutError:
@@ -94,6 +96,7 @@ class AsyncShieldEngine(BaseShieldEngine):
         args: dict,
         session_id: str,
         sender: str | None,
+        context: dict | None = None,
     ) -> ShieldResult:
         """Internal check logic — offloads CPU-bound work to threads."""
         # Kill switch — immediate block
@@ -184,6 +187,7 @@ class AsyncShieldEngine(BaseShieldEngine):
                 session_state=session_state,
                 sender=sender,
                 event_buffer=event_buffer,
+                context=context,
             )
         except Exception as e:
             logger.error("Matcher error: %s", e)
@@ -196,6 +200,19 @@ class AsyncShieldEngine(BaseShieldEngine):
             )
 
         if match is None:
+            # LLM Guard — check for threats even when no rule matches
+            if self._llm_guard is not None and getattr(self._llm_guard, "enabled", False):
+                try:
+                    guard_result = await self._llm_guard.analyze(tool_name, args)
+                    if guard_result.is_threat and guard_result.risk_score >= self._llm_guard.risk_threshold:
+                        return ShieldResult(
+                            verdict=Verdict.BLOCK,
+                            rule_id="__llm_guard__",
+                            message=f"LLM Guard: {guard_result.explanation}",
+                        )
+                except Exception as e:
+                    logger.warning("LLM Guard error: %s", e)
+
             default = rule_set.default_verdict
             if default == Verdict.BLOCK:
                 return ShieldResult(

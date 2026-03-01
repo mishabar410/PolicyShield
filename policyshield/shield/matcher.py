@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from policyshield.core.models import ChainCondition, RuleConfig, RuleSet, Severity, Verdict
+from policyshield.shield.context import ContextEvaluator
 
 # Maximum length for regex patterns to prevent ReDoS
 MAX_PATTERN_LENGTH = 500
@@ -20,6 +21,7 @@ class CompiledRule:
     tool_pattern: re.Pattern | None = None
     arg_patterns: list[tuple[str, str, re.Pattern]] = field(default_factory=list)
     sender_pattern: re.Pattern | None = None
+    context_conditions: dict | None = None
 
     @classmethod
     def from_rule(cls, rule: RuleConfig) -> CompiledRule:
@@ -91,6 +93,11 @@ class CompiledRule:
                 raise ValueError(f"Sender pattern in rule '{rule.id}' exceeds {MAX_PATTERN_LENGTH} characters")
             compiled.sender_pattern = re.compile(f"^{sender}$")
 
+        # Extract context conditions
+        ctx = when.get("context")
+        if ctx and isinstance(ctx, dict):
+            compiled.context_conditions = ctx
+
         return compiled
 
 
@@ -117,8 +124,9 @@ class MatcherEngine:
     apply to all tools.
     """
 
-    def __init__(self, rule_set: RuleSet):
+    def __init__(self, rule_set: RuleSet, context_timezone: str = "UTC"):
         self._rule_set = rule_set
+        self._context_eval = ContextEvaluator(tz=context_timezone)
         self._compiled: list[CompiledRule] = []
         self._tool_index: dict[str, list[CompiledRule]] = {}
         self._wildcard_rules: list[CompiledRule] = []
@@ -153,6 +161,7 @@ class MatcherEngine:
         session_state: dict | None = None,
         sender: str | None = None,
         event_buffer: object | None = None,
+        context: dict | None = None,
     ) -> list[CompiledRule]:
         """Find all rules matching a tool call.
 
@@ -162,6 +171,7 @@ class MatcherEngine:
             session_state: Current session state for session-based conditions.
             sender: Identity of the caller.
             event_buffer: Optional EventRingBuffer for chain rule evaluation.
+            context: Optional context dict for context-based conditions.
 
         Returns:
             List of matching CompiledRule objects, sorted by priority.
@@ -172,7 +182,7 @@ class MatcherEngine:
 
         matching: list[CompiledRule] = []
         for compiled in candidates:
-            if self._matches(compiled, tool_name, args, session_state, sender, event_buffer):
+            if self._matches(compiled, tool_name, args, session_state, sender, event_buffer, context):
                 matching.append(compiled)
 
         # Sort: most restrictive verdict first, then by severity
@@ -192,13 +202,14 @@ class MatcherEngine:
         session_state: dict | None = None,
         sender: str | None = None,
         event_buffer: object | None = None,
+        context: dict | None = None,
     ) -> CompiledRule | None:
         """Find the highest-priority matching rule.
 
         Returns:
             The most restrictive matching rule, or None.
         """
-        matches = self.find_matching_rules(tool_name, args, session_state, sender, event_buffer)
+        matches = self.find_matching_rules(tool_name, args, session_state, sender, event_buffer, context)
         return matches[0] if matches else None
 
     def _matches(
@@ -209,6 +220,7 @@ class MatcherEngine:
         session_state: dict | None,
         sender: str | None,
         event_buffer: object | None = None,
+        context: dict | None = None,
     ) -> bool:
         """Check if a compiled rule matches a tool call."""
         # Check tool name
@@ -265,6 +277,12 @@ class MatcherEngine:
         # Check sender
         if compiled.sender_pattern:
             if not sender or not compiled.sender_pattern.match(sender):
+                return False
+
+        # Check context conditions
+        if compiled.context_conditions is not None:
+            ctx = context or {}
+            if not self._context_eval.evaluate(compiled.context_conditions, ctx):
                 return False
 
         # Check chain conditions

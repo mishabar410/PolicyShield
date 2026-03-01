@@ -24,6 +24,7 @@ class ShieldEngine(BaseShieldEngine):
         args: dict | None = None,
         session_id: str = "default",
         sender: str | None = None,
+        context: dict | None = None,
     ) -> ShieldResult:
         """Pre-call check: match rules, detect PII, build verdict.
 
@@ -32,6 +33,7 @@ class ShieldEngine(BaseShieldEngine):
             args: Arguments to the tool call.
             session_id: Session identifier.
             sender: Identity of the caller.
+            context: Optional context dict for context-based conditions.
 
         Returns:
             ShieldResult with the verdict and details.
@@ -48,7 +50,7 @@ class ShieldEngine(BaseShieldEngine):
             span_ctx = self._otel.on_check_start(tool_name, session_id, args)
 
         try:
-            result = self._do_check_sync(tool_name, args, session_id, sender)
+            result = self._do_check_sync(tool_name, args, session_id, sender, context)
         except Exception as e:
             if self._fail_open:
                 logger.warning("Shield error (fail-open): %s", e)

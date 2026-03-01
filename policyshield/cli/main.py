@@ -268,6 +268,12 @@ def app(args: list[str] | None = None) -> int:
     openapi_parser.add_argument("--output", "-o", default=None, help="Output file (default: stdout)")
     openapi_parser.add_argument("--indent", type=int, default=2, help="JSON indent (default: 2)")
 
+    # compile command (NL → YAML)
+    compile_parser = subparsers.add_parser("compile", help="Compile natural language to PolicyShield YAML")
+    compile_parser.add_argument("description", help="Natural language policy description")
+    compile_parser.add_argument("--output", "-o", default=None, help="Output YAML file (default: stdout)")
+    compile_parser.add_argument("--model", default="gpt-4o-mini", help="LLM model (default: gpt-4o-mini)")
+
     # check (dry-run) command
     check_parser = subparsers.add_parser("check", help="One-shot tool call check (dry-run)")
     check_parser.add_argument("--tool", required=True, help="Tool name to check")
@@ -353,6 +359,8 @@ def app(args: list[str] | None = None) -> int:
         from policyshield.cli.openclaw import cmd_openclaw
 
         return cmd_openclaw(parsed)
+    elif parsed.command == "compile":
+        return _cmd_compile(parsed)
     else:
         parser.print_help()
         return 1
@@ -1437,3 +1445,47 @@ def _cmd_check(parsed: argparse.Namespace) -> int:
             print(f"  Rule: {result.rule_id}")
 
     return 0 if result.verdict.value == "ALLOW" else 2
+
+
+def _cmd_compile(parsed: argparse.Namespace) -> int:
+    """Compile natural language to PolicyShield YAML rules."""
+    import asyncio
+
+    from policyshield.ai.compiler import PolicyCompiler
+
+    api_key = None
+    try:
+        import os
+
+        api_key = os.environ.get("OPENAI_API_KEY")
+    except Exception:
+        pass
+
+    if not api_key:
+        print("✗ OPENAI_API_KEY environment variable required", file=sys.stderr)
+        return 1
+
+    compiler = PolicyCompiler(api_key=api_key, model=parsed.model)
+    print(f"Compiling: {parsed.description}", file=sys.stderr)
+
+    result = asyncio.get_event_loop().run_until_complete(
+        compiler.compile(parsed.description)
+    )
+
+    if not result.is_valid:
+        print(f"✗ Compilation failed after {result.attempts} attempts:", file=sys.stderr)
+        for err in result.errors:
+            print(f"  - {err}", file=sys.stderr)
+        if result.yaml_text:
+            print("\nPartial output:", file=sys.stderr)
+            print(result.yaml_text)
+        return 1
+
+    if parsed.output:
+        Path(parsed.output).parent.mkdir(parents=True, exist_ok=True)
+        Path(parsed.output).write_text(result.yaml_text + "\n", encoding="utf-8")
+        print(f"✓ Written to {parsed.output} ({result.attempts} attempt(s))", file=sys.stderr)
+    else:
+        print(result.yaml_text)
+
+    return 0
