@@ -274,6 +274,13 @@ def app(args: list[str] | None = None) -> int:
     compile_parser.add_argument("--output", "-o", default=None, help="Output YAML file (default: stdout)")
     compile_parser.add_argument("--model", default="gpt-4o-mini", help="LLM model (default: gpt-4o-mini)")
 
+    # bot command (Telegram bot)
+    bot_parser = subparsers.add_parser("bot", help="Start Telegram bot for NL policy management")
+    bot_parser.add_argument("--token", default=None, help="Telegram Bot API token (or POLICYSHIELD_BOT_TOKEN)")
+    bot_parser.add_argument("--rules", default=None, help="Path to YAML rules file (or POLICYSHIELD_BOT_RULES_PATH)")
+    bot_parser.add_argument("--server", default=None, help="PolicyShield server URL (or POLICYSHIELD_SERVER_URL)")
+    bot_parser.add_argument("--admin-token", default=None, help="Admin token for server API (or POLICYSHIELD_ADMIN_TOKEN)")
+
     # check (dry-run) command
     check_parser = subparsers.add_parser("check", help="One-shot tool call check (dry-run)")
     check_parser.add_argument("--tool", required=True, help="Tool name to check")
@@ -361,6 +368,8 @@ def app(args: list[str] | None = None) -> int:
         return cmd_openclaw(parsed)
     elif parsed.command == "compile":
         return _cmd_compile(parsed)
+    elif parsed.command == "bot":
+        return _cmd_bot(parsed)
     else:
         parser.print_help()
         return 1
@@ -1485,5 +1494,25 @@ def _cmd_compile(parsed: argparse.Namespace) -> int:
         print(f"✓ Written to {parsed.output} ({result.attempts} attempt(s))", file=sys.stderr)
     else:
         print(result.yaml_text)
+
+
+def _cmd_bot(parsed: argparse.Namespace) -> int:
+    """Start the Telegram bot for NL policy management."""
+    from policyshield.bot.telegram_bot import run_bot
+
+    try:
+        run_bot(
+            token=parsed.token,
+            rules_path=parsed.rules,
+            server_url=parsed.server,
+            admin_token=getattr(parsed, "admin_token", None),
+        )
+        return 0
+    except ValueError as e:
+        print(f"✗ {e}", file=sys.stderr)
+        return 1
+    except KeyboardInterrupt:
+        print("\nBot stopped.")
+        return 0
 
     return 0
