@@ -288,7 +288,7 @@ class AdaptiveRateLimiter:
         self._burst_threshold = burst_threshold
         self._tighten_factor = tighten_factor
         self._cooldown = cooldown
-        self._call_histories: dict[str, list[float]] = defaultdict(list)
+        self._call_histories: dict[str, deque[float]] = defaultdict(deque)
         self._effective_limits: dict[str, int] = {}
         self._last_tighten: dict[str, float] = {}
         self._lock = threading.Lock()
@@ -319,7 +319,9 @@ class AdaptiveRateLimiter:
             self._cleanup_stale_sessions(now)
             history = self._call_histories[session_id]
             cutoff = now - self._window
-            history[:] = [t for t in history if t > cutoff]
+            # O(1) amortized: remove expired timestamps from the left
+            while history and history[0] <= cutoff:
+                history.popleft()
             current_rate = len(history)
 
             eff_limit = self._effective_limits.get(session_id, self._base_limit)

@@ -45,7 +45,13 @@ class CompiledRule:
             else:
                 if len(str(tool)) > MAX_PATTERN_LENGTH:
                     raise ValueError(f"Tool pattern in rule '{rule.id}' exceeds {MAX_PATTERN_LENGTH} characters")
-                compiled.tool_pattern = re.compile(f"^{tool}$")
+                # If the pattern looks like a literal name (no regex metacharacters),
+                # escape it to prevent accidental regex interpretation.
+                tool_str = str(tool)
+                if tool_str == re.escape(tool_str):
+                    compiled.tool_pattern = re.compile(f"^{re.escape(tool_str)}$")
+                else:
+                    compiled.tool_pattern = re.compile(f"^{tool_str}$")
 
         # Compile argument matchers (support both 'args' and 'args_match')
         args = when.get("args") or when.get("args_match") or {}

@@ -44,7 +44,11 @@ class SessionManager:
         """Get or create session — caller must hold self._lock."""
         self._maybe_evict()
         if session_id in self._sessions:
-            return self._sessions[session_id]
+            session = self._sessions[session_id]
+            if self._is_expired(session):
+                del self._sessions[session_id]
+            else:
+                return session
 
         # Evict oldest if at capacity
         if len(self._sessions) >= self._max_sessions:

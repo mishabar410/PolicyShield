@@ -771,9 +771,11 @@ class BaseShieldEngine:
 
     def get_policy_summary(self) -> str:
         """Return human-readable summary of active rules for LLM context."""
-        lines = [f"PolicyShield: {self._rule_set.shield_name} v{self._rule_set.version}"]
-        lines.append(f"Default: {self._rule_set.default_verdict.value}")
-        lines.append(f"Rules: {len(self._rule_set.rules)}")
-        for rule in self._rule_set.rules:
+        with self._lock:
+            rule_set = self._rule_set
+        lines = [f"PolicyShield: {rule_set.shield_name} v{rule_set.version}"]
+        lines.append(f"Default: {rule_set.default_verdict.value}")
+        lines.append(f"Rules: {len(rule_set.rules)}")
+        for rule in rule_set.rules:
             lines.append(f"  - [{rule.then.value}] {rule.id}: {rule.message or rule.description or rule.id}")
         return "\n".join(lines)

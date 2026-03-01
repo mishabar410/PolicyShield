@@ -114,8 +114,10 @@ def create_mcp_proxy_server(engine: Any) -> Any:
     @server.list_tools()
     async def handle_list_tools() -> list[Tool]:
         """List tools from the engine's ruleset."""
+        # Snapshot rules to avoid race with hot-reload
+        rules_snapshot = list(engine.rules.rules)
         tools = []
-        for rule in engine.rules.rules:
+        for rule in rules_snapshot:
             tool_pattern = rule.when.get("tool") if isinstance(rule.when, dict) else None
             if tool_pattern and tool_pattern != "*":
                 tools.append(

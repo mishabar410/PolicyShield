@@ -71,6 +71,29 @@ def _snils_check(snils_str: str) -> bool:
     return expected == control
 
 
+def _iban_check(iban: str) -> bool:
+    """Validate IBAN checksum (ISO 13616 mod-97 check)."""
+    # Remove spaces and uppercase
+    iban = iban.replace(" ", "").upper()
+    if len(iban) < 5:
+        return False
+    # Move first 4 chars to end
+    rearranged = iban[4:] + iban[:4]
+    # Convert letters to numbers (A=10, B=11, ..., Z=35)
+    numeric = ""
+    for ch in rearranged:
+        if ch.isdigit():
+            numeric += ch
+        elif ch.isalpha():
+            numeric += str(ord(ch) - ord("A") + 10)
+        else:
+            return False
+    try:
+        return int(numeric) % 97 == 1
+    except (ValueError, OverflowError):
+        return False
+
+
 def _date_check(date_str: str) -> bool:
     """Basic plausibility check for date-of-birth strings.
 
@@ -94,7 +117,12 @@ def _date_check(date_str: str) -> bool:
     elif nums[0] > 31:  # YYYY/MM/DD
         year, day_or_month_1, day_or_month_2 = nums
     else:
-        return True  # Ambiguous, accept by default
+        # Ambiguous (all parts ≤ 31): still require at least one ≤ 12 (month)
+        # to reject clear non-dates like version numbers "32.33.34" is already
+        # caught above, but "5.6.7" should still be accepted cautiously.
+        if all(n > 12 for n in nums):
+            return False  # No part can be a month
+        return True
 
     # At least one of the two non-year parts must be ≤ 12 (month)
     # and both must be ≤ 31
@@ -245,6 +273,10 @@ class PIIDetector:
                 if pii_pattern.pii_type == PIIType.DATE_OF_BIRTH:
                     if not _date_check(matched_text):
                         continue
+                # Extra validation for IBAN (mod-97 checksum)
+                if pii_pattern.pii_type == PIIType.IBAN:
+                    if not _iban_check(matched_text):
+                        continue
 
                 matches.append(
                     PIIMatch(
@@ -274,11 +306,22 @@ class PIIDetector:
             elif isinstance(value, dict):
                 matches.extend(self.scan_dict(value, field_name))
             elif isinstance(value, list):
-                for i, item in enumerate(value):
-                    if isinstance(item, str):
-                        matches.extend(self.scan(item, f"{field_name}[{i}]"))
-                    elif isinstance(item, dict):
-                        matches.extend(self.scan_dict(item, f"{field_name}[{i}]"))
+                matches.extend(self._scan_list(value, field_name))
+        return matches
+
+    def _scan_list(self, items: list, prefix: str, _depth: int = 0) -> list[PIIMatch]:
+        """Recursively scan list items for PII, handling nested lists."""
+        if _depth > 20:  # Prevent stack overflow on deeply nested input
+            return []
+        matches: list[PIIMatch] = []
+        for i, item in enumerate(items):
+            field_name = f"{prefix}[{i}]"
+            if isinstance(item, str):
+                matches.extend(self.scan(item, field_name))
+            elif isinstance(item, dict):
+                matches.extend(self.scan_dict(item, field_name))
+            elif isinstance(item, list):
+                matches.extend(self._scan_list(item, field_name, _depth + 1))
         return matches
 
     @staticmethod
@@ -319,8 +362,10 @@ class PIIDetector:
                 # Overlapping — extend span, keep whichever has larger coverage
                 if match.span[1] > prev.span[1]:
                     extended_text = text[prev.span[0] : match.span[1]]
+                    # Use the higher-priority PII type (prefer the more specific one)
+                    pii_type = match.pii_type if match.span[1] - match.span[0] > prev.span[1] - prev.span[0] else prev.pii_type
                     merged[-1] = PIIMatch(
-                        pii_type=prev.pii_type,
+                        pii_type=pii_type,
                         span=(prev.span[0], match.span[1]),
                         field=prev.field,
                         masked_value=self.mask(extended_text),

@@ -195,24 +195,32 @@ class _Counter:
         self.count = 0
 
 
-def _flatten_to_string(value: Any) -> str:
-    """Flatten a nested structure to a single string for pattern matching."""
+def _flatten_to_string(value: Any, max_size: int = 1_000_000) -> str:
+    """Flatten a nested structure to a single string for pattern matching.
+
+    Args:
+        value: The value to flatten.
+        max_size: Maximum total characters to collect (default 1MB).
+    """
     parts: list[str] = []
-    _flatten_recurse(value, parts)
+    _flatten_recurse(value, parts, _max_size=max_size)
     return " ".join(parts)
 
 
-def _flatten_recurse(value: Any, parts: list[str], _depth: int = 0) -> None:
+def _flatten_recurse(value: Any, parts: list[str], _depth: int = 0, *, _max_size: int = 1_000_000) -> None:
     if _depth > 50:  # prevent stack overflow on deeply nested input
+        return
+    # Check accumulated size to prevent memory exhaustion
+    if sum(len(p) for p in parts[-10:]) + len(parts) > _max_size and len(parts) > 100:
         return
     if isinstance(value, dict):
         for k, v in value.items():
             if isinstance(k, str):
                 parts.append(k)
-            _flatten_recurse(v, parts, _depth + 1)
+            _flatten_recurse(v, parts, _depth + 1, _max_size=_max_size)
     elif isinstance(value, list):
         for item in value:
-            _flatten_recurse(item, parts, _depth + 1)
+            _flatten_recurse(item, parts, _depth + 1, _max_size=_max_size)
     elif isinstance(value, str):
         parts.append(value)
     elif value is not None:

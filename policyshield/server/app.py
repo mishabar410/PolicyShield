@@ -312,10 +312,11 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
             client_key = request.client.host if request.client else "unknown"
             if not request.client:
                 _logger.warning("API rate-limit: request.client is None (proxy misconfiguration?)")
-            # Use API token prefix as key if available
+            # Use hash of API token as key if available (prevents prefix-rotation bypass)
             auth = request.headers.get("Authorization", "")
-            if auth.startswith("Bearer "):
-                client_key = f"token:{auth[7:][:8]}"
+            if auth.startswith("Bearer ") and len(auth) > 7:
+                import hashlib
+                client_key = f"token:{hashlib.sha256(auth[7:].encode()).hexdigest()[:16]}"
             if not _api_limiter.is_allowed(client_key):
                 return JSONResponse(
                     status_code=429,

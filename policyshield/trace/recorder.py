@@ -164,18 +164,23 @@ class TraceRecorder:
             self._flush_unlocked()
 
     def _open_file(self, path: Path):
-        """Open trace file with restricted permissions (0o600)."""
-        if not path.exists():
-            path.touch(mode=0o600)
-        else:
-            current = path.stat().st_mode & 0o777
-            if current != 0o600:
-                os.chmod(path, 0o600)
-                logger.warning(
-                    "Fixed trace file permissions: %s (%o → 600)",
-                    path,
-                    current,
-                )
+        """Open trace file with restricted permissions (0o600 on Unix)."""
+        import sys
+
+        if sys.platform != "win32":
+            if not path.exists():
+                path.touch(mode=0o600)
+            else:
+                current = path.stat().st_mode & 0o777
+                if current != 0o600:
+                    os.chmod(path, 0o600)
+                    logger.warning(
+                        "Fixed trace file permissions: %s (%o → 600)",
+                        path,
+                        current,
+                    )
+        elif not path.exists():
+            path.touch()
         return open(path, "a", encoding="utf-8")  # noqa: SIM115
 
     def _flush_unlocked(self) -> None:
@@ -193,11 +198,19 @@ class TraceRecorder:
                     f.write(json.dumps(entry, default=str) + "\n")
         except OSError as exc:
             logger.error(
-                "Failed to write trace file %s: %s (dropping %d records)",
+                "Failed to write trace file %s: %s (retaining %d records for retry)",
                 self._file_path,
                 exc,
                 len(self._buffer),
             )
+            # Don't clear buffer — records will be retried on next flush.
+            # Cap retained buffer to prevent unbounded memory growth.
+            max_retained = self._batch_size * 10
+            if len(self._buffer) > max_retained:
+                dropped = len(self._buffer) - max_retained
+                self._buffer = self._buffer[-max_retained:]
+                logger.warning("Trace buffer overflow: dropped %d oldest records", dropped)
+            return
 
         self._buffer.clear()
 

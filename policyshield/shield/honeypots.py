@@ -83,8 +83,8 @@ class HoneypotChecker:
 
     @property
     def names(self) -> set[str]:
-        """Set of configured honeypot tool names."""
-        return set(self._lookup.keys())
+        """Set of configured honeypot tool names (original case)."""
+        return {h.name for h in self._lookup.values()}
 
     def __len__(self) -> int:
         return len(self._lookup)
