@@ -17,10 +17,12 @@ function mockFetchError() {
 }
 
 type HookHandler = (...args: unknown[]) => unknown;
+type RegisteredCommand = { name: string; description: string; acceptsArgs?: boolean; requireAuth?: boolean; handler: (ctx: { args?: string }) => unknown };
 
 /** Create a mock OpenClaw Plugin API that matches the real shape. */
 function createMockApi(config: Record<string, unknown> = {}) {
     const hooks = new Map<string, { handler: HookHandler; priority?: number }>();
+    const commands: RegisteredCommand[] = [];
     const logs: string[] = [];
     const api = {
         id: "policyshield",
@@ -44,13 +46,13 @@ function createMockApi(config: Record<string, unknown> = {}) {
         registerCli: () => { },
         registerService: () => { },
         registerProvider: () => { },
-        registerCommand: () => { },
+        registerCommand: (cmd: RegisteredCommand) => { commands.push(cmd); },
         resolvePath: (input: string) => input,
         on: (hookName: string, handler: HookHandler, opts?: { priority?: number }) => {
             hooks.set(hookName, { handler, priority: opts?.priority });
         },
     } as unknown as OpenClawPluginApi;
-    return { api, hooks, logs };
+    return { api, hooks, commands, logs };
 }
 
 describe("Plugin Registration (api.on pattern)", () => {
@@ -298,5 +300,112 @@ describe("before_agent_start hook", () => {
             { agentId: "a1" },
         );
         expect(result).toBeUndefined();
+    });
+});
+
+describe("/policyshield command", () => {
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    async function getCommandHandler(config: Record<string, unknown> = {}) {
+        mockFetch({}, 200); // health check
+        const { api, commands } = createMockApi(config);
+        await plugin.register!(api);
+        const cmd = commands.find((c) => c.name === "policyshield");
+        expect(cmd).toBeDefined();
+        return cmd!;
+    }
+
+    it("registers command with correct metadata", async () => {
+        const cmd = await getCommandHandler();
+        expect(cmd.name).toBe("policyshield");
+        expect(cmd.acceptsArgs).toBe(true);
+        expect(cmd.requireAuth).toBe(true);
+        expect(cmd.description).toContain("status");
+    });
+
+    it("status — server online", async () => {
+        const cmd = await getCommandHandler();
+        vi.restoreAllMocks();
+        mockFetch({}, 200);
+        const result = (await cmd.handler({ args: "status" })) as { text: string };
+        expect(result.text).toContain("✅");
+        expect(result.text).toContain("online");
+    });
+
+    it("status — server unreachable", async () => {
+        const cmd = await getCommandHandler();
+        vi.restoreAllMocks();
+        mockFetchError();
+        const result = (await cmd.handler({ args: "status" })) as { text: string };
+        expect(result.text).toContain("❌");
+        expect(result.text).toContain("unreachable");
+    });
+
+    it("kill — sends kill and returns confirmation", async () => {
+        const cmd = await getCommandHandler();
+        vi.restoreAllMocks();
+        const spy = mockFetch({}, 200);
+        const result = (await cmd.handler({ args: "kill server overload" })) as { text: string };
+        expect(result.text).toContain("KILLED");
+        const killCall = spy.mock.calls.find((c) => String(c[0]).includes("/kill"));
+        expect(killCall).toBeDefined();
+        const body = JSON.parse(killCall![1]!.body as string);
+        expect(body.reason).toBe("server overload");
+    });
+
+    it("kill — default reason when no reason provided", async () => {
+        const cmd = await getCommandHandler();
+        vi.restoreAllMocks();
+        const spy = mockFetch({}, 200);
+        await cmd.handler({ args: "kill" });
+        const killCall = spy.mock.calls.find((c) => String(c[0]).includes("/kill"));
+        const body = JSON.parse(killCall![1]!.body as string);
+        expect(body.reason).toBe("Telegram kill switch");
+    });
+
+    it("resume — sends resume", async () => {
+        const cmd = await getCommandHandler();
+        vi.restoreAllMocks();
+        const spy = mockFetch({}, 200);
+        const result = (await cmd.handler({ args: "resume" })) as { text: string };
+        expect(result.text).toContain("Resumed");
+        const resumeCall = spy.mock.calls.find((c) => String(c[0]).includes("/resume"));
+        expect(resumeCall).toBeDefined();
+    });
+
+    it("reload — sends reload", async () => {
+        const cmd = await getCommandHandler();
+        vi.restoreAllMocks();
+        const spy = mockFetch({}, 200);
+        const result = (await cmd.handler({ args: "reload" })) as { text: string };
+        expect(result.text).toContain("reloaded");
+        const reloadCall = spy.mock.calls.find((c) => String(c[0]).includes("/reload"));
+        expect(reloadCall).toBeDefined();
+    });
+
+    it("no args — returns help text", async () => {
+        const cmd = await getCommandHandler();
+        vi.restoreAllMocks();
+        const result = (await cmd.handler({})) as { text: string };
+        expect(result.text).toContain("Usage");
+        expect(result.text).toContain("status");
+        expect(result.text).toContain("kill");
+    });
+
+    it("unknown subcommand — returns help text", async () => {
+        const cmd = await getCommandHandler();
+        vi.restoreAllMocks();
+        const result = (await cmd.handler({ args: "foobar" })) as { text: string };
+        expect(result.text).toContain("Usage");
+    });
+
+    it("error handling — server unreachable during kill", async () => {
+        const cmd = await getCommandHandler();
+        vi.restoreAllMocks();
+        mockFetchError();
+        const result = (await cmd.handler({ args: "kill" })) as { text: string };
+        expect(result.text).toContain("command failed");
     });
 });
