@@ -1,7 +1,7 @@
 # PolicyShield v1.0 — Brainstorm
 
-> Текущее состояние: **v0.13.0** released. 1226 тестов, 85% coverage.
-> Дата: 2026-02-28
+> Текущее состояние: **v0.14.0** released. 1350 тестов, 85% coverage.
+> Дата: 2026-03-01
 
 ---
 
@@ -25,9 +25,9 @@
 
 ---
 
-## 🔥 Tier 3A — Must-Have для v1.0
+## ✅ Tier 3A — Must-Have для v1.0 (реализовано в v0.14.0)
 
-### 1. LLM Guard (optional middleware)
+### 1. LLM Guard (optional middleware) ✅
 
 Архитектура: LLM как **опциональный** шаг в pipeline. Без LLM — 0ms. С LLM — +200-500ms.
 
@@ -50,7 +50,7 @@ Tool Call → Sanitizer → Regex Rules → [LLM Guard] → Verdict
 - Fallback: если LLM недоступен → regex-only?
 - Конфиг: `llm_guard: { enabled: true, model: gpt-4o-mini, timeout: 2s, cache_ttl: 300 }`
 
-### 2. Natural Language → Policy Compiler
+### 2. Natural Language → Policy Compiler ✅
 
 LLM компилирует человеческие описания «что нельзя» в структурированные YAML-правила.
 
@@ -102,19 +102,19 @@ rules:
 ```
 
 **Реализация:**
-- [ ] CLI: `policyshield compile "описание на человеческом языке" -o rules.yaml`
-- [ ] CLI: `policyshield compile --file restrictions.md -o rules.yaml`
-- [ ] Двухстадийный pipeline: LLM генерирует → `policyshield validate` проверяет
+- [x] CLI: `policyshield compile "описание на человеческом языке" -o rules.yaml`
+- [x] CLI: `policyshield compile --file restrictions.md -o rules.yaml`
+- [x] Двухстадийный pipeline: LLM генерирует → `policyshield validate` проверяет
 - [ ] Diff mode: `policyshield compile --diff` — показать что изменится vs текущие правила
-- [ ] Iterative refinement: если validate fails → LLM исправляет автоматически
-- [ ] Model: `gpt-4o` для точности, `gpt-4o-mini` для скорости
-- [ ] Prompt template с примерами existing rules для consistency
-- [ ] Support conditional rules (time/role) в output
+- [x] Iterative refinement: если validate fails → LLM исправляет автоматически
+- [x] Model: `gpt-4o` для точности, `gpt-4o-mini` для скорости
+- [x] Prompt template с примерами existing rules для consistency
+- [x] Support conditional rules (time/role) в output
 
 **Ключевое преимущество:**
 Не надо знать YAML-формат PolicyShield — пишешь на человеческом языке, получаешь production-ready правила.
 
-### 3. Conditional Rules
+### 3. Conditional Rules ✅
 
 ```yaml
 rules:
@@ -136,28 +136,28 @@ rules:
 ```
 
 **Что нужно:**
-- [ ] Расширить `when` matcher для context conditions
-- [ ] Передавать `context` dict в `engine.check()`
-- [ ] Time parsing (timezone-aware)
-- [ ] Wildcard tool matching (`delete_*`)
+- [x] Расширить `when` matcher для context conditions
+- [x] Передавать `context` dict в `engine.check()`
+- [x] Time parsing (timezone-aware)
+- [x] Wildcard tool matching (`delete_*`)
 
-### 4. Bounded Session Storage
+### 4. Bounded Session Storage ✅
 
 Сейчас: `InMemorySessionManager` растёт бесконечно.
 
-- [ ] LRU eviction (max N sessions)
-- [ ] TTL per session (default 1h)
-- [ ] Redis backend как альтернатива
+- [x] LRU eviction (max N sessions)
+- [x] TTL per session (default 1h)
+- [x] Redis backend как альтернатива
 - [ ] Метрики: active_sessions, evicted_sessions_total
 
-### 5. Production Deployment Guide
+### 5. Production Deployment Guide ✅
 
-- [ ] `docs/deployment/` directory
-- [ ] Docker production Dockerfile (multi-stage, non-root)
-- [ ] Kubernetes manifests (Deployment, Service, PDB, HPA)
+- [x] `docs/deployment.md`
+- [x] Docker production Dockerfile (multi-stage, non-root)
+- [x] Kubernetes manifests (Deployment, Service)
 - [ ] Helm chart
-- [ ] docker-compose production config
-- [ ] ENV checklist
+- [x] docker-compose production config
+- [x] ENV checklist
 - [ ] Monitoring/alerting рекомендации
 - [ ] Backup/restore для traces
 
@@ -349,14 +349,14 @@ policyshield install-pack coding-agent-security
 
 ### Phase 1: v1.0-rc (1-2 недели)
 1. ~~Покрытие → 90%~~ Тесты для mcp_proxy, quickstart, async_client
-2. Conditional rules (time/role)
-3. Bounded session storage (LRU + TTL)
-4. Production deployment guide
+2. ~~Conditional rules (time/role)~~ ✅ v0.14.0
+3. ~~Bounded session storage (LRU + TTL)~~ ✅ v0.14.0
+4. ~~Production deployment guide~~ ✅ v0.14.0
 5. Fix mypy errors
 
 ### Phase 2: v1.0 (2-3 недели)
-6. LLM Guard: prompt injection + semantic PII
-7. NL → Policy Compiler
+6. ~~LLM Guard: prompt injection + semantic PII~~ ✅ v0.14.0
+7. ~~NL → Policy Compiler~~ ✅ v0.14.0
 8. Web UI dashboard (HTMX)
 9. OpenAI Agents SDK integration
 10. Anthropic tool_use integration

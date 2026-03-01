@@ -14,7 +14,7 @@ pip install -e ".[dev,server]"
 
 **Проверка:**
 ```bash
-policyshield --version   # → 0.13.0
+policyshield --version   # → 0.14.0
 python -c "from policyshield import ShieldEngine; print('OK')"
 ```
 
@@ -25,7 +25,7 @@ python -c "from policyshield import ShieldEngine; print('OK')"
 Запустите полный CI pipeline локально:
 
 ```bash
-# Тесты (должно быть 1226+, 0 failures)
+# Тесты (должно быть 1350+, 0 failures)
 pytest tests/ -v --tb=short --cov=policyshield --cov-fail-under=85
 
 # Линтер (0 errors)
@@ -42,7 +42,7 @@ cd plugins/openclaw && npx tsc --noEmit && cd ../..
 ```
 
 **Ожидаемый результат:**
-- 1226+ passed, 0 failed
+- 1350+ passed, 0 failed
 - coverage ≥ 85%
 - ruff: All checks passed
 - mypy: 0 errors

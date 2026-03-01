@@ -80,3 +80,48 @@ OPENAI_API_KEY="sk-..." policyshield generate "Block file deletions"
 # Generate rules with Anthropic
 ANTHROPIC_API_KEY="..." policyshield generate "Block file deletions" --provider anthropic
 ```
+
+## Slack Approval Backend
+
+In addition to Telegram, you can use Slack for approval notifications:
+
+| Env Var | Description |
+|---------|-------------|
+| `POLICYSHIELD_SLACK_WEBHOOK_URL` | Slack Incoming Webhook URL |
+
+- **Set** → Slack backend (sends approval requests via webhook)
+- **Not set** → Falls back to Telegram (if configured) or InMemory
+
+```bash
+POLICYSHIELD_SLACK_WEBHOOK_URL="https://hooks.slack.com/services/..." \
+policyshield server --rules rules.yaml --port 8100
+```
+
+## LLM Guard
+
+LLM Guard is an optional async middleware that adds LLM-based threat detection to the pipeline. Without it, PolicyShield uses only regex-based rules (0ms overhead). With it, tool call arguments are analyzed by an LLM for threats (+200-500ms).
+
+| Env Var | Description |
+|---------|-------------|
+| `OPENAI_API_KEY` | Required for LLM Guard (uses OpenAI models) |
+| `POLICYSHIELD_LLM_GUARD_ENABLED` | Enable LLM Guard (`true`/`false`, default: `false`) |
+| `POLICYSHIELD_LLM_GUARD_MODEL` | Model to use (default: `gpt-4o-mini`) |
+| `POLICYSHIELD_LLM_GUARD_TIMEOUT` | Max seconds per LLM check (default: `2.0`) |
+| `POLICYSHIELD_LLM_GUARD_CACHE_TTL` | Cache TTL in seconds (default: `300`) |
+| `POLICYSHIELD_LLM_GUARD_FAIL_OPEN` | Behavior on LLM failure: `true` = allow, `false` = block |
+
+```python
+# Pipeline with LLM Guard:
+# Tool Call → Sanitizer → Regex Rules → [LLM Guard] → Verdict
+```
+
+## NL Policy Compiler
+
+Compile natural language descriptions into validated YAML rules:
+
+```bash
+OPENAI_API_KEY="sk-..." policyshield compile "Block file deletions" -o rules.yaml
+OPENAI_API_KEY="sk-..." policyshield compile --file restrictions.md -o rules.yaml
+```
+
+The compiler uses a two-stage pipeline: LLM generates YAML → `policyshield validate` verifies. If validation fails, the LLM auto-corrects.

@@ -66,9 +66,14 @@ policyshield server --rules <path> [--port PORT] [--host HOST] [--mode MODE] [--
 | `/api/v1/respond-approval` | POST | Approve or deny a pending request |
 | `/api/v1/pending-approvals` | GET | List pending approvals |
 | `/api/v1/health` | GET | Health check |
+| `/api/v1/status` | GET | Server status (running, killed, mode, version) |
 | `/api/v1/constraints` | GET | Human-readable policy summary |
-| `/admin/kill` | POST | Emergency kill switch — block all calls |
-| `/admin/resume` | POST | Deactivate kill switch |
+| `/api/v1/reload` | POST | Hot-reload rules from disk |
+| `/api/v1/kill` | POST | Emergency kill switch — block all calls |
+| `/api/v1/resume` | POST | Deactivate kill switch |
+| `/healthz` · `/api/v1/livez` | GET | Liveness probe (K8s) |
+| `/readyz` · `/api/v1/readyz` | GET | Readiness probe |
+| `/metrics` | GET | Prometheus metrics |
 
 ### `policyshield trace`
 
@@ -258,3 +263,25 @@ policyshield migrate --from <version> --to <version> <config-file>
 | `--from` | Source version (e.g. `0.11`) |
 | `--to` | Target version (e.g. `1.0`) |
 | `<config-file>` | Path to YAML config to migrate |
+
+### `policyshield compile`
+
+Compile natural language descriptions into validated YAML rules using an LLM.
+
+```bash
+# From text
+policyshield compile "Block file deletions and redact PII in emails" -o rules.yaml
+
+# From file
+policyshield compile --file restrictions.md -o rules.yaml
+```
+
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `<text>` | — | Natural language policy description |
+| `--file` | — | Path to a markdown/text file with policy descriptions |
+| `-o` | stdout | Output file path |
+| `--provider` | `openai` | LLM provider (`openai` or `anthropic`) |
+| `--model` | per-provider | Specific model name |
+
+Requires `pip install "policyshield[ai]"` and `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`.

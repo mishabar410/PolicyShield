@@ -126,7 +126,7 @@
 - **Config migration**: `policyshield migrate` between versions
 - 1192 tests
 
-### v0.13 — Tier 2: SDK, DX & Integrations ✅ (current)
+### v0.13 — Tier 2: SDK, DX & Integrations ✅
 - **Python SDK**: `PolicyShieldClient` + `AsyncPolicyShieldClient` — typed check, kill, resume, reload, post_check
 - **TypeScript SDK**: added kill/resume/reload/waitForApproval — full parity with Python SDK
 - **`@shield()` decorator**: sync + async function wrapping with `on_block` config
@@ -142,15 +142,22 @@
 - **Integration examples**: standalone_check, fastapi_middleware, docker_compose
 - 1226 tests, 85% coverage
 
+### v0.14 — Tier 3A: v1.0 Essential Features ✅ (current)
+- **Conditional Rules (601)**: `ContextEvaluator` for time-of-day, day-of-week, and arbitrary context conditions
+- **Bounded Session Storage (602)**: `SessionBackend` interface with `InMemorySessionBackend` (LRU + TTL) and `RedisSessionBackend` stub
+- **LLM Guard (603)**: async threat detection middleware with response caching, fail-open/closed
+- **NL Policy Compiler (604)**: `policyshield compile` — natural language → YAML with validation loop
+- **Deployment Guide (605)**: production Dockerfile, docker-compose, Kubernetes manifests, docs
+- 80+ bug fixes across engine, PII, session, trace, server modules
+- 1350 tests, 85% coverage
+
 ## Next
 
 ### v1.0 — Production Release (planned)
-- LLM Guard: prompt injection detection, semantic PII, intent classification
-- Conditional rules: time of day, user role
-- Bounded session storage (LRU eviction, TTL)
 - Coverage gate raised to 90%
-- Production deployment guide
 - Web UI dashboard
+- OpenAI Agents SDK integration
+- Anthropic tool_use integration
 
 ---
 
@@ -158,8 +165,6 @@
 
 | Item | Description |
 |------|-------------|
-| **Conditional rules** | `when.context` conditions: time of day, user role, session state |
-| **LLM Guard** | Prompt injection detection, semantic PII, intent classification |
 | **Policy-as-Code SDK** | Python API to define rules programmatically alongside YAML |
 | **Rego/OPA bridge** | Optional: evaluate rules via Open Policy Agent |
 | **Multi-tenant** | Per-user / per-org policy sets with inheritance |

@@ -1,10 +1,12 @@
-# 🧠 Tier 3 — LLM Guard (отдельный milestone)
+# 🧠 Tier 3 — LLM Guard (partially implemented in v0.14.0)
 
 Архитектура: **LLM Guard как опциональный middleware** в pipeline. Без LLM — всё работает как сейчас (0ms). С LLM — +200-500ms, но ловит то, что regex не может. Включается per-rule.
 
 ```
 Tool Call → Sanitizer → Regex Rules → [LLM Guard] → Verdict
 ```
+
+> **v0.14.0 status:** Core LLM Guard middleware is implemented with async threat detection, response caching, and fail-open/closed behavior. Advanced capabilities (semantic PII, intent classification, multi-step plan analysis) are planned for future releases.
 
 **Почему отдельный tier:** меняет value proposition с «бесплатный 0ms фаервол» на «платный медленный фаервол». Мощно, но не для первого знакомства.
 

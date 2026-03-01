@@ -22,6 +22,10 @@ PolicyShield lets you define YAML rules that control what tools an AI agent can 
 - 🔗 **Integrations** — LangChain, CrewAI
 - 🧪 **Testing** — Validate rules before deployment
 - 🚀 **CLI** — Scaffold, validate, lint, test, serve from the command line
+- 🕐 **Conditional Rules** — Context-based: time of day, day of week, custom context
+- 🧠 **LLM Guard** — Async threat detection middleware with caching
+- 📝 **NL Policy Compiler** — `policyshield compile` — natural language → YAML rules
+- 💾 **Bounded Sessions** — LRU + TTL session storage with Redis support
 
 ## Quick Start
 
