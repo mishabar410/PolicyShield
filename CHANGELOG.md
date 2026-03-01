@@ -4,6 +4,27 @@ All notable changes to PolicyShield will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.14.0] - 2026-03-01
+
+### Added — Tier 3A: v1.0 Essential Features (601–605)
+
+- **Conditional Rules (601)**: `ContextEvaluator` for time-of-day, day-of-week, and arbitrary context conditions in rule matching
+- **Bounded Session Storage (602)**: `SessionBackend` interface with `InMemorySessionBackend` (LRU + TTL eviction) and `RedisSessionBackend` stub
+- **LLM Guard (603)**: async threat detection middleware with response caching and configurable fail-open/fail-closed behavior
+- **NL Policy Compiler (604)**: LLM-powered natural language → YAML rule compiler with validation loop and `policyshield compile` CLI command
+- **Deployment Guide (605)**: production `Dockerfile`, `docker-compose.yml`, Kubernetes manifests, and comprehensive deployment docs
+
+### Fixed
+
+- **80+ bug fixes** across engine, PII, session, trace, server, parser, async engine, decorators, and security modules (v17–v18 audits)
+- **CI**: lint errors, SDK sync, ruff formatting across 9 files
+- **Test coverage**: improved to 85% threshold with additional tests for async client, bugfix coverage, and Phase 10 features
+
+### Changed
+
+- **Release workflow**: added `skip-existing: true` to PyPI publish step to prevent duplicate upload failures on re-runs
+- **npm plugin**: version synced to 0.14.0
+
 ## [0.13.0] - 2026-02-25
 
 ### Added — Tier 2: SDK, DX & Integrations (16 features)
