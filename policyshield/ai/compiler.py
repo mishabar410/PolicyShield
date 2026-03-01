@@ -152,7 +152,7 @@ class PolicyCompiler:
         """Synchronous wrapper for :meth:`compile`."""
         import asyncio
 
-        return asyncio.get_event_loop().run_until_complete(self.compile(description))
+        return asyncio.run(self.compile(description))
 
     # ------------------------------------------------------------------
     # Validation

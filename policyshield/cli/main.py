@@ -1468,7 +1468,7 @@ def _cmd_compile(parsed: argparse.Namespace) -> int:
     compiler = PolicyCompiler(api_key=api_key, model=parsed.model)
     print(f"Compiling: {parsed.description}", file=sys.stderr)
 
-    result = asyncio.get_event_loop().run_until_complete(compiler.compile(parsed.description))
+    result = asyncio.run(compiler.compile(parsed.description))
 
     if not result.is_valid:
         print(f"✗ Compilation failed after {result.attempts} attempts:", file=sys.stderr)
