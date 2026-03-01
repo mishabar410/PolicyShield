@@ -20,6 +20,7 @@ export type CheckRequest = {
     session_id: string;
     sender?: string;
     request_id?: string;
+    context?: Record<string, unknown>;
 };
 
 export type CheckResponse = {

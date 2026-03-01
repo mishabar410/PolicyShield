@@ -6,8 +6,6 @@ from datetime import datetime
 from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
-import pytest
-
 from policyshield.shield.context import ContextEvaluator
 
 

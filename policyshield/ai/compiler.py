@@ -16,10 +16,8 @@ Or via CLI::
 
 from __future__ import annotations
 
-import json
 import logging
 import os
-from typing import Any
 
 import yaml
 
@@ -206,7 +204,7 @@ class PolicyCompiler:
 
         user_msg = f"Convert to PolicyShield YAML rules:\n\n{description}"
         if errors:
-            user_msg += f"\n\nPrevious attempt had errors:\n" + "\n".join(f"- {e}" for e in errors)
+            user_msg += "\n\nPrevious attempt had errors:\n" + "\n".join(f"- {e}" for e in errors)
             user_msg += "\n\nFix these errors and output corrected YAML."
 
         async with httpx.AsyncClient(timeout=10.0) as client:

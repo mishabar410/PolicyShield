@@ -16,7 +16,6 @@ import threading
 from abc import ABC, abstractmethod
 from collections import OrderedDict
 from datetime import datetime, timezone
-from typing import Any
 
 logger = logging.getLogger("policyshield")
 

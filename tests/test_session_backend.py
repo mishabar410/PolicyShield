@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-import time
 from unittest.mock import patch
-
-import pytest
 
 from policyshield.shield.session_backend import InMemorySessionBackend, _now_ts
 
@@ -66,7 +63,6 @@ class TestInMemorySessionBackend:
         assert backend.get("s1") is not None
 
         # Simulate time passing
-        original_ts = _now_ts
         with patch(
             "policyshield.shield.session_backend._now_ts",
             return_value=_now_ts() + 2,
@@ -139,3 +135,75 @@ class TestSessionManagerWithBackend:
         stats = mgr.stats()
         assert "backend" in stats
         assert stats["backend"]["backend"] == "memory"
+
+
+# ---------------------------------------------------------------------------
+# RedisSessionBackend (mocked)
+# ---------------------------------------------------------------------------
+
+
+class TestRedisSessionBackendMocked:
+    def _make_backend(self):
+        """Create a RedisSessionBackend with a mocked redis client."""
+        from unittest.mock import MagicMock
+
+        from policyshield.shield.session_backend import RedisSessionBackend
+
+        # Patch the import inside __init__
+        with patch.dict("sys.modules", {"redis": MagicMock()}):
+            backend = RedisSessionBackend.__new__(RedisSessionBackend)
+            backend._client = MagicMock()
+            backend._ttl = 3600
+            backend._prefix = "ps:session:"
+        return backend
+
+    def test_get_found(self):
+        backend = self._make_backend()
+        backend._client.get.return_value = '{"user": "alice"}'
+        result = backend.get("s1")
+        assert result == {"user": "alice"}
+
+    def test_get_not_found(self):
+        backend = self._make_backend()
+        backend._client.get.return_value = None
+        assert backend.get("s1") is None
+
+    def test_get_corrupt_data(self):
+        backend = self._make_backend()
+        backend._client.get.return_value = "not json"
+        assert backend.get("s1") is None
+        backend._client.delete.assert_called()
+
+    def test_put(self):
+        backend = self._make_backend()
+        backend.put("s1", {"user": "alice"})
+        backend._client.setex.assert_called_once()
+
+    def test_delete(self):
+        backend = self._make_backend()
+        backend.delete("s1")
+        backend._client.delete.assert_called_once()
+
+    def test_count_single_page(self):
+        backend = self._make_backend()
+        backend._client.scan.return_value = (0, ["ps:session:s1", "ps:session:s2"])
+        assert backend.count() == 2
+
+    def test_count_multi_page(self):
+        backend = self._make_backend()
+        backend._client.scan.side_effect = [
+            (1, ["ps:session:s1"]),
+            (0, ["ps:session:s2"]),
+        ]
+        assert backend.count() == 2
+
+    def test_stats(self):
+        backend = self._make_backend()
+        backend._client.scan.return_value = (0, [])
+        stats = backend.stats()
+        assert stats["backend"] == "redis"
+        assert "active_sessions" in stats
+
+    def test_key_prefix(self):
+        backend = self._make_backend()
+        assert backend._key("test") == "ps:session:test"

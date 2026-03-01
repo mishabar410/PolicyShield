@@ -3,9 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-from unittest.mock import AsyncMock, patch
-
-import pytest
 
 from policyshield.shield.llm_guard import GuardResult, LLMGuard, LLMGuardConfig
 
