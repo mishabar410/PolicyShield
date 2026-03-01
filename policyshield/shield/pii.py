@@ -363,7 +363,9 @@ class PIIDetector:
                 if match.span[1] > prev.span[1]:
                     extended_text = text[prev.span[0] : match.span[1]]
                     # Use the higher-priority PII type (prefer the more specific one)
-                    pii_type = match.pii_type if match.span[1] - match.span[0] > prev.span[1] - prev.span[0] else prev.pii_type
+                    pii_type = (
+                        match.pii_type if match.span[1] - match.span[0] > prev.span[1] - prev.span[0] else prev.pii_type
+                    )
                     merged[-1] = PIIMatch(
                         pii_type=pii_type,
                         span=(prev.span[0], match.span[1]),

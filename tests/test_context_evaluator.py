@@ -167,19 +167,25 @@ class TestMultipleConditions:
         ev = _make_eval()
         with _fixed_now("10:30", day="Wed"):
             ctx = {"user_role": "admin", "env": "production"}
-            assert ev.evaluate(
-                {"time_of_day": "09:00-18:00", "user_role": "admin", "env": "production"},
-                ctx,
-            ) is True
+            assert (
+                ev.evaluate(
+                    {"time_of_day": "09:00-18:00", "user_role": "admin", "env": "production"},
+                    ctx,
+                )
+                is True
+            )
 
     def test_one_fails(self):
         ev = _make_eval()
         with _fixed_now("10:30", day="Wed"):
             ctx = {"user_role": "viewer", "env": "production"}
-            assert ev.evaluate(
-                {"time_of_day": "09:00-18:00", "user_role": "admin", "env": "production"},
-                ctx,
-            ) is False
+            assert (
+                ev.evaluate(
+                    {"time_of_day": "09:00-18:00", "user_role": "admin", "env": "production"},
+                    ctx,
+                )
+                is False
+            )
 
 
 # ---------------------------------------------------------------------------

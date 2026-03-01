@@ -28,8 +28,7 @@ class TestValidation:
     def test_invalid_then(self):
         compiler = PolicyCompiler()
         errors = compiler._validate(
-            "shield_name: test\nversion: 1\nrules:\n"
-            "  - id: r1\n    when:\n      tool: exec\n    then: DELETE\n"
+            "shield_name: test\nversion: 1\nrules:\n  - id: r1\n    when:\n      tool: exec\n    then: DELETE\n"
         )
         assert any("invalid 'then'" in e for e in errors)
 
@@ -41,17 +40,13 @@ class TestValidation:
     def test_missing_id(self):
         compiler = PolicyCompiler()
         errors = compiler._validate(
-            "shield_name: test\nversion: 1\nrules:\n"
-            "  - when:\n      tool: exec\n    then: BLOCK\n"
+            "shield_name: test\nversion: 1\nrules:\n  - when:\n      tool: exec\n    then: BLOCK\n"
         )
         assert any("missing 'id'" in e for e in errors)
 
     def test_missing_when(self):
         compiler = PolicyCompiler()
-        errors = compiler._validate(
-            "shield_name: test\nversion: 1\nrules:\n"
-            "  - id: r1\n    then: BLOCK\n"
-        )
+        errors = compiler._validate("shield_name: test\nversion: 1\nrules:\n  - id: r1\n    then: BLOCK\n")
         assert any("missing 'when'" in e for e in errors)
 
     def test_rules_not_list(self):

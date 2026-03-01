@@ -29,9 +29,7 @@ class SessionManager:
         self._lock = threading.Lock()
         self._eviction_counter = 0
         self._eviction_every_n = 100
-        self._backend = backend or InMemorySessionBackend(
-            max_size=max_sessions, ttl_seconds=ttl_seconds
-        )
+        self._backend = backend or InMemorySessionBackend(max_size=max_sessions, ttl_seconds=ttl_seconds)
 
     def get_or_create(self, session_id: str) -> SessionState:
         """Get an existing session or create a new one.

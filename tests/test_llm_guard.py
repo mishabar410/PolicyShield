@@ -76,15 +76,7 @@ class TestResponseParsing:
 
     def test_markdown_fenced_response(self):
         guard = LLMGuard(LLMGuardConfig(enabled=True))
-        data = {
-            "choices": [
-                {
-                    "message": {
-                        "content": '```json\n{"is_threat": false, "risk_score": 0.1}\n```'
-                    }
-                }
-            ]
-        }
+        data = {"choices": [{"message": {"content": '```json\n{"is_threat": false, "risk_score": 0.1}\n```'}}]}
         result = guard._parse_response(data)
         assert result.is_threat is False
 

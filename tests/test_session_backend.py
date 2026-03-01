@@ -72,8 +72,8 @@ class TestInMemorySessionBackend:
     def test_hit_miss_counters(self):
         backend = InMemorySessionBackend()
         backend.put("s1", {"a": 1})
-        backend.get("s1")           # hit
-        backend.get("s1")           # hit
+        backend.get("s1")  # hit
+        backend.get("s1")  # hit
         backend.get("nonexistent")  # miss
         assert backend.hits == 2
         assert backend.misses == 1

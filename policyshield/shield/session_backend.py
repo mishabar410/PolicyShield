@@ -160,8 +160,7 @@ class RedisSessionBackend(SessionBackend):
             import redis as _redis  # type: ignore[import-untyped]
         except ImportError as exc:
             raise ImportError(
-                "RedisSessionBackend requires the 'redis' package. "
-                "Install with: pip install policyshield[redis]"
+                "RedisSessionBackend requires the 'redis' package. Install with: pip install policyshield[redis]"
             ) from exc
 
         self._client = _redis.from_url(redis_url, decode_responses=True)

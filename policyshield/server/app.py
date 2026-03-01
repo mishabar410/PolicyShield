@@ -316,6 +316,7 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
             auth = request.headers.get("Authorization", "")
             if auth.startswith("Bearer ") and len(auth) > 7:
                 import hashlib
+
                 client_key = f"token:{hashlib.sha256(auth[7:].encode()).hexdigest()[:16]}"
             if not _api_limiter.is_allowed(client_key):
                 return JSONResponse(
