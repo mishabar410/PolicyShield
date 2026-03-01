@@ -27,6 +27,9 @@ from policyshield.server.models import (
     CheckResponse,
     ClearTaintRequest,
     ClearTaintResponse,
+    CompileRequest,
+    CompileResponse,
+    CompileAndApplyResponse,
     ConstraintsResponse,
     HealthResponse,
     KillSwitchResponse,
@@ -572,5 +575,100 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
             rules_count=engine.rule_count,
             version=__version__,
         )
+
+    # ── Compile endpoint ──────────────────────────────────────────
+
+    @app.post("/api/v1/compile", response_model=CompileResponse, dependencies=auth)
+    async def compile_rule(req: CompileRequest) -> CompileResponse:
+        """Compile natural language description into PolicyShield YAML rules."""
+        from policyshield.ai.compiler import PolicyCompiler
+
+        compiler = PolicyCompiler()
+        result = await compiler.compile(req.description)
+        return CompileResponse(
+            yaml_text=result.yaml_text,
+            is_valid=result.is_valid,
+            errors=result.errors,
+        )
+
+    @app.post("/api/v1/compile-and-apply", response_model=CompileAndApplyResponse, dependencies=auth)
+    async def compile_and_apply(req: CompileRequest) -> CompileAndApplyResponse:
+        """Compile natural language description, merge into rules file, and reload."""
+        from policyshield.ai.compiler import PolicyCompiler
+        import yaml
+
+        compiler = PolicyCompiler()
+        result = await compiler.compile(req.description)
+        if not result.is_valid:
+            return CompileAndApplyResponse(
+                yaml_text=result.yaml_text,
+                is_valid=False,
+                errors=result.errors,
+            )
+
+        # Merge new rules into existing rules file
+        rules_path = engine._rules_path
+        if rules_path is None:
+            return CompileAndApplyResponse(
+                yaml_text=result.yaml_text,
+                is_valid=True,
+                errors=["No rules file path configured — cannot save"],
+            )
+
+        try:
+            new_data = yaml.safe_load(result.yaml_text)
+            new_rules = new_data.get("rules", [])
+
+            # Read existing rules
+            existing_data = yaml.safe_load(rules_path.read_text(encoding="utf-8"))
+            existing_rules = existing_data.get("rules", [])
+
+            # Collect tools targeted by new rules
+            new_tools = set()
+            for r in new_rules:
+                if isinstance(r, dict) and isinstance(r.get("when"), dict):
+                    t = r["when"].get("tool")
+                    if t:
+                        new_tools.add(t)
+                # Ensure override rules get highest priority
+                if isinstance(r, dict):
+                    r["priority"] = 0
+
+            # Remove existing rules that conflict (same tool)
+            new_ids = {r["id"] for r in new_rules if isinstance(r, dict)}
+            merged_rules = []
+            for r in existing_rules:
+                if r.get("id") in new_ids:
+                    continue  # replaced by new rule
+                tool = r.get("when", {}).get("tool") if isinstance(r.get("when"), dict) else None
+                if tool and tool in new_tools:
+                    continue  # conflicting tool — removed
+                merged_rules.append(r)
+            merged_rules.extend(new_rules)
+
+            existing_data["rules"] = merged_rules
+
+            # Write back
+            rules_path.write_text(
+                yaml.dump(existing_data, default_flow_style=False, allow_unicode=True, sort_keys=False),
+                encoding="utf-8",
+            )
+
+            # Reload engine
+            engine.reload_rules()
+
+            return CompileAndApplyResponse(
+                yaml_text=result.yaml_text,
+                is_valid=True,
+                applied=True,
+                rules_count=engine.rule_count,
+            )
+        except Exception as e:
+            _logger.error("compile-and-apply save/reload failed: %s", e)
+            return CompileAndApplyResponse(
+                yaml_text=result.yaml_text,
+                is_valid=True,
+                errors=[f"Save/reload failed: {e}"],
+            )
 
     return app

@@ -87,7 +87,7 @@ const plugin: OpenClawPluginDefinition = {
     version: "0.9.0",
     description: "PolicyShield — runtime policy enforcement for AI agent tool calls",
 
-    async register(api: OpenClawPluginApi) {
+    register(api: OpenClawPluginApi) {
         const rawConfig = (api.pluginConfig ?? {}) as PluginConfig;
         const log = api.logger;
 
@@ -212,6 +212,103 @@ const plugin: OpenClawPluginDefinition = {
             },
             { priority: 50 },
         );
+
+        // ── /policyshield command: manage PolicyShield from chat ──
+        api.registerCommand({
+            name: "policyshield",
+            description: "PolicyShield management: status, rules, kill, resume, reload, compile",
+            acceptsArgs: true,
+            requireAuth: true,
+            handler: async (ctx: { args?: string }) => {
+                const sub = ctx.args?.split(/\s+/)[0]?.toLowerCase();
+                try {
+                    switch (sub) {
+                        case "status": {
+                            const ok = await client.healthCheck();
+                            return {
+                                text: ok
+                                    ? "🛡️ PolicyShield: ✅ online"
+                                    : "🛡️ PolicyShield: ❌ unreachable",
+                            };
+                        }
+                        case "rules": {
+                            const status = await client.getStatus();
+                            const constraints = await client.getConstraints();
+                            let text = `🛡️ PolicyShield: ${status.rules_count} rules (${status.mode})`;
+                            if (status.killed) text += " ⛔ KILLED";
+                            if (constraints) text += "\n\n" + constraints;
+                            return { text };
+                        }
+                        case "kill": {
+                            const reason = ctx.args?.slice(4).trim() || "Telegram kill switch";
+                            await client.kill(reason);
+                            return {
+                                text: "🛡️ PolicyShield: 🔴 KILLED — all tool calls blocked",
+                            };
+                        }
+                        case "resume": {
+                            await client.resume();
+                            return {
+                                text: "🛡️ PolicyShield: 🟢 Resumed — normal operation",
+                            };
+                        }
+                        case "reload": {
+                            await client.reload();
+                            return {
+                                text: "🛡️ PolicyShield: 🔄 Rules reloaded",
+                            };
+                        }
+                        case "compile": {
+                            const desc = ctx.args?.slice(7).trim();
+                            if (!desc) {
+                                return {
+                                    text: "Usage: /policyshield compile <description>\n\nExample: /policyshield compile Block all file deletions in production",
+                                };
+                            }
+                            const result = await client.compile(desc);
+                            if (result.is_valid) {
+                                return {
+                                    text: `✅ Generated rule:\n\`\`\`yaml\n${result.yaml_text}\n\`\`\``,
+                                };
+                            }
+                            return {
+                                text: `❌ Compilation failed:\n${result.errors.join("\n")}`,
+                            };
+                        }
+                        case "apply": {
+                            const desc = ctx.args?.slice(5).trim();
+                            if (!desc) {
+                                return {
+                                    text: "Usage: /policyshield apply <description>\n\nCompiles, saves, and reloads rules.\nExample: /policyshield apply Allow file reads in staging",
+                                };
+                            }
+                            const result = await client.compileAndApply(desc);
+                            if (result.applied) {
+                                return {
+                                    text: `✅ Rule applied! (${result.rules_count} total rules)\n\`\`\`yaml\n${result.yaml_text}\n\`\`\``,
+                                };
+                            }
+                            if (result.errors.length > 0) {
+                                return {
+                                    text: `❌ Apply failed:\n${result.errors.join("\n")}`,
+                                };
+                            }
+                            return {
+                                text: `❌ Compilation failed:\n${result.errors.join("\n")}`,
+                            };
+                        }
+                        default:
+                            return {
+                                text: "Usage: /policyshield {status|rules|kill|resume|reload|compile|apply}",
+                            };
+                    }
+                } catch (err) {
+                    return {
+                        text: `🛡️ PolicyShield: ⚠️ command failed — ${String(err)}`,
+                    };
+                }
+            },
+        });
     },
 };
 

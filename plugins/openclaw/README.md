@@ -147,6 +147,40 @@ openclaw plugins info policyshield
 
 ---
 
+## Telegram Management Commands
+
+Manage PolicyShield directly from Telegram chat (requires auth in OpenClaw allowlist):
+
+```
+/policyshield status          # Check if server is online
+/policyshield rules           # View active rules with mode and count
+/policyshield kill [reason]   # Emergency kill switch — blocks ALL tool calls
+/policyshield resume          # Resume normal operation
+/policyshield reload          # Hot-reload rules from disk
+/policyshield compile <desc>  # Generate YAML rules from natural language
+/policyshield apply <desc>    # Compile + save + reload in one step
+```
+
+**`apply`** is the most powerful command — it generates rules via LLM, replaces conflicting rules for the same tool, and reloads the engine in one step. New rules get `priority: 0` to override existing defaults.
+
+### Rule Priority
+
+Rules have a `priority` field (lower number = higher priority). When multiple rules match the same tool call, the rule with the lowest priority number wins. If priorities are equal, the more restrictive verdict (BLOCK > REDACT > APPROVE > ALLOW) takes precedence.
+
+```yaml
+- id: block-deletions
+  when: { tool: file.delete }
+  then: BLOCK
+  priority: 1        # default
+
+- id: allow-deletions
+  when: { tool: file.delete }
+  then: ALLOW
+  priority: 0        # wins — lower number = higher priority
+```
+
+---
+
 ## Configuration
 
 ```bash

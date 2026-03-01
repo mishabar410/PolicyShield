@@ -7,6 +7,9 @@ import type {
     PostCheckResponse,
     ConstraintsResponse,
     ApprovalStatusResponse,
+    StatusResponse,
+    CompileResponse,
+    CompileAndApplyResponse,
 } from "./types.js";
 
 export class PolicyShieldClient {
@@ -160,6 +163,43 @@ export class PolicyShieldClient {
             headers: this.getHeaders(),
             signal: AbortSignal.timeout(this.timeout),
         });
+    }
+
+    async getStatus(): Promise<StatusResponse> {
+        const res = await fetch(`${this.url}/api/v1/status`, {
+            headers: this.getHeaders(),
+            signal: AbortSignal.timeout(this.timeout),
+        });
+        if (!res.ok) {
+            throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+        }
+        return (await res.json()) as StatusResponse;
+    }
+
+    async compile(description: string): Promise<CompileResponse> {
+        const res = await fetch(`${this.url}/api/v1/compile`, {
+            method: "POST",
+            headers: this.getHeaders(),
+            body: JSON.stringify({ description }),
+            signal: AbortSignal.timeout(30_000), // compilation can be slow
+        });
+        if (!res.ok) {
+            throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+        }
+        return (await res.json()) as CompileResponse;
+    }
+
+    async compileAndApply(description: string): Promise<CompileAndApplyResponse> {
+        const res = await fetch(`${this.url}/api/v1/compile-and-apply`, {
+            method: "POST",
+            headers: this.getHeaders(),
+            body: JSON.stringify({ description }),
+            signal: AbortSignal.timeout(30_000),
+        });
+        if (!res.ok) {
+            throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+        }
+        return (await res.json()) as CompileAndApplyResponse;
     }
 
     async waitForApproval(

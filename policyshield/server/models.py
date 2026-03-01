@@ -174,3 +174,29 @@ class StatusResponse(BaseModel):
     mode: str = ""
     rules_count: int = 0
     version: str = ""
+
+
+class CompileRequest(BaseModel):
+    """Request body for the /api/v1/compile endpoint."""
+
+    description: str = Field(..., min_length=1, max_length=2000)
+
+
+class CompileResponse(BaseModel):
+    """Response body for the /api/v1/compile endpoint."""
+
+    yaml_text: str = ""
+    is_valid: bool = False
+    errors: list[str] = []
+
+
+class CompileAndApplyResponse(BaseModel):
+    """Response body for the /api/v1/compile-and-apply endpoint."""
+
+    yaml_text: str = ""
+    is_valid: bool = False
+    errors: list[str] = []
+    applied: bool = False
+    rules_count: int = 0
+
+

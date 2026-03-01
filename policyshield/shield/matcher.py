@@ -185,13 +185,13 @@ class MatcherEngine:
             if self._matches(compiled, tool_name, args, session_state, sender, event_buffer, context):
                 matching.append(compiled)
 
-        # Sort: most restrictive verdict first, then by severity
+        # Sort: lower priority number wins (ascending), then most restrictive verdict as tiebreaker
         matching.sort(
             key=lambda c: (
-                _VERDICT_PRIORITY.get(c.rule.then, 0),
-                _SEVERITY_PRIORITY.get(c.rule.severity, 0),
+                c.rule.priority,
+                -_VERDICT_PRIORITY.get(c.rule.then, 0),
+                -_SEVERITY_PRIORITY.get(c.rule.severity, 0),
             ),
-            reverse=True,
         )
         return matching
 

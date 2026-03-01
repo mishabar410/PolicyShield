@@ -81,6 +81,7 @@ class RuleConfig(BaseModel):
     then: Verdict = Verdict.ALLOW
     message: str | None = None
     severity: Severity = Severity.LOW
+    priority: int = 1
     enabled: bool = True
     approval_strategy: str | None = None  # "once", "per_session", "per_rule", "per_tool"
     chain: list[dict] | None = None  # Chain conditions for multi-step rules

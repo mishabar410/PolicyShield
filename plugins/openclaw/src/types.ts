@@ -55,3 +55,26 @@ export type ApprovalStatusResponse = {
     status: "pending" | "approved" | "denied";
     responder?: string;
 };
+
+export type StatusResponse = {
+    status: string;
+    killed: boolean;
+    mode: string;
+    rules_count: number;
+    version: string;
+};
+
+export type CompileResponse = {
+    yaml_text: string;
+    is_valid: boolean;
+    errors: string[];
+};
+
+export type CompileAndApplyResponse = {
+    yaml_text: string;
+    is_valid: boolean;
+    errors: string[];
+    applied: boolean;
+    rules_count: number;
+};
+

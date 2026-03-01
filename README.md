@@ -176,6 +176,8 @@ policyshield server --rules ./rules.yaml --port 8100
 | `/api/v1/reload` | POST | Hot-reload rules |
 | `/api/v1/kill` | POST | Emergency kill switch |
 | `/api/v1/resume` | POST | Deactivate kill switch |
+| `/api/v1/compile` | POST | Compile NL description → YAML rules |
+| `/api/v1/compile-and-apply` | POST | Compile + save + reload in one step |
 | `/healthz` · `/readyz` | GET | K8s probes |
 | `/metrics` | GET | Prometheus metrics |
 
@@ -290,6 +292,20 @@ policyshield server --rules policies/rules.yaml --port 8100
 | `write("config.env", "API_KEY=...")` | **APPROVE** | Human reviews first |
 
 [Full integration guide](docs/integrations/openclaw.md) · [Plugin README](plugins/openclaw/README.md)
+
+**Telegram Management Commands:**
+
+With the OpenClaw plugin, manage PolicyShield directly from Telegram:
+
+```
+/policyshield status          # Check if server is online
+/policyshield rules           # View active rules summary
+/policyshield kill [reason]   # Emergency kill switch
+/policyshield resume          # Resume normal operation
+/policyshield reload          # Hot-reload rules from disk
+/policyshield compile <desc>  # Generate YAML rules from text
+/policyshield apply <desc>    # Compile + save + reload in one step
+```
 
 </details>
 
