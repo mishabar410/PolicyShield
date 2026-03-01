@@ -6,9 +6,8 @@ Focuses on async_engine.py and decorators.py — the two largest gaps.
 from __future__ import annotations
 
 import asyncio
-import inspect
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
