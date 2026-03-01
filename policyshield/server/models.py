@@ -198,5 +198,3 @@ class CompileAndApplyResponse(BaseModel):
     errors: list[str] = []
     applied: bool = False
     rules_count: int = 0
-
-

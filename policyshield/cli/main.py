@@ -279,7 +279,9 @@ def app(args: list[str] | None = None) -> int:
     bot_parser.add_argument("--token", default=None, help="Telegram Bot API token (or POLICYSHIELD_BOT_TOKEN)")
     bot_parser.add_argument("--rules", default=None, help="Path to YAML rules file (or POLICYSHIELD_BOT_RULES_PATH)")
     bot_parser.add_argument("--server", default=None, help="PolicyShield server URL (or POLICYSHIELD_SERVER_URL)")
-    bot_parser.add_argument("--admin-token", default=None, help="Admin token for server API (or POLICYSHIELD_ADMIN_TOKEN)")
+    bot_parser.add_argument(
+        "--admin-token", default=None, help="Admin token for server API (or POLICYSHIELD_ADMIN_TOKEN)"
+    )
 
     # check (dry-run) command
     check_parser = subparsers.add_parser("check", help="One-shot tool call check (dry-run)")
@@ -1495,6 +1497,8 @@ def _cmd_compile(parsed: argparse.Namespace) -> int:
     else:
         print(result.yaml_text)
 
+    return 0
+
 
 def _cmd_bot(parsed: argparse.Namespace) -> int:
     """Start the Telegram bot for NL policy management."""
@@ -1514,5 +1518,3 @@ def _cmd_bot(parsed: argparse.Namespace) -> int:
     except KeyboardInterrupt:
         print("\nBot stopped.")
         return 0
-
-    return 0
