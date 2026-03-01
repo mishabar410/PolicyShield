@@ -195,6 +195,7 @@ class TestBindAndRebuildArgs:
         """Tests fallback when signature cannot be inspected."""
         # Use a callable that raises ValueError on signature inspection
         import operator
+
         result = _bind_args(operator.add, (), {"end": "!"})
         assert result == {"end": "!"}
 
