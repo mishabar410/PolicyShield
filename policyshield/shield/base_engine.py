@@ -315,8 +315,14 @@ class BaseShieldEngine:
             if self._llm_guard is not None and getattr(self._llm_guard, "enabled", False):
                 try:
                     import asyncio
+                    import concurrent.futures
 
-                    guard_result = asyncio.run(self._llm_guard.analyze(tool_name, args))
+                    # Issue #154: Run in a separate thread to avoid deadlock
+                    # when sync engine is called from an existing event loop
+                    # (e.g., FastAPI middleware, Jupyter, asyncio frameworks).
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                        future = pool.submit(asyncio.run, self._llm_guard.analyze(tool_name, args))
+                        guard_result = future.result(timeout=self._engine_timeout)
                     if guard_result.is_threat and guard_result.risk_score >= self._llm_guard.risk_threshold:
                         return ShieldResult(
                             verdict=Verdict.BLOCK,

@@ -153,19 +153,19 @@ def create_mcp_server(engine: Any, admin_token: str | None = None) -> Any:
                 if admin_token and arguments.get("admin_token") != admin_token:
                     return [TextContent(type="text", text=json.dumps({"error": "Unauthorized: invalid admin_token"}))]
                 reason = arguments.get("reason", "MCP kill switch")
-                engine.kill(reason)
+                await asyncio.to_thread(engine.kill, reason)
                 return [TextContent(type="text", text=json.dumps({"status": "killed", "reason": reason}))]
 
             elif name == "resume":
                 if admin_token and arguments.get("admin_token") != admin_token:
                     return [TextContent(type="text", text=json.dumps({"error": "Unauthorized: invalid admin_token"}))]
-                engine.resume()
+                await asyncio.to_thread(engine.resume)
                 return [TextContent(type="text", text=json.dumps({"status": "resumed"}))]
 
             elif name == "reload":
                 if admin_token and arguments.get("admin_token") != admin_token:
                     return [TextContent(type="text", text=json.dumps({"error": "Unauthorized: invalid admin_token"}))]
-                engine.reload_rules()
+                await asyncio.to_thread(engine.reload_rules)
                 return [
                     TextContent(
                         type="text",

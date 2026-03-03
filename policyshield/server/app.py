@@ -488,9 +488,8 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
     @app.post("/api/v1/clear-taint", response_model=ClearTaintResponse, dependencies=auth)
     async def clear_taint(req: ClearTaintRequest) -> ClearTaintResponse:
         """Clear PII taint from a session, re-enabling outgoing calls."""
-        session = engine.session_manager.get(req.session_id)
-        if session is not None:
-            session.clear_taint()
+        # Issue #199: Use SessionManager.clear_taint() for atomic get+clear
+        engine.session_manager.clear_taint(req.session_id)
         return ClearTaintResponse(session_id=req.session_id)
 
     @app.post("/api/v1/respond-approval", response_model=RespondApprovalResponse, dependencies=auth)

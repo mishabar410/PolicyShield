@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import httpx
 
@@ -16,6 +16,9 @@ class CheckResult:
     message: str = ""
     rule_id: str | None = None
     modified_args: dict | None = None
+    pii_types: list[str] = field(default_factory=list)
+    approval_id: str | None = None
+    shield_version: str | None = None
     request_id: str = ""
 
 
@@ -69,20 +72,61 @@ class PolicyShieldClient:
         payload = {"tool_name": tool_name, "args": args or {}, **kwargs}
         resp = self._request("POST", "/check", json=payload)
         resp.raise_for_status()
-        data = resp.json()
-        return CheckResult(
-            verdict=data.get("verdict", ""),
-            message=data.get("message", ""),
-            rule_id=data.get("rule_id"),
-            modified_args=data.get("modified_args"),
-            request_id=data.get("request_id", ""),
+        return CheckResult(**{k: v for k, v in resp.json().items() if k in CheckResult.__dataclass_fields__})
+
+    def post_check(self, tool_name: str, result: str, session_id: str = "default") -> dict:
+        """Post-call check on tool output for PII."""
+        resp = self._request(
+            "POST",
+            "/post-check",
+            json={"tool_name": tool_name, "result": result, "session_id": session_id},
         )
+        resp.raise_for_status()
+        return resp.json()
 
     def health(self) -> dict:
         """Check PolicyShield server health."""
         resp = self._request("GET", "/health")
         resp.raise_for_status()
         return resp.json()
+
+    def kill(self, reason: str = "SDK kill switch") -> dict:
+        """Activate kill switch."""
+        resp = self._request("POST", "/kill", json={"reason": reason})
+        resp.raise_for_status()
+        return resp.json()
+
+    def resume(self) -> dict:
+        """Deactivate kill switch."""
+        resp = self._request("POST", "/resume")
+        resp.raise_for_status()
+        return resp.json()
+
+    def reload(self) -> dict:
+        """Reload rules from disk."""
+        resp = self._request("POST", "/reload")
+        resp.raise_for_status()
+        return resp.json()
+
+    def wait_for_approval(
+        self,
+        approval_id: str,
+        timeout: float = 60.0,
+        poll_interval: float = 2.0,
+    ) -> dict:
+        """Poll approval status until resolved or timeout."""
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            resp = self._request(
+                "POST",
+                "/check-approval",
+                json={"approval_id": approval_id},
+            )
+            data = resp.json()
+            if data.get("status") != "pending":
+                return data
+            time.sleep(poll_interval)
+        raise TimeoutError(f"Approval {approval_id} not resolved within {timeout}s")
 
     def close(self) -> None:
         self._client.close()

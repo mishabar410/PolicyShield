@@ -152,6 +152,26 @@ class SessionManager:
             session.taints.add(pii_type)
             self._sync_to_backend(session)
 
+    def clear_taint(self, session_id: str) -> bool:
+        """Clear PII taint from a session (thread-safe).
+
+        Performs get + clear atomically under the manager lock,
+        preventing race conditions with concurrent add_taint calls.
+
+        Args:
+            session_id: Session identifier.
+
+        Returns:
+            True if session was found and cleared, False if not found.
+        """
+        with self._lock:
+            session = self._sessions.get(session_id)
+            if session is None or self._is_expired(session):
+                return False
+            session.clear_taint()
+            self._sync_to_backend(session)
+            return True
+
     def remove(self, session_id: str) -> bool:
         """Remove a session.
 

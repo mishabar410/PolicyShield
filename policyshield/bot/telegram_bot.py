@@ -386,12 +386,15 @@ class PolicyBot:
                 dir=str(self._rules_path.parent),
                 suffix=".tmp",
             )
+            fd_closed = False
             try:
                 os.write(fd, yaml_content.encode("utf-8"))
                 os.close(fd)
+                fd_closed = True
                 os.replace(tmp_path, str(self._rules_path))
             except Exception:
-                os.close(fd) if not os.get_inheritable(fd) else None  # noqa: E702
+                if not fd_closed:
+                    os.close(fd)
                 if os.path.exists(tmp_path):
                     os.unlink(tmp_path)
                 raise

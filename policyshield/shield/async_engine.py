@@ -88,7 +88,15 @@ class AsyncShieldEngine(BaseShieldEngine):
         if self._otel:
             self._otel.on_check_end(span_ctx, result, latency_ms)
 
-        return await asyncio.to_thread(self._apply_post_check, result, session_id, tool_name, latency_ms, args)
+        # Issue #200: Add timeout to prevent deadlock if lock is contended
+        try:
+            return await asyncio.wait_for(
+                asyncio.to_thread(self._apply_post_check, result, session_id, tool_name, latency_ms, args),
+                timeout=self._engine_timeout,
+            )
+        except asyncio.TimeoutError:
+            logger.error("_apply_post_check timed out (%.1fs)", self._engine_timeout)
+            return result
 
     async def _do_check(
         self,

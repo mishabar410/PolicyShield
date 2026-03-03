@@ -109,7 +109,10 @@ class PolicyShieldClient:
         """Poll approval status until resolved or timeout."""
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
-            resp = self._client.get(f"/api/v1/approval/{approval_id}/status")
+            resp = self._client.post(
+                "/api/v1/check-approval",
+                json={"approval_id": approval_id},
+            )
             data = resp.json()
             if data.get("status") != "pending":
                 return data
@@ -212,7 +215,10 @@ class AsyncPolicyShieldClient:
 
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
-            resp = await self._client.get(f"/api/v1/approval/{approval_id}/status")
+            resp = await self._client.post(
+                "/api/v1/check-approval",
+                json={"approval_id": approval_id},
+            )
             data = resp.json()
             if data.get("status") != "pending":
                 return data

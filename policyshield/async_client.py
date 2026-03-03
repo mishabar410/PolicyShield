@@ -98,6 +98,56 @@ class AsyncPolicyShieldClient:
     async def close(self) -> None:
         await self._client.aclose()
 
+    async def post_check(self, tool_name: str, result: str, session_id: str = "default") -> dict:
+        """Post-call check on tool output for PII."""
+        resp = await self._request(
+            "POST",
+            "/post-check",
+            json={"tool_name": tool_name, "result": result, "session_id": session_id},
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    async def kill(self, reason: str = "SDK kill switch") -> dict:
+        """Activate kill switch."""
+        resp = await self._request("POST", "/kill", json={"reason": reason})
+        resp.raise_for_status()
+        return resp.json()
+
+    async def resume(self) -> dict:
+        """Deactivate kill switch."""
+        resp = await self._request("POST", "/resume")
+        resp.raise_for_status()
+        return resp.json()
+
+    async def reload(self) -> dict:
+        """Reload rules from disk."""
+        resp = await self._request("POST", "/reload")
+        resp.raise_for_status()
+        return resp.json()
+
+    async def wait_for_approval(
+        self,
+        approval_id: str,
+        timeout: float = 60.0,
+        poll_interval: float = 2.0,
+    ) -> dict:
+        """Poll approval status until resolved or timeout."""
+        import time
+
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            resp = await self._request(
+                "POST",
+                "/check-approval",
+                json={"approval_id": approval_id},
+            )
+            data = resp.json()
+            if data.get("status") != "pending":
+                return data
+            await asyncio.sleep(poll_interval)
+        raise TimeoutError(f"Approval {approval_id} not resolved within {timeout}s")
+
     async def __aenter__(self) -> AsyncPolicyShieldClient:
         return self
 
