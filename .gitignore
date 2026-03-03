@@ -60,3 +60,6 @@ tests/e2e-openclaw/node_modules/
 
 # Prompts (internal development only)
 prompts/
+
+ISSUES.md
+issues/
