@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-import pytest
 
 from policyshield.core.models import PIIType, SessionState
 from policyshield.shield.session import SessionManager
