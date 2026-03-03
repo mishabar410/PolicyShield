@@ -138,12 +138,16 @@ class TestSyncClientNewMethods:
 
     def test_check_filters_unknown_fields(self, monkeypatch):
         """check() should not crash on unknown fields from server response."""
+
         def mock_request(self, method, path, **kwargs):
-            return _mock_response(200, {
-                "verdict": "ALLOW",
-                "message": "ok",
-                "unknown_field": "should_be_ignored",
-            })
+            return _mock_response(
+                200,
+                {
+                    "verdict": "ALLOW",
+                    "message": "ok",
+                    "unknown_field": "should_be_ignored",
+                },
+            )
 
         monkeypatch.setattr(PolicyShieldClient, "_request", mock_request)
         client = PolicyShieldClient()
@@ -451,4 +455,3 @@ class TestSDKClientAsync:
         async with SDKAsyncClient(base_url="http://localhost:8000") as client:
             result = await client.reload()
             assert result["status"] == "reloaded"
-
