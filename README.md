@@ -284,17 +284,6 @@ policyshield compile "Block file deletions and redact PII" -o rules.yaml
 
 ---
 
-## 📊 Performance
-
-| Operation | p50 | p99 |
-|-----------|-----|-----|
-| Sync check | 0.01ms | 0.01ms |
-| Async check | 0.05ms | 0.10ms |
-
-Zero overhead for allowed calls. [Philosophy](PHILOSOPHY.md)
-
----
-
 <details>
 <summary><strong>🖥️ HTTP Server & Endpoints</strong></summary>
 
@@ -442,16 +431,4 @@ policyshield openclaw teardown             # Remove plugin
 
 ---
 
-## 🛠 Development
-
-```bash
-git clone https://github.com/mishabar410/PolicyShield.git && cd PolicyShield
-pip install -e ".[dev,server]"
-pytest tests/ -v  # 1500+ tests, 85% coverage
-```
-
-📖 [Documentation](https://mishabar410.github.io/PolicyShield/) · 📝 [Changelog](CHANGELOG.md) · 🗺 [Roadmap](ROADMAP.md)
-
-## License
-
-[MIT](LICENSE)
+📖 [Documentation](https://mishabar410.github.io/PolicyShield/) · 📝 [Changelog](CHANGELOG.md) · 🗺 [Roadmap](ROADMAP.md) · [MIT License](LICENSE)
