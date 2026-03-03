@@ -88,9 +88,7 @@ class TestApprovalBackendCoverage:
         from policyshield.approval.base import ApprovalRequest
 
         backend = InMemoryBackend()
-        req = ApprovalRequest.create(
-            tool_name="tool_a", args={}, rule_id="test_rule", message="test", session_id="s1"
-        )
+        req = ApprovalRequest.create(tool_name="tool_a", args={}, rule_id="test_rule", message="test", session_id="s1")
         backend.submit(req)
         backend.respond(req.request_id, approved=False, responder="test")
         status = backend.get_status(req.request_id)
