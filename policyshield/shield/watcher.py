@@ -121,13 +121,23 @@ class RuleWatcher:
     def _has_changes(self) -> bool:
         """Check if any YAML file has been modified."""
         current: dict[Path, float] = {}
+        # Issue #172: Wrap stat() in try/except to handle TOCTOU race
         if self._path.is_file():
-            current[self._path] = self._path.stat().st_mtime
+            try:
+                current[self._path] = self._path.stat().st_mtime
+            except FileNotFoundError:
+                pass  # File deleted between is_file() and stat()
         elif self._path.is_dir():
             for f in self._path.rglob("*.yaml"):
-                current[f] = f.stat().st_mtime
+                try:
+                    current[f] = f.stat().st_mtime
+                except FileNotFoundError:
+                    pass
             for f in self._path.rglob("*.yml"):
-                current[f] = f.stat().st_mtime
+                try:
+                    current[f] = f.stat().st_mtime
+                except FileNotFoundError:
+                    pass
 
         changed = current != self._mtimes
         if changed:

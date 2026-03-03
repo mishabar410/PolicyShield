@@ -118,9 +118,16 @@ class PolicyShieldTool(BaseTool):
             if result.verdict == Verdict.REDACT:
                 tool_input = result.modified_args or tool_input
 
-            if isinstance(tool_input, dict):
-                return await asyncio.to_thread(self.wrapped_tool._run, **tool_input)
-            return await asyncio.to_thread(self.wrapped_tool._run, tool_input)
+            # Issue #159/#184: Use native _arun() if wrapped tool overrides it
+            has_native_arun = type(self.wrapped_tool)._arun is not BaseTool._arun
+            if has_native_arun:
+                if isinstance(tool_input, dict):
+                    return await self.wrapped_tool._arun(**tool_input)
+                return await self.wrapped_tool._arun(tool_input)
+            else:
+                if isinstance(tool_input, dict):
+                    return await asyncio.to_thread(self.wrapped_tool._run, **tool_input)
+                return await asyncio.to_thread(self.wrapped_tool._run, tool_input)
 
         # Fallback: sync engine in thread
         return await asyncio.to_thread(self._run, *args, **kwargs)

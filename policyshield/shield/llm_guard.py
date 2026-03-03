@@ -168,8 +168,12 @@ class LLMGuard:
         prompt = self._build_prompt(tool_name, args)
 
         # Issue #131: Reuse persistent httpx client
+        # Issue #203: Thread-safe lazy init to prevent TOCTOU race
         if self._http_client is None or self._http_client.is_closed:
-            self._http_client = httpx.AsyncClient(timeout=self._config.timeout)
+            with self._cache_lock:
+                # Double-check after acquiring lock
+                if self._http_client is None or self._http_client.is_closed:
+                    self._http_client = httpx.AsyncClient(timeout=self._config.timeout)
 
         resp = await self._http_client.post(
             f"{self._config.base_url}/chat/completions",

@@ -209,7 +209,7 @@ def _build_config(data: dict) -> PolicyShieldConfig:
 # ────────────────────────────────────────────────────────────────────
 
 
-def _build_approval_backend(backend_name: str):  # noqa: ANN202
+def _build_approval_backend(backend_name: str, **kwargs):  # noqa: ANN202
     """Create approval backend from config name."""
     if backend_name == "inmemory":
         from policyshield.approval.memory import InMemoryBackend
@@ -217,6 +217,23 @@ def _build_approval_backend(backend_name: str):  # noqa: ANN202
         return InMemoryBackend()
     if backend_name == "none":
         return None
+    # Issue #212: Support Slack, Telegram, Webhook backends
+    if backend_name == "slack":
+        from policyshield.approval.slack import SlackApprovalBackend
+
+        webhook_url = kwargs.get("webhook_url") or os.environ.get("POLICYSHIELD_SLACK_WEBHOOK_URL", "")
+        return SlackApprovalBackend(webhook_url=webhook_url)
+    if backend_name == "telegram":
+        from policyshield.approval.telegram import TelegramApprovalBackend
+
+        bot_token = kwargs.get("bot_token") or os.environ.get("POLICYSHIELD_APPROVAL_BOT_TOKEN", "")
+        chat_id = kwargs.get("chat_id") or os.environ.get("POLICYSHIELD_APPROVAL_CHAT_ID", "")
+        return TelegramApprovalBackend(bot_token=bot_token, chat_id=chat_id)
+    if backend_name == "webhook":
+        from policyshield.approval.webhook import WebhookApprovalBackend
+
+        webhook_url = kwargs.get("webhook_url") or os.environ.get("POLICYSHIELD_APPROVAL_WEBHOOK_URL", "")
+        return WebhookApprovalBackend(webhook_url=webhook_url)
     # Unknown backends → warn and return None
     import logging
 
@@ -257,6 +274,16 @@ def build_engine_from_config(config: PolicyShieldConfig):  # noqa: ANN201
     # Issue #50: Build approval backend from config
     approval = _build_approval_backend(config.approval_backend)
 
+    # Issue #211: Build OTel exporter from config
+    otel_exporter = None
+    if config.otel_enabled:
+        from policyshield.trace.otel import OTelExporter
+
+        otel_exporter = OTelExporter(
+            service_name=config.otel_service_name,
+            endpoint=config.otel_endpoint,
+        )
+
     engine = ShieldEngine(
         rules=config.rules_path,
         mode=config.mode,
@@ -266,6 +293,7 @@ def build_engine_from_config(config: PolicyShieldConfig):  # noqa: ANN201
         sanitizer=sanitizer,
         rate_limiter=rate_limiter,
         approval_backend=approval,
+        otel_exporter=otel_exporter,
     )
 
     # Issue #50/#106: Start watching if configured
@@ -308,6 +336,16 @@ def build_async_engine_from_config(config: PolicyShieldConfig):  # noqa: ANN201
     # Issue #83: Build approval backend from config
     approval = _build_approval_backend(config.approval_backend)
 
+    # Issue #211: Build OTel exporter from config
+    otel_exporter = None
+    if config.otel_enabled:
+        from policyshield.trace.otel import OTelExporter
+
+        otel_exporter = OTelExporter(
+            service_name=config.otel_service_name,
+            endpoint=config.otel_endpoint,
+        )
+
     engine = AsyncShieldEngine(
         rules=config.rules_path,
         mode=config.mode,
@@ -317,6 +355,7 @@ def build_async_engine_from_config(config: PolicyShieldConfig):  # noqa: ANN201
         sanitizer=sanitizer,
         rate_limiter=rate_limiter,
         approval_backend=approval,
+        otel_exporter=otel_exporter,
     )
 
     # Issue #83/#106: Start watching if configured

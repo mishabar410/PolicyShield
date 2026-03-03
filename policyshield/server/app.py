@@ -460,7 +460,9 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
     @app.post("/api/v1/reload", response_model=ReloadResponse, dependencies=auth)
     async def reload() -> ReloadResponse:
         """Reload rules from disk."""
-        engine.reload_rules()
+        # Issue #204: Use _compile_lock to prevent race with compile-and-apply
+        async with _compile_lock:
+            engine.reload_rules()
         return ReloadResponse(
             rules_count=engine.rule_count,
             rules_hash=_rules_hash(engine),
@@ -611,17 +613,6 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
                 existing_data = yaml.safe_load(rules_path.read_text(encoding="utf-8"))
                 existing_rules = existing_data.get("rules", [])
 
-                # Collect tools targeted by new rules
-                new_tools = set()
-                for r in new_rules:
-                    if isinstance(r, dict) and isinstance(r.get("when"), dict):
-                        t = r["when"].get("tool")
-                        if t:
-                            new_tools.add(t)
-                    # Ensure override rules get highest priority
-                    if isinstance(r, dict):
-                        r["priority"] = 0
-
                 # Issue #29: Remove only rules with the same ID, not by tool match
                 new_ids = {r["id"] for r in new_rules if isinstance(r, dict)}
                 merged_rules = [r for r in existing_rules if r.get("id") not in new_ids]
@@ -646,7 +637,7 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
                     tmp_fd.flush()
                     os.fsync(tmp_fd.fileno())
                     tmp_fd.close()
-                    os.rename(tmp_fd.name, str(rules_path))
+                    os.replace(tmp_fd.name, str(rules_path))
                 except Exception:
                     tmp_fd.close()
                     try:

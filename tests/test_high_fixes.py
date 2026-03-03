@@ -92,12 +92,21 @@ class TestLangChainWrapper:
     async def test_arun_with_async_engine(self):
         from unittest.mock import AsyncMock
 
+        from langchain_core.tools import BaseTool
         from policyshield.integrations.langchain.wrapper import PolicyShieldTool
 
-        mock_wrapped = MagicMock()
-        mock_wrapped.name = "test_tool"
-        mock_wrapped.description = "A test tool"
-        mock_wrapped._run = MagicMock(return_value="async output")
+        # Create a real BaseTool subclass with native _arun
+        class AsyncWrappedTool(BaseTool):
+            name: str = "test_tool"
+            description: str = "A test tool"
+
+            def _run(self, **kwargs):
+                return "sync output"
+
+            async def _arun(self, **kwargs):
+                return "async output"
+
+        mock_wrapped = AsyncWrappedTool()
 
         result = SimpleNamespace(
             verdict=Verdict.ALLOW,
@@ -110,7 +119,7 @@ class TestLangChainWrapper:
 
         tool = PolicyShieldTool(wrapped_tool=mock_wrapped, async_engine=mock_async_engine)
         output = await tool._arun(query="test")
-        assert output == "async output"
+        assert output == "async output"  # Uses native _arun, not to_thread(_run)
         mock_async_engine.check.assert_called_once()
 
 
@@ -316,6 +325,32 @@ class TestConfigLoaderApprovalBackend:
         from policyshield.config.loader import _build_approval_backend
 
         assert _build_approval_backend("redis") is None
+
+    def test_build_slack_backend(self, monkeypatch):
+        from policyshield.config.loader import _build_approval_backend
+
+        monkeypatch.setenv("POLICYSHIELD_SLACK_WEBHOOK_URL", "https://hooks.slack.com/test")
+        backend = _build_approval_backend("slack")
+        assert backend is not None
+        from policyshield.approval.slack import SlackApprovalBackend
+
+        assert isinstance(backend, SlackApprovalBackend)
+        backend.stop()
+
+    def test_build_telegram_backend(self, monkeypatch):
+        from policyshield.config.loader import _build_approval_backend
+
+        monkeypatch.setenv("POLICYSHIELD_APPROVAL_BOT_TOKEN", "test-token")
+        monkeypatch.setenv("POLICYSHIELD_APPROVAL_CHAT_ID", "123")
+        backend = _build_approval_backend("telegram")
+        assert backend is not None
+
+    def test_build_webhook_backend(self, monkeypatch):
+        from policyshield.config.loader import _build_approval_backend
+
+        monkeypatch.setenv("POLICYSHIELD_APPROVAL_WEBHOOK_URL", "https://example.com/webhook")
+        backend = _build_approval_backend("webhook")
+        assert backend is not None
 
 
 # ── LLM Guard cache lock ──────────────────────────────────────────

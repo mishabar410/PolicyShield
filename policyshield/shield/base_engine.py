@@ -283,10 +283,11 @@ class BaseShieldEngine:
         # Session state for condition matching
         session_state = self._build_session_state(session_id)
 
-        # Snapshot matcher + rule_set atomically to avoid race with hot-reload
+        # Snapshot matcher + rule_set + pii_detector atomically to avoid race with hot-reload
         with self._lock:
             matcher = self._matcher
             rule_set = self._rule_set
+            pii_detector = self._pii  # Issue #170: snapshot like async path
 
         # Find best matching rule
         try:
@@ -348,7 +349,7 @@ class BaseShieldEngine:
             # PII detection on args (only for BLOCK to enrich the message)
             pii_matches = []
             try:
-                pii_matches = self._pii.scan_dict(args)
+                pii_matches = pii_detector.scan_dict(args)
             except Exception as e:
                 logger.warning("PII detection error (fail-open): %s", e)
             # Taint session with detected PII types
@@ -363,7 +364,7 @@ class BaseShieldEngine:
             )
         elif rule.then == Verdict.REDACT:
             # redact_dict scans for PII internally — no need for a separate scan
-            redacted, pii_matches = self._pii.redact_dict(args)
+            redacted, pii_matches = pii_detector.redact_dict(args)
             for pm in pii_matches:
                 self._session_mgr.add_taint(session_id, pm.pii_type)
             result = self._verdict_builder.redact(
@@ -573,6 +574,10 @@ class BaseShieldEngine:
         self, result: ShieldResult, session_id: str, tool_name: str, latency_ms: float, args: dict
     ) -> ShieldResult:
         """Apply audit-mode override, session update, and trace after a check."""
+        # Issue #201: Proactive GC — clean stale approval meta on every check
+        if self._approval_meta:
+            with self._lock:
+                self._cleanup_approval_meta()
         # In AUDIT mode, always allow but record the would-be verdict
         # Exception: kill switch and honeypots override even AUDIT mode
         if (

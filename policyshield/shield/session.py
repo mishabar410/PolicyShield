@@ -221,6 +221,7 @@ class SessionManager:
         expired = [sid for sid, s in self._sessions.items() if self._is_expired(s)]
         for sid in expired:
             del self._sessions[sid]
+            self._backend.delete(sid)  # Issue #171: sync backend
 
     def _evict_oldest(self) -> None:
         """Remove the least-recently-used session. Must be called with lock held.
@@ -238,3 +239,4 @@ class SessionManager:
             ),
         )
         del self._sessions[lru_id]
+        self._backend.delete(lru_id)  # Issue #171: sync backend

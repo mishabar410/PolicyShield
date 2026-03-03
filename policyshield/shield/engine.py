@@ -19,6 +19,15 @@ class ShieldEngine(BaseShieldEngine):
     from :class:`BaseShieldEngine`.
     """
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Issue #157: Persistent thread pool to avoid per-call creation overhead
+        self._pool = concurrent.futures.ThreadPoolExecutor(max_workers=2)
+
+    def shutdown(self) -> None:
+        """Shut down the persistent thread pool."""
+        self._pool.shutdown(wait=False)
+
     def check(
         self,
         tool_name: str,
@@ -53,16 +62,15 @@ class ShieldEngine(BaseShieldEngine):
         try:
             # Issue #33: Apply timeout to sync check (matches async path)
             if self._engine_timeout and self._engine_timeout > 0:
-                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-                    future = pool.submit(
-                        self._do_check_sync,
-                        tool_name,
-                        args,
-                        session_id,
-                        sender,
-                        context,
-                    )
-                    result = future.result(timeout=self._engine_timeout)
+                future = self._pool.submit(
+                    self._do_check_sync,
+                    tool_name,
+                    args,
+                    session_id,
+                    sender,
+                    context,
+                )
+                result = future.result(timeout=self._engine_timeout)
             else:
                 result = self._do_check_sync(tool_name, args, session_id, sender, context)
         except concurrent.futures.TimeoutError:

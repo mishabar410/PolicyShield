@@ -117,7 +117,9 @@ class InMemoryBackend(ApprovalBackend):
             return {"status": "pending", "responder": None}
 
     def wait_for_response(self, request_id: str, timeout: float = 300.0) -> ApprovalResponse | None:
-        event = self._events.get(request_id)
+        # Issue #186: Read event under lock to prevent race with stop()
+        with self._lock:
+            event = self._events.get(request_id)
         if event is None:
             return None
 

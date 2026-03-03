@@ -93,3 +93,7 @@ class SlackApprovalBackend(ApprovalBackend):
 
     def health(self) -> dict[str, Any]:
         return {"healthy": True, "backend": "slack", "webhook_configured": bool(self._webhook_url)}
+
+    def stop(self) -> None:
+        """Stop the internal backend GC timer (Issue #185)."""
+        self._store.stop()
