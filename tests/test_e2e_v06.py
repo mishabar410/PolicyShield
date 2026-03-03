@@ -95,7 +95,6 @@ class TestCLICommands:
         assert "port" in self._output(r)
 
 
-
 class TestArtifactsExist:
     def test_dashboard_frontend_exists(self):
         assert (ROOT / "policyshield" / "dashboard" / "static" / "index.html").exists()
