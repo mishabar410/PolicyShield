@@ -6,6 +6,7 @@ post-checking, kill switch, reload, and constraints queries.
 
 from __future__ import annotations
 
+import asyncio
 import json
 from typing import Any
 
@@ -173,7 +174,8 @@ def create_mcp_server(engine: Any, admin_token: str | None = None) -> Any:
                 ]
 
             elif name == "constraints":
-                summary = engine.get_policy_summary()
+                # Issue #88: Use to_thread to avoid blocking event loop
+                summary = await asyncio.to_thread(engine.get_policy_summary)
                 return [TextContent(type="text", text=summary)]
 
             return [TextContent(type="text", text=json.dumps({"error": f"Unknown tool: {name}"}))]

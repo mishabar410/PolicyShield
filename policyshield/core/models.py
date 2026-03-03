@@ -83,6 +83,11 @@ class RuleConfig(BaseModel):
     message: str | None = None
     severity: Severity = Severity.LOW
     priority: int = 1
+    """Priority for rule ordering. LOWER value = HIGHER priority.
+
+    Default is 1. Rules with priority 0 take precedence over priority 1.
+    Matcher sorts rules ascending by priority (0 before 1 before 2).
+    """
     enabled: bool = True
     approval_strategy: str | None = None  # "once", "per_session", "per_rule", "per_tool"
     chain: list[dict] | None = None  # Chain conditions for multi-step rules

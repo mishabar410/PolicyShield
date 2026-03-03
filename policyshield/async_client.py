@@ -24,14 +24,25 @@ class AsyncPolicyShieldClient:
         base_url: str = "http://localhost:8000/api/v1",
         token: str | None = None,
         timeout: float = 30.0,
-        retries: int = 2,
-        backoff_factor: float = 0.5,
+        max_retries: int = 3,
+        backoff_factor: float = 1.0,
+        retries: int | None = None,  # Deprecated alias
     ) -> None:
+        # Issue #119/#135: Unify retry params with sync client
+        if retries is not None:
+            import warnings
+
+            warnings.warn(
+                "'retries' is deprecated, use 'max_retries'",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            max_retries = retries
         headers: dict[str, str] = {}
         if token:
             headers["Authorization"] = f"Bearer {token}"
         self._client = httpx.AsyncClient(base_url=base_url, headers=headers, timeout=timeout)
-        self._retries = retries
+        self._retries = max_retries
         self._backoff_factor = backoff_factor
 
     async def _request(self, method: str, path: str, **kwargs) -> httpx.Response:

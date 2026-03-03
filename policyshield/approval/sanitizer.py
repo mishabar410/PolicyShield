@@ -15,16 +15,21 @@ _SECRET_PATTERNS = [
 MAX_VALUE_LENGTH = 200
 
 
+def _sanitize_value(value: object) -> object:
+    """Recursively sanitize a single value (Issue #158)."""
+    if isinstance(value, dict):
+        return {k: _sanitize_value(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return type(value)(_sanitize_value(item) for item in value)
+
+    v_str = str(value)
+    for pattern, replacement in _SECRET_PATTERNS:
+        v_str = pattern.sub(replacement, v_str)
+    if len(v_str) > MAX_VALUE_LENGTH:
+        v_str = v_str[:MAX_VALUE_LENGTH] + "… (truncated)"
+    return v_str
+
+
 def sanitize_args(args: dict) -> dict:
-    """Mask sensitive values and truncate long strings."""
-    sanitized = {}
-    for k, v in args.items():
-        v_str = str(v)
-        # Redact known secret patterns
-        for pattern, replacement in _SECRET_PATTERNS:
-            v_str = pattern.sub(replacement, v_str)
-        # Truncate
-        if len(v_str) > MAX_VALUE_LENGTH:
-            v_str = v_str[:MAX_VALUE_LENGTH] + "… (truncated)"
-        sanitized[k] = v_str
-    return sanitized
+    """Mask sensitive values and truncate long strings (recursive)."""
+    return {k: _sanitize_value(v) for k, v in args.items()}

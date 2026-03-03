@@ -22,6 +22,8 @@ class CompiledRule:
     arg_patterns: list[tuple[str, str, re.Pattern, str]] = field(default_factory=list)
     sender_pattern: re.Pattern | None = None
     context_conditions: dict | None = None
+    # Issue #24: Pre-compiled chain conditions
+    compiled_chain: list[ChainCondition] | None = None
 
     @classmethod
     def from_rule(cls, rule: RuleConfig) -> CompiledRule:
@@ -103,6 +105,11 @@ class CompiledRule:
         ctx = when.get("context")
         if ctx and isinstance(ctx, dict):
             compiled.context_conditions = ctx
+
+        # Issue #24: Pre-compile chain conditions
+        chain = rule.chain
+        if chain:
+            compiled.compiled_chain = [ChainCondition(**step) for step in chain]
 
         return compiled
 
@@ -292,21 +299,21 @@ class MatcherEngine:
                 return False
 
         # Check chain conditions
-        if compiled.rule.chain and not self._check_chain(compiled.rule.chain, event_buffer):
+        if compiled.compiled_chain and not self._check_chain(compiled.compiled_chain, event_buffer):
             return False
 
         return True
 
     def _check_chain(
         self,
-        chain: list[dict],
+        chain: list[ChainCondition],
         event_buffer: Any,
     ) -> bool:
-        """Check whether all chain prerequisites are satified in the event buffer."""
+        """Check whether all chain prerequisites are satisfied in the event buffer."""
         if event_buffer is None:
             return False
-        for step in chain:
-            cond = ChainCondition(**step)
+        # Issue #24: Use pre-compiled ChainCondition objects
+        for cond in chain:
             matches = event_buffer.find_recent(  # type: ignore[union-attr]
                 cond.tool,
                 within_seconds=cond.within_seconds,

@@ -16,6 +16,17 @@ from policyshield.core.models import Verdict
 logger = logging.getLogger(__name__)
 
 
+def _stable_default(obj: Any) -> Any:
+    """Deterministic serialization for non-JSON types (Issue #139)."""
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    if isinstance(obj, (set, frozenset)):
+        return sorted(obj, key=str)
+    if hasattr(obj, "__dict__"):
+        return {k: v for k, v in sorted(obj.__dict__.items())}
+    return repr(obj)  # More stable than str()
+
+
 def compute_args_hash(args: dict) -> str:
     """Compute a SHA-256 hash of arguments for privacy mode.
 
@@ -25,7 +36,7 @@ def compute_args_hash(args: dict) -> str:
     Returns:
         Hex string of SHA-256 hash.
     """
-    serialized = json.dumps(args, sort_keys=True, default=str)
+    serialized = json.dumps(args, sort_keys=True, default=_stable_default)
     return hashlib.sha256(serialized.encode()).hexdigest()
 
 
@@ -99,13 +110,13 @@ class TraceRecorder:
         base = self._output_dir / f"trace_{timestamp}.jsonl"
         if not base.exists():
             return base
-        # Append counter to avoid collisions during rapid rotation
-        counter = 1
-        while True:
+        # Issue #151: Append counter with upper bound to prevent infinite loop
+        max_counter = 10_000
+        for counter in range(1, max_counter + 1):
             candidate = self._output_dir / f"trace_{timestamp}_{counter}.jsonl"
             if not candidate.exists():
                 return candidate
-            counter += 1
+        raise RuntimeError(f"Cannot generate unique trace file path after {max_counter} attempts in {self._output_dir}")
 
     def record(
         self,

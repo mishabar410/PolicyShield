@@ -8,6 +8,10 @@ from enum import Enum
 
 from policyshield.approval.base import ApprovalResponse
 
+# Issue #68: Use ASCII Unit Separator to avoid key collisions
+# when session_id or rule_id contains ":".
+_SEP = "\x1f"
+
 
 class ApprovalStrategy(str, Enum):
     """How to cache approval decisions."""
@@ -87,15 +91,12 @@ class ApprovalCache:
 
             keys_to_remove = []
             for key in self._cache:
-                # PER_RULE keys are global ("rule:__global__:...") —
+                # PER_RULE keys are global ("rule\x1f__global__\x1f...") —
                 # skip when clearing a specific session
-                if key.startswith("rule:"):
+                if key.startswith(f"rule{_SEP}"):
                     continue
-                # Session-scoped keys contain the session_id after the prefix:
-                # PER_SESSION: "sess:{session_id}:{rule_id}"
-                # PER_TOOL: "tool:{session_id}:{tool_name}"
-                # Fallback: "other:{session_id}:{rule_id}:{tool_name}"
-                parts = key.split(":", 2)  # prefix:session_id:rest
+                # Session-scoped keys contain the session_id after prefix:
+                parts = key.split(_SEP, 2)  # prefix, session_id, rest
                 if len(parts) >= 2 and parts[1] == session_id:
                     keys_to_remove.append(key)
 
@@ -105,7 +106,7 @@ class ApprovalCache:
     def clear_global(self) -> None:
         """Clear all global (PER_RULE) cached approvals."""
         with self._lock:
-            keys_to_remove = [k for k in self._cache if k.startswith("rule:")]
+            keys_to_remove = [k for k in self._cache if k.startswith(f"rule{_SEP}")]
             for k in keys_to_remove:
                 del self._cache[k]
 
@@ -118,15 +119,15 @@ class ApprovalCache:
     ) -> str:
         """Generate cache key based on strategy (prefixed to avoid collisions)."""
         if strategy == ApprovalStrategy.PER_SESSION:
-            return f"sess:{session_id}:{rule_id}"
+            return f"sess{_SEP}{session_id}{_SEP}{rule_id}"
         elif strategy == ApprovalStrategy.PER_RULE:
-            return f"rule:__global__:{rule_id}"
+            return f"rule{_SEP}__global__{_SEP}{rule_id}"
         elif strategy == ApprovalStrategy.PER_TOOL:
-            return f"tool:{session_id}:{tool_name}"
+            return f"tool{_SEP}{session_id}{_SEP}{tool_name}"
         else:
             # ONCE is short-circuited in get()/put(), so this branch is only
             # reachable if a new strategy is added without updating this method.
-            return f"other:{session_id}:{rule_id}:{tool_name}"
+            return f"other{_SEP}{session_id}{_SEP}{rule_id}{_SEP}{tool_name}"
 
     def _evict_if_needed(self) -> None:
         """Remove oldest quarter of entries when cache exceeds max_size.

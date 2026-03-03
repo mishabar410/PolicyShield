@@ -68,7 +68,17 @@ class InputSanitizer:
         warnings: list[str] = []
         was_modified = False
 
-        raw_str = _flatten_to_string(args)
+        # Issue #53: Early size guard — reject extremely large payloads
+        _max_total = max(self._config.max_string_length * self._config.max_total_keys, 1_000_000)
+        raw_str = _flatten_to_string(args, max_size=_max_total)
+        if len(raw_str) > _max_total:
+            return SanitizeResult(
+                sanitized_args=args,
+                warnings=[f"Total flattened payload exceeds {_max_total} chars"],
+                was_modified=False,
+                rejected=True,
+                rejection_reason="Payload too large after flattening",
+            )
 
         # 1) Built-in detectors run FIRST (defence-in-depth)
         if self._detectors:

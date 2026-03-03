@@ -95,6 +95,10 @@ class WebhookApprovalBackend(ApprovalBackend):
         self._responses: OrderedDict[str, ApprovalResponse] = OrderedDict()
         self._max_entries: int = 10_000
 
+        # Issue #55: Circuit breaker for webhook failures
+        self._consecutive_failures = 0
+        self._max_consecutive_failures = 5
+
     # ── ABC implementation ───────────────────────────────────────────
 
     def submit(self, request: ApprovalRequest) -> None:
@@ -199,6 +203,18 @@ class WebhookApprovalBackend(ApprovalBackend):
 
     def _sync_request(self, request: ApprovalRequest) -> ApprovalResponse:
         """Send POST and expect immediate JSON answer."""
+        # Issue #55: Circuit breaker — short-circuit if too many failures
+        if self._consecutive_failures >= self._max_consecutive_failures:
+            logger.warning(
+                "Webhook circuit breaker open (%d failures) — auto-denying",
+                self._consecutive_failures,
+            )
+            return ApprovalResponse(
+                request_id=request.request_id,
+                approved=False,
+                comment=f"webhook circuit breaker open ({self._consecutive_failures} consecutive failures)",
+            )
+
         payload = self._build_payload(request)
         body = json.dumps(payload).encode()
         headers = self._build_headers(body)
@@ -207,6 +223,7 @@ class WebhookApprovalBackend(ApprovalBackend):
             resp = self._client.post(self._url, content=body, headers=headers)
 
             if resp.status_code >= 400:
+                self._consecutive_failures += 1
                 return ApprovalResponse(
                     request_id=request.request_id,
                     approved=False,
@@ -214,18 +231,21 @@ class WebhookApprovalBackend(ApprovalBackend):
                 )
 
             data = resp.json()
+            self._consecutive_failures = 0  # Reset on success
             return ApprovalResponse(
                 request_id=request.request_id,
                 approved=bool(data.get("approved", False)),
                 comment=data.get("reason", ""),
             )
         except httpx.TimeoutException:
+            self._consecutive_failures += 1
             return ApprovalResponse(
                 request_id=request.request_id,
                 approved=False,
                 comment="webhook timeout",
             )
         except Exception as e:
+            self._consecutive_failures += 1
             logger.warning("Webhook request failed: %s", e)
             return ApprovalResponse(
                 request_id=request.request_id,

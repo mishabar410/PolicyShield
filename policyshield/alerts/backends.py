@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-import json
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+
+import httpx
 
 from policyshield.alerts import Alert
 
@@ -43,15 +44,13 @@ class WebhookBackend(AlertBackend):
         self._url = url
         self._headers = headers or {"Content-Type": "application/json"}
         self._timeout = timeout
+        # Issue #159: Use httpx instead of blocking urllib
+        self._client = httpx.Client(timeout=timeout)
 
     def send(self, alert: Alert) -> bool:
-        import urllib.request
-
-        payload = json.dumps(alert.to_dict()).encode()
-        req = urllib.request.Request(self._url, data=payload, headers=self._headers, method="POST")
         try:
-            with urllib.request.urlopen(req, timeout=self._timeout) as resp:
-                return 200 <= resp.status < 300
+            resp = self._client.post(self._url, json=alert.to_dict(), headers=self._headers)
+            return 200 <= resp.status_code < 300
         except Exception as e:
             logger.error("Webhook send failed: %s", e)
             return False
@@ -63,10 +62,10 @@ class SlackBackend(AlertBackend):
     def __init__(self, webhook_url: str, channel: str | None = None) -> None:
         self._webhook_url = webhook_url
         self._channel = channel
+        # Issue #159: Use httpx instead of blocking urllib
+        self._client = httpx.Client(timeout=10)
 
     def send(self, alert: Alert) -> bool:
-        import urllib.request
-
         icon = {"CRITICAL": ":rotating_light:", "WARNING": ":warning:", "INFO": ":information_source:"}.get(
             alert.severity.value, ":bell:"
         )
@@ -76,13 +75,9 @@ class SlackBackend(AlertBackend):
         if self._channel:
             payload["channel"] = self._channel
 
-        data = json.dumps(payload).encode()
-        req = urllib.request.Request(
-            self._webhook_url, data=data, headers={"Content-Type": "application/json"}, method="POST"
-        )
         try:
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                return 200 <= resp.status < 300
+            resp = self._client.post(self._webhook_url, json=payload)
+            return 200 <= resp.status_code < 300
         except Exception as e:
             logger.error("Slack send failed: %s", e)
             return False
@@ -94,18 +89,16 @@ class TelegramBackend(AlertBackend):
     def __init__(self, bot_token: str, chat_id: str) -> None:
         self._bot_token = bot_token
         self._chat_id = chat_id
+        # Issue #159: Use httpx instead of blocking urllib
+        self._client = httpx.Client(timeout=10)
 
     def send(self, alert: Alert) -> bool:
-        import urllib.parse
-        import urllib.request
-
         icon = {"CRITICAL": "🚨", "WARNING": "⚠️", "INFO": "ℹ️"}.get(alert.severity.value, "📌")
         text = f"{icon} [{alert.severity.value}] {alert.rule_name}\n{alert.message}"
         url = f"https://api.telegram.org/bot{self._bot_token}/sendMessage"
-        params = urllib.parse.urlencode({"chat_id": self._chat_id, "text": text})
         try:
-            with urllib.request.urlopen(f"{url}?{params}", timeout=10) as resp:
-                return 200 <= resp.status < 300
+            resp = self._client.post(url, json={"chat_id": self._chat_id, "text": text})
+            return 200 <= resp.status_code < 300
         except Exception as e:
             logger.error("Telegram send failed: %s", e)
             return False

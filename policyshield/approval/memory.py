@@ -171,6 +171,18 @@ class InMemoryBackend(ApprovalBackend):
         with self._lock:
             return list(self._requests.values())
 
+    def health(self) -> dict:
+        """Return health status for readiness probe (Issue #23)."""
+        with self._lock:
+            return {
+                "healthy": not self._stopped,
+                "latency_ms": 0,
+                "error": None,
+                "backend": "inmemory",
+                "pending_requests": len(self._requests),
+                "total_responses": len(self._responses),
+            }
+
     def stop(self) -> None:
         """Clean up all pending state and stop GC timer (called during shutdown)."""
         self._stopped = True  # Set BEFORE cancel to prevent reschedule

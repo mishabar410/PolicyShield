@@ -63,17 +63,19 @@ class EventRingBuffer:
         # Snapshot under lock, filter outside
         with self._lock:
             events = list(self._buffer)
+        # Issue #95/#118: Iterate backward for O(k) early exit
         results = []
-        for event in events:
+        for event in reversed(events):
+            if within_seconds is not None:
+                age = (now - event.timestamp).total_seconds()
+                if age > within_seconds:
+                    break  # All older events are also beyond cutoff
             if event.tool != tool:
                 continue
             if verdict is not None and event.verdict != verdict:
                 continue
-            if within_seconds is not None:
-                age = (now - event.timestamp).total_seconds()
-                if age > within_seconds:
-                    continue
             results.append(event)
+        results.reverse()  # Restore chronological order (oldest first)
         return results
 
     def has_recent(

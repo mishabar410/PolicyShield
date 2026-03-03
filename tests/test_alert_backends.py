@@ -45,17 +45,17 @@ class TestWebhookBackend:
         backend = WebhookBackend(url="http://example.com/webhook")
         alert = _make_alert()
         mock_resp = MagicMock()
-        mock_resp.status = 200
-        mock_resp.__enter__ = MagicMock(return_value=mock_resp)
-        mock_resp.__exit__ = MagicMock(return_value=False)
-        with patch("urllib.request.urlopen", return_value=mock_resp):
-            assert backend.send(alert) is True
+        mock_resp.status_code = 200
+        backend._client = MagicMock()
+        backend._client.post.return_value = mock_resp
+        assert backend.send(alert) is True
 
     def test_send_failure(self):
         backend = WebhookBackend(url="http://example.com/webhook")
         alert = _make_alert()
-        with patch("urllib.request.urlopen", side_effect=Exception("Connection refused")):
-            assert backend.send(alert) is False
+        backend._client = MagicMock()
+        backend._client.post.side_effect = Exception("Connection refused")
+        assert backend.send(alert) is False
 
 
 class TestSlackBackend:
@@ -63,17 +63,17 @@ class TestSlackBackend:
         backend = SlackBackend(webhook_url="https://hooks.slack.com/test", channel="#alerts")
         alert = _make_alert()
         mock_resp = MagicMock()
-        mock_resp.status = 200
-        mock_resp.__enter__ = MagicMock(return_value=mock_resp)
-        mock_resp.__exit__ = MagicMock(return_value=False)
-        with patch("urllib.request.urlopen", return_value=mock_resp):
-            assert backend.send(alert) is True
+        mock_resp.status_code = 200
+        backend._client = MagicMock()
+        backend._client.post.return_value = mock_resp
+        assert backend.send(alert) is True
 
     def test_send_failure(self):
         backend = SlackBackend(webhook_url="https://hooks.slack.com/test")
         alert = _make_alert()
-        with patch("urllib.request.urlopen", side_effect=Exception("Timeout")):
-            assert backend.send(alert) is False
+        backend._client = MagicMock()
+        backend._client.post.side_effect = Exception("Timeout")
+        assert backend.send(alert) is False
 
 
 class TestTelegramBackend:
@@ -81,17 +81,17 @@ class TestTelegramBackend:
         backend = TelegramBackend(bot_token="123:ABC", chat_id="456")
         alert = _make_alert()
         mock_resp = MagicMock()
-        mock_resp.status = 200
-        mock_resp.__enter__ = MagicMock(return_value=mock_resp)
-        mock_resp.__exit__ = MagicMock(return_value=False)
-        with patch("urllib.request.urlopen", return_value=mock_resp):
-            assert backend.send(alert) is True
+        mock_resp.status_code = 200
+        backend._client = MagicMock()
+        backend._client.post.return_value = mock_resp
+        assert backend.send(alert) is True
 
     def test_send_failure(self):
         backend = TelegramBackend(bot_token="123:ABC", chat_id="456")
         alert = _make_alert()
-        with patch("urllib.request.urlopen", side_effect=Exception("Timeout")):
-            assert backend.send(alert) is False
+        backend._client = MagicMock()
+        backend._client.post.side_effect = Exception("Timeout")
+        assert backend.send(alert) is False
 
 
 class TestAlertDispatcher:

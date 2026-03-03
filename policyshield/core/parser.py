@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 import yaml
@@ -9,8 +10,10 @@ import yaml
 from policyshield.core.exceptions import PolicyShieldParseError
 from policyshield.core.models import OutputRule, RuleConfig, RuleSet, TaintChainConfig, Verdict
 
+logger = logging.getLogger("policyshield")
+
 # Valid keys for the 'when' clause — anything else is likely a typo
-_VALID_WHEN_KEYS = {"tool", "args", "args_match", "sender", "session", "chain"}
+_VALID_WHEN_KEYS = {"tool", "args", "args_match", "sender", "session", "chain", "context"}
 
 
 def parse_sanitizer_config(data: dict) -> dict | None:
@@ -161,6 +164,7 @@ def _load_rules_from_dir(dir_path: Path) -> RuleSet:
 
     Each file is parsed exactly once. Rules, taint_chain, honeypots,
     and output_rules are collected from all files in a single pass.
+    Cross-file extends are resolved after collecting all raw rules.
     """
     yaml_files = sorted(
         list(dir_path.glob("*.yaml")) + list(dir_path.glob("*.yml")),
@@ -169,7 +173,7 @@ def _load_rules_from_dir(dir_path: Path) -> RuleSet:
     if not yaml_files:
         raise PolicyShieldParseError(f"No YAML files found in {dir_path}")
 
-    all_rules: list[RuleConfig] = []
+    all_raw_rules: list[dict] = []
     all_output_rules: list[OutputRule] = []
     shield_name = ""
     version = 1
@@ -193,9 +197,9 @@ def _load_rules_from_dir(dir_path: Path) -> RuleSet:
             except ValueError:
                 raise PolicyShieldParseError(f"Invalid default_verdict '{dv}'", str(f))
 
-        # Rules
+        # Collect raw rules for cross-file extends resolution (Issue #35)
         for raw in data.get("rules", []):
-            all_rules.append(_parse_rule(raw, str(f)))
+            all_raw_rules.append(raw)
 
         # Taint chain (last file wins)
         tc_data = data.get("taint_chain")
@@ -210,6 +214,12 @@ def _load_rules_from_dir(dir_path: Path) -> RuleSet:
         # Output rules
         for raw_or in data.get("output_rules", []):
             all_output_rules.append(_parse_output_rule(raw_or, str(f)))
+
+    # Resolve extends across ALL files (Issue #35)
+    all_raw_rules = _resolve_extends(all_raw_rules)
+
+    # Parse resolved rules
+    all_rules = [_parse_rule(raw, str(dir_path)) for raw in all_raw_rules]
 
     if not shield_name:
         shield_name = dir_path.name
@@ -296,6 +306,18 @@ def _resolve_extends(rules: list[dict]) -> list[dict]:
                 merged = _deep_merge(parent, rule)
                 merged["id"] = rule["id"]  # Keep child's ID
                 merged.pop("extends", None)
+                # Issue #36: Don't inherit priority from parent — let child
+                # use its own or fall back to the default.
+                if "priority" not in rule:
+                    merged.pop("priority", None)
+                # Issue #22: Warn if child inherits enabled=false from parent
+                if parent.get("enabled") is False and "enabled" not in rule:
+                    logger.warning(
+                        "Rule '%s' inherits enabled=false from parent '%s'. "
+                        "Set 'enabled: true' explicitly to override.",
+                        rule.get("id", "?"),
+                        parent.get("id", "?"),
+                    )
                 resolved.append(merged)
                 rules_by_id[rule["id"]] = merged  # Update for downstream children
                 changed = True
@@ -407,9 +429,7 @@ def _validated_when(when: dict, rule_id: str, file_path: str | None) -> dict:
         return when
     unknown = set(when.keys()) - _VALID_WHEN_KEYS
     if unknown:
-        import logging
-
-        logging.getLogger("policyshield").warning(
+        logger.warning(
             "Unknown 'when' keys %s in rule '%s'%s — ignored",
             unknown,
             rule_id,

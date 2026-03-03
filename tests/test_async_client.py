@@ -31,8 +31,8 @@ def _mock_response(status_code: int = 200, json_data: dict | None = None) -> htt
 @pytest.mark.asyncio
 async def test_init_defaults():
     async with AsyncPolicyShieldClient() as client:
-        assert client._retries == 2
-        assert client._backoff_factor == 0.5
+        assert client._retries == 3
+        assert client._backoff_factor == 1.0
 
 
 @pytest.mark.asyncio

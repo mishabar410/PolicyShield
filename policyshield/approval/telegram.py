@@ -162,8 +162,14 @@ class TelegramApprovalBackend(ApprovalBackend):
         """Stop the polling thread."""
         self._stop_event.set()
         if self._poll_thread and self._poll_thread.is_alive():
-            self._poll_thread.join(timeout=5.0)
-        self._client.close()
+            self._poll_thread.join(timeout=10.0)
+            if self._poll_thread.is_alive():
+                logger.warning("Telegram poll thread did not stop within timeout")
+        # Issue #56: Safe to close — poll thread is guaranteed stopped or timed out
+        try:
+            self._client.close()
+        except Exception:
+            pass  # Best-effort cleanup
 
     def _ensure_polling(self) -> None:
         if self._poll_thread is not None and self._poll_thread.is_alive():
@@ -204,8 +210,10 @@ class TelegramApprovalBackend(ApprovalBackend):
                 continue
 
             action, request_id = cb_data.split(":", 1)
-            if request_id not in self._pending and request_id not in self._events:
-                continue
+            # Issue #56: Check under lock to avoid race with respond()
+            with self._lock:
+                if request_id not in self._pending and request_id not in self._events:
+                    continue
 
             approved = action == "approve"
             responder = cb.get("from", {}).get("username", "telegram")

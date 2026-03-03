@@ -71,7 +71,6 @@ class TestMCPProxyCreation:
         proxy = MCPProxy(engine=mock_engine, upstream_command=["node", "server.js"])
         assert proxy.engine is mock_engine
         assert proxy.upstream_command == ["node", "server.js"]
-        assert proxy._upstream_proc is None
 
     @pytest.mark.asyncio
     async def test_mcpproxy_check_block(self, mock_engine):

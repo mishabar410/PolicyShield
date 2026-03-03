@@ -12,6 +12,10 @@ from policyshield.core.models import PIIMatch, PIIType
 # Maximum string length to scan for PII (prevents ReDoS on huge inputs)
 MAX_SCAN_LENGTH = 50_000
 
+# Issue #52/#70: Limits to prevent unbounded match accumulation
+MAX_MATCHES_PER_PATTERN = 50
+MAX_TOTAL_MATCHES = 200
+
 
 @dataclass
 class PIIPattern:
@@ -254,7 +258,14 @@ class PIIDetector:
 
         matches: list[PIIMatch] = []
         for pii_pattern in self._patterns:
+            # Issue #70: Stop scanning if we've accumulated too many matches
+            if len(matches) >= MAX_TOTAL_MATCHES:
+                break
+            per_pattern_count = 0
             for m in pii_pattern.pattern.finditer(scan_text):
+                # Issue #52: Limit matches per pattern
+                if per_pattern_count >= MAX_MATCHES_PER_PATTERN:
+                    break
                 matched_text = m.group()
                 # Extra validation for credit cards via Luhn
                 if pii_pattern.pii_type == PIIType.CREDIT_CARD:
@@ -278,6 +289,7 @@ class PIIDetector:
                     if not _iban_check(matched_text):
                         continue
 
+                per_pattern_count += 1
                 matches.append(
                     PIIMatch(
                         pii_type=pii_pattern.pii_type,

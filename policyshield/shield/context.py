@@ -26,7 +26,11 @@ class ContextEvaluator:
     """
 
     def __init__(self, tz: str = "UTC") -> None:
-        self._tz = ZoneInfo(tz)
+        # Issue #94: Validate timezone early
+        try:
+            self._tz = ZoneInfo(tz)
+        except (KeyError, Exception) as e:
+            raise ValueError(f"Invalid timezone: {tz!r}. Must be a valid IANA timezone.") from e
 
     # ------------------------------------------------------------------
     # Public API
@@ -82,7 +86,8 @@ class ContextEvaluator:
         if negate:
             spec = spec[1:]
 
-        today = self._now().strftime("%a")  # Mon, Tue, …
+        # Issue #94: Use weekday() index for locale-independent day names
+        today = _DAYS[self._now().weekday()]  # 0=Mon, always English
 
         if "-" in spec:
             parts = spec.split("-", 1)

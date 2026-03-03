@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import json
 import logging
-import subprocess
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -31,20 +30,21 @@ except ImportError:
 
 
 class MCPProxy:
-    """Transparent MCP proxy that enforces PolicyShield rules.
+    """MCP proxy that applies PolicyShield rules to tool calls.
 
-    Forwards tool calls to an upstream MCP server after checking
-    with PolicyShield. Blocks/modifies calls as needed.
+    This is a policy-filtering proxy, NOT a transparent forwarding proxy.
+    Tool calls are checked against PolicyShield rules and either allowed
+    or blocked. The upstream_command parameter is reserved for future use
+    when actual upstream MCP process forwarding is implemented.
 
     Args:
         engine: AsyncShieldEngine instance.
-        upstream_command: Command to start the upstream MCP server.
+        upstream_command: Command to start the upstream MCP server (reserved).
     """
 
     def __init__(self, engine: Any, upstream_command: list[str]) -> None:
         self.engine = engine
         self.upstream_command = upstream_command
-        self._upstream_proc: subprocess.Popen | None = None
 
     async def check_and_forward(
         self,
@@ -77,7 +77,8 @@ class MCPProxy:
         final_args = result.modified_args if result.modified_args else arguments
 
         # Issue #75: Honestly report whether upstream was called
-        forwarded = self._upstream_proc is not None
+        # Upstream process forwarding is not yet implemented
+        forwarded = False
         return {
             "blocked": False,
             "verdict": result.verdict.value,

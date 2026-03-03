@@ -93,12 +93,21 @@ class RateLimiter:
         ```
         """
         configs = []
-        for item in data:
+        for i, item in enumerate(data):
+            # Issue #150: Validate required keys and values
+            if "max_calls" not in item:
+                raise ValueError(f"Rate limit entry #{i}: missing required key 'max_calls'")
+            max_calls = int(item["max_calls"])
+            if max_calls <= 0:
+                raise ValueError(f"Rate limit entry #{i}: max_calls must be > 0, got {max_calls}")
+            window_seconds = float(item.get("window_seconds", 60))
+            if window_seconds <= 0:
+                raise ValueError(f"Rate limit entry #{i}: window_seconds must be > 0, got {window_seconds}")
             configs.append(
                 RateLimitConfig(
                     tool=item.get("tool", "*"),
-                    max_calls=int(item["max_calls"]),
-                    window_seconds=float(item.get("window_seconds", 60)),
+                    max_calls=max_calls,
+                    window_seconds=window_seconds,
                     per_session=item.get("per_session", True),
                     message=item.get("message", "Rate limit exceeded"),
                 )

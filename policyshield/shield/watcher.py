@@ -90,7 +90,12 @@ class RuleWatcher:
             try:
                 if self._has_changes():
                     self._reload()
-                self._consecutive_failures = 0
+                    # Issue #54: Reset only on successful reload, not every poll
+                    self._consecutive_failures = 0
+                    self._last_error = None
+            except (FileNotFoundError, PermissionError) as e:
+                # Issue #25: Transient FS errors don't count as failures
+                logger.warning("Watcher transient error (not counting as failure): %s", e)
             except Exception as e:
                 self._consecutive_failures += 1
                 self._last_error = str(e)

@@ -51,7 +51,8 @@ def _rules_hash(engine: AsyncShieldEngine) -> str:
     ruleset = engine.rules
     raw = f"{ruleset.shield_name}:{ruleset.version}:{len(ruleset.rules)}"
     for r in ruleset.rules:
-        raw += f"|{r.id}:{r.then.value}"
+        # Issue #38: Include rule content in hash for modification detection
+        raw += f"|{r.id}:{r.then.value}:{r.severity}:{r.enabled}:{r.priority}:{r.when}"
     return hashlib.sha256(raw.encode()).hexdigest()[:16]
 
 

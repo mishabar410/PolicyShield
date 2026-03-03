@@ -205,16 +205,16 @@ class SessionManager:
     def _evict_oldest(self) -> None:
         """Remove the least-recently-used session. Must be called with lock held.
 
-        Evicts the session with the fewest total calls (least active),
-        falling back to oldest creation time for ties.
+        Issue #91: Evicts by oldest creation time (LRU proxy), with fewest
+        total calls as tiebreaker.
         """
         if not self._sessions:
             return
         lru_id = min(
             self._sessions,
             key=lambda sid: (
-                self._sessions[sid].total_calls,
                 self._sessions[sid].created_at,
+                self._sessions[sid].total_calls,
             ),
         )
         del self._sessions[lru_id]

@@ -13,6 +13,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
 import threading
 import time
 from dataclasses import dataclass, field
@@ -54,6 +55,17 @@ class LLMGuardConfig:
         default_factory=lambda: ["prompt_injection", "semantic_pii"],
     )
     max_arg_length: int = 2000  # truncate args in prompt to this length
+    api_key_env: str = "OPENAI_API_KEY"  # Env var fallback for api_key
+
+    def get_api_key(self) -> str | None:
+        """Get API key, preferring env var over stored value (Issue #138)."""
+        return os.environ.get(self.api_key_env) or self.api_key
+
+    def __repr__(self) -> str:
+        """Hide api_key from repr/logs (Issue #138)."""
+        return (
+            f"LLMGuardConfig(enabled={self.enabled}, model={self.model!r}, api_key='***', base_url={self.base_url!r})"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -161,7 +173,7 @@ class LLMGuard:
 
         resp = await self._http_client.post(
             f"{self._config.base_url}/chat/completions",
-            headers={"Authorization": f"Bearer {self._config.api_key}"},
+            headers={"Authorization": f"Bearer {self._config.get_api_key()}"},
             json={
                 "model": self._config.model,
                 "messages": [

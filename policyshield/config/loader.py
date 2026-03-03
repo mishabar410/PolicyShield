@@ -168,20 +168,33 @@ def _build_config(data: dict) -> PolicyShieldConfig:
     if not isinstance(rate_limits_raw, list):
         rate_limits_raw = []
 
+    # Issue #57/#89: Validate numeric config values
+    watch_interval = float(rules.get("watch_interval", 2.0))
+    if watch_interval <= 0:
+        raise ValueError(f"watch_interval must be > 0, got {watch_interval}")
+
+    batch_size = int(trace.get("batch_size", 100))
+    if batch_size < 1:
+        raise ValueError(f"trace.batch_size must be >= 1, got {batch_size}")
+
+    max_string_length = san.get("max_string_length", 10_000)
+    if max_string_length < 1:
+        raise ValueError(f"sanitizer.max_string_length must be >= 1, got {max_string_length}")
+
     return PolicyShieldConfig(
         mode=mode,
         fail_open=data.get("fail_open", True),
         rules_path=rules.get("path", "./policies/"),
         watch=rules.get("watch", False),
-        watch_interval=float(rules.get("watch_interval", 2.0)),
+        watch_interval=watch_interval,
         pii_enabled=pii.get("enabled", True),
         sanitizer_enabled=san.get("enabled", False),
-        sanitizer_max_string_length=san.get("max_string_length", 10_000),
+        sanitizer_max_string_length=max_string_length,
         sanitizer_blocked_patterns=san.get("blocked_patterns", []),
         sanitizer_builtin_detectors=san.get("builtin_detectors", []),
         trace_enabled=trace.get("enabled", True),
         trace_output_dir=trace.get("output_dir", "./traces/"),
-        trace_batch_size=int(trace.get("batch_size", 100)),
+        trace_batch_size=batch_size,
         trace_privacy_mode=trace.get("privacy_mode", False),
         otel_enabled=otel.get("enabled", False),
         otel_service_name=otel.get("service_name", "policyshield"),
@@ -386,6 +399,7 @@ def render_config(config: PolicyShieldConfig) -> str:
             "approval": {
                 "backend": config.approval_backend,
             },
+            "rate_limits": config.rate_limits,  # Issue #137
         }
     }
     return yaml.dump(d, default_flow_style=False, sort_keys=False)
