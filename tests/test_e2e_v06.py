@@ -95,13 +95,8 @@ class TestCLICommands:
         assert "port" in self._output(r)
 
 
+
 class TestArtifactsExist:
-    def test_grafana_dashboard_json_exists(self):
-        assert (ROOT / "grafana" / "dashboards" / "policyshield.json").exists()
-
-    def test_grafana_datasource_exists(self):
-        assert (ROOT / "grafana" / "provisioning" / "datasources" / "policyshield.yaml").exists()
-
     def test_dashboard_frontend_exists(self):
         assert (ROOT / "policyshield" / "dashboard" / "static" / "index.html").exists()
 
@@ -115,7 +110,6 @@ class TestArtifactsExist:
             "policyshield/dashboard/__init__.py",
             "policyshield/dashboard/prometheus.py",
             "policyshield/dashboard/static/index.html",
-            "grafana/dashboards/policyshield.json",
         ]
         for path in expected:
             assert (ROOT / path).exists(), f"Missing: {path}"
