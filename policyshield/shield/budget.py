@@ -34,7 +34,11 @@ class BudgetTracker:
     ) -> None:
         self._config = config
         self._tool_costs = {**DEFAULT_TOOL_COSTS, **(tool_costs or {})}
-        self._session_spend: dict[str, float] = {}
+        # Issue #155: Use OrderedDict with LRU eviction
+        from collections import OrderedDict
+
+        self._session_spend: OrderedDict[str, float] = OrderedDict()
+        self._max_spend_sessions = 50_000
         self._hourly_entries: list[tuple[float, float]] = []  # (timestamp, cost)
         self._lock = threading.Lock()
 
@@ -79,6 +83,10 @@ class BudgetTracker:
         cost = self.get_tool_cost(tool_name)
         with self._lock:
             self._session_spend[session_id] = self._session_spend.get(session_id, 0) + cost
+            self._session_spend.move_to_end(session_id)
+            # Issue #155: LRU eviction
+            while len(self._session_spend) > self._max_spend_sessions:
+                self._session_spend.popitem(last=False)
             self._hourly_entries.append((monotonic(), cost))
         return cost
 

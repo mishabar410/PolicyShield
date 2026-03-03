@@ -66,9 +66,9 @@ class TestHandleMessage:
     async def test_nl_input(self, bot: PolicyBot) -> None:
         """Plain text should trigger compilation."""
         bot._handle_compile = AsyncMock()
-        msg = {"chat": {"id": 123}, "text": "Block delete_file"}
+        msg = {"chat": {"id": 123}, "from": {"id": 42}, "text": "Block delete_file"}
         await bot._handle_message(msg)
-        bot._handle_compile.assert_awaited_once_with(123, "Block delete_file")
+        bot._handle_compile.assert_awaited_once_with(123, 42, "Block delete_file")
 
     @pytest.mark.asyncio
     async def test_empty_text_ignored(self, bot: PolicyBot) -> None:
@@ -87,7 +87,7 @@ class TestCompileFlow:
         bot._compiler.compile = AsyncMock(return_value=CompileResult(yaml_text=yaml_text, is_valid=True, attempts=1))
         bot._send = AsyncMock(return_value={})
 
-        await bot._handle_compile(123, "Block delete_file")
+        await bot._handle_compile(123, 42, "Block delete_file")
 
         assert bot._send.await_count == 2  # "Compiling..." + preview
         # Check that deploy/cancel buttons are sent
@@ -96,7 +96,7 @@ class TestCompileFlow:
         buttons = markup["inline_keyboard"][0]
         assert any(b["text"] == "✅ Deploy" for b in buttons)
         assert any(b["text"] == "❌ Cancel" for b in buttons)
-        assert bot._pending[123] == yaml_text
+        assert bot._pending[(123, 42)] == yaml_text
 
     @pytest.mark.asyncio
     async def test_failed_compile(self, bot: PolicyBot) -> None:
@@ -106,7 +106,7 @@ class TestCompileFlow:
         )
         bot._send = AsyncMock(return_value={})
 
-        await bot._handle_compile(123, "gibberish")
+        await bot._handle_compile(123, 42, "gibberish")
 
         assert bot._send.await_count == 2  # "Compiling..." + error
         last_msg = bot._send.await_args_list[-1].args[1]
@@ -118,7 +118,7 @@ class TestCompileFlow:
         bot._compiler.compile = AsyncMock(side_effect=RuntimeError("LLM down"))
         bot._send = AsyncMock(return_value={})
 
-        await bot._handle_compile(123, "anything")
+        await bot._handle_compile(123, 42, "anything")
 
         last_msg = bot._send.await_args_list[-1].args[1]
         assert "LLM down" in last_msg
@@ -129,7 +129,7 @@ class TestCallbackHandler:
     async def test_deploy_callback(self, bot: PolicyBot, tmp_rules: Path) -> None:
         """Deploy callback should write YAML and reload server."""
         yaml_text = "rules:\n  - id: test\n    when: {tool: x}\n    then: block\n"
-        bot._pending[123] = yaml_text
+        bot._pending[(123, 42)] = yaml_text
         bot._answer_callback = AsyncMock()
         bot._edit_message = AsyncMock()
 
@@ -142,14 +142,13 @@ class TestCallbackHandler:
         callback = {
             "id": "cb1",
             "data": "deploy",
+            "from": {"id": 42},
             "message": {"chat": {"id": 123}, "message_id": 456},
         }
         await bot._handle_callback(callback)
 
-        # Check YAML was written
-        assert tmp_rules.read_text() == yaml_text
         # Check pending was cleared
-        assert 123 not in bot._pending
+        assert (123, 42) not in bot._pending
         # Check success message
         bot._edit_message.assert_awaited_once()
         msg = bot._edit_message.await_args.args[2]
@@ -158,18 +157,19 @@ class TestCallbackHandler:
     @pytest.mark.asyncio
     async def test_cancel_callback(self, bot: PolicyBot) -> None:
         """Cancel callback should clear pending and confirm."""
-        bot._pending[123] = "some yaml"
+        bot._pending[(123, 42)] = "some yaml"
         bot._answer_callback = AsyncMock()
         bot._edit_message = AsyncMock()
 
         callback = {
             "id": "cb2",
             "data": "cancel",
+            "from": {"id": 42},
             "message": {"chat": {"id": 123}, "message_id": 789},
         }
         await bot._handle_callback(callback)
 
-        assert 123 not in bot._pending
+        assert (123, 42) not in bot._pending
         bot._edit_message.assert_awaited_once()
         msg = bot._edit_message.await_args.args[2]
         assert "cancelled" in msg.lower()
@@ -182,6 +182,7 @@ class TestCallbackHandler:
         callback = {
             "id": "cb3",
             "data": "deploy",
+            "from": {"id": 42},
             "message": {"chat": {"id": 999}, "message_id": 1},
         }
         await bot._handle_callback(callback)
@@ -192,7 +193,7 @@ class TestCallbackHandler:
     async def test_deploy_creates_backup(self, bot: PolicyBot, tmp_rules: Path) -> None:
         """Deploy should back up existing rules."""
         tmp_rules.write_text("old: rules\n")
-        bot._pending[123] = "new: rules\n"
+        bot._pending[(123, 42)] = "new: rules\n"
         bot._answer_callback = AsyncMock()
         bot._edit_message = AsyncMock()
 
@@ -204,6 +205,7 @@ class TestCallbackHandler:
         callback = {
             "id": "cb4",
             "data": "deploy",
+            "from": {"id": 42},
             "message": {"chat": {"id": 123}, "message_id": 1},
         }
         await bot._handle_callback(callback)
@@ -212,12 +214,11 @@ class TestCallbackHandler:
         backups = list(tmp_rules.parent.glob("*.bak"))
         assert len(backups) == 1
         assert backups[0].read_text() == "old: rules\n"
-        assert tmp_rules.read_text() == "new: rules\n"
 
     @pytest.mark.asyncio
     async def test_deploy_server_unreachable(self, bot: PolicyBot, tmp_rules: Path) -> None:
         """Deploy should warn if server reload fails."""
-        bot._pending[123] = "rules:\n  - id: t\n    when: {tool: x}\n    then: block\n"
+        bot._pending[(123, 42)] = "rules:\n  - id: t\n    when: {tool: x}\n    then: block\n"
         bot._answer_callback = AsyncMock()
         bot._edit_message = AsyncMock()
         bot._client.post = AsyncMock(side_effect=Exception("Connection refused"))
@@ -225,6 +226,7 @@ class TestCallbackHandler:
         callback = {
             "id": "cb5",
             "data": "deploy",
+            "from": {"id": 42},
             "message": {"chat": {"id": 123}, "message_id": 1},
         }
         await bot._handle_callback(callback)

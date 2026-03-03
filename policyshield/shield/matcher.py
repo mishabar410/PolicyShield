@@ -19,7 +19,7 @@ class CompiledRule:
 
     rule: RuleConfig
     tool_pattern: re.Pattern | None = None
-    arg_patterns: list[tuple[str, str, re.Pattern]] = field(default_factory=list)
+    arg_patterns: list[tuple[str, str, re.Pattern, str]] = field(default_factory=list)
     sender_pattern: re.Pattern | None = None
     context_conditions: dict | None = None
 
@@ -84,7 +84,7 @@ class CompiledRule:
                         f"Regex pattern for field '{field_name}' in rule "
                         f"'{rule.id}' exceeds {MAX_PATTERN_LENGTH} characters"
                     )
-                compiled.arg_patterns.append((field_name, predicate, re.compile(value)))
+                compiled.arg_patterns.append((field_name, predicate, re.compile(value), value))
 
         # Compile sender pattern
         sender = when.get("sender")
@@ -228,7 +228,7 @@ class MatcherEngine:
             return False
 
         # Check arguments
-        for field_name, predicate, pattern in compiled.arg_patterns:
+        for field_name, predicate, pattern, raw_value in compiled.arg_patterns:
             arg_value = args.get(field_name)
             if arg_value is None:
                 return False
@@ -237,13 +237,13 @@ class MatcherEngine:
                 if not pattern.search(arg_str):
                     return False
             elif predicate == "eq":
-                if arg_str != pattern.pattern:
+                if arg_str != raw_value:
                     return False
             elif predicate == "contains":
-                if pattern.pattern not in arg_str:
+                if raw_value not in arg_str:
                     return False
             elif predicate == "not_contains":
-                if pattern.pattern in arg_str:
+                if raw_value in arg_str:
                     return False
             else:
                 # Unknown predicate — treat as regex

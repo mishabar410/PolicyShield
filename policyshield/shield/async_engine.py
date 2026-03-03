@@ -272,6 +272,7 @@ class AsyncShieldEngine(BaseShieldEngine):
                     session_state=session_state,
                     sender=sender,
                     event_buffer=event_buffer,
+                    context=context,
                 )
                 shadow_verdict = shadow_match.rule.then if shadow_match else Verdict.ALLOW
                 if shadow_match and shadow_match.rule.then != result.verdict:
@@ -312,6 +313,17 @@ class AsyncShieldEngine(BaseShieldEngine):
                 rule_id=rule.id,
                 message="No approval backend configured",
             )
+
+        # Circuit breaker — fail fast if backend is unhealthy (Issue #3: parity with sync)
+        if hasattr(self._approval_backend, "_circuit_breaker"):
+            cb = self._approval_backend._circuit_breaker
+            if not cb.is_available():
+                verdict = Verdict.BLOCK if cb.fallback_verdict == "BLOCK" else Verdict.ALLOW
+                return ShieldResult(
+                    verdict=verdict,
+                    rule_id=rule.id,
+                    message=f"Approval backend circuit breaker OPEN (fallback: {cb.fallback_verdict})",
+                )
 
         # Determine strategy
         strategy = None

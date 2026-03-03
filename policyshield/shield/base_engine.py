@@ -301,6 +301,21 @@ class BaseShieldEngine:
             )
 
         if match is None:
+            # LLM Guard — check for threats even when no rule matches (Issue #1)
+            if self._llm_guard is not None and getattr(self._llm_guard, "enabled", False):
+                try:
+                    import asyncio
+
+                    guard_result = asyncio.run(self._llm_guard.analyze(tool_name, args))
+                    if guard_result.is_threat and guard_result.risk_score >= self._llm_guard.risk_threshold:
+                        return ShieldResult(
+                            verdict=Verdict.BLOCK,
+                            rule_id="__llm_guard__",
+                            message=f"LLM Guard: {guard_result.explanation}",
+                        )
+                except Exception as e:
+                    logger.warning("LLM Guard error: %s", e)
+
             default = rule_set.default_verdict
             if default == Verdict.BLOCK:
                 return ShieldResult(
@@ -359,6 +374,7 @@ class BaseShieldEngine:
                     session_state=session_state,
                     sender=sender,
                     event_buffer=event_buffer,
+                    context=context,
                 )
                 shadow_verdict = shadow_match.rule.then if shadow_match else Verdict.ALLOW
                 if shadow_match and shadow_match.rule.then != result.verdict:

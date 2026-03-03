@@ -119,8 +119,11 @@ class LLMGuard:
         cache_key = self._make_cache_key(tool_name, args)
         cached = self._get_cached(cache_key)
         if cached is not None:
-            cached.cached = True
-            return cached
+            import copy
+
+            result_copy = copy.copy(cached)
+            result_copy.cached = True
+            return result_copy
 
         start = time.monotonic()
         try:

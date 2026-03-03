@@ -86,6 +86,9 @@ class WebhookApprovalBackend(ApprovalBackend):
         self._poll_timeout = poll_timeout
         self._extra_headers = headers or {}
 
+        # Persistent client to avoid connection leak (Issue #43)
+        self._client = httpx.Client(timeout=timeout)
+
         # Internal storage to satisfy ApprovalBackend ABC
         self._requests: dict[str, ApprovalRequest] = {}
         self._responses: dict[str, ApprovalResponse] = {}
@@ -94,14 +97,20 @@ class WebhookApprovalBackend(ApprovalBackend):
 
     def submit(self, request: ApprovalRequest) -> None:
         """Submit an approval request via webhook."""
+        import threading
+
         self._requests[request.request_id] = request
 
         if self._mode == "sync":
             resp = self._sync_request(request)
+            self._responses[request.request_id] = resp
         else:
-            resp = self._poll_request(request)
+            # Issue #16: poll mode runs in background thread to avoid blocking
+            def _poll_bg() -> None:
+                resp = self._poll_request(request)
+                self._responses[request.request_id] = resp
 
-        self._responses[request.request_id] = resp
+            threading.Thread(target=_poll_bg, daemon=True).start()
 
     def wait_for_response(
         self,
@@ -136,8 +145,7 @@ class WebhookApprovalBackend(ApprovalBackend):
 
         start = monotonic()
         try:
-            with httpx.Client(timeout=5.0) as client:
-                resp = client.head(self._url)
+            resp = self._client.head(self._url)
             latency = (monotonic() - start) * 1000
             healthy = resp.status_code < 500
             return {
@@ -148,6 +156,16 @@ class WebhookApprovalBackend(ApprovalBackend):
         except Exception as e:
             latency = (monotonic() - start) * 1000
             return {"healthy": False, "latency_ms": round(latency, 1), "error": str(e)}
+
+    def close(self) -> None:
+        """Close the persistent HTTP client."""
+        self._client.close()
+
+    def __enter__(self) -> WebhookApprovalBackend:
+        return self
+
+    def __exit__(self, *args: Any) -> None:
+        self.close()
 
     # ── Internal helpers ─────────────────────────────────────────────
 
@@ -178,8 +196,7 @@ class WebhookApprovalBackend(ApprovalBackend):
         headers = self._build_headers(body)
 
         try:
-            with httpx.Client(timeout=self._timeout) as client:
-                resp = client.post(self._url, content=body, headers=headers)
+            resp = self._client.post(self._url, content=body, headers=headers)
 
             if resp.status_code >= 400:
                 return ApprovalResponse(
@@ -215,8 +232,7 @@ class WebhookApprovalBackend(ApprovalBackend):
         headers = self._build_headers(body)
 
         try:
-            with httpx.Client(timeout=self._timeout) as client:
-                resp = client.post(self._url, content=body, headers=headers)
+            resp = self._client.post(self._url, content=body, headers=headers)
 
             if resp.status_code >= 400:
                 return ApprovalResponse(
@@ -245,8 +261,7 @@ class WebhookApprovalBackend(ApprovalBackend):
         deadline = time.monotonic() + self._poll_timeout
         while time.monotonic() < deadline:
             try:
-                with httpx.Client(timeout=self._timeout) as client:
-                    poll_resp = client.get(poll_url, headers=self._extra_headers)
+                poll_resp = self._client.get(poll_url, headers=self._extra_headers)
                 poll_data = poll_resp.json()
                 status = poll_data.get("status", "pending")
 

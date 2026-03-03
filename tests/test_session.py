@@ -100,3 +100,22 @@ class TestSessionManager:
             session = manager.get(f"s{i}")
             assert session is not None
             assert session.total_calls == 100
+
+    def test_record_call_syncs_to_backend(self):
+        """Issue #78: record_call writes through to backend."""
+        manager = SessionManager(ttl_seconds=3600, max_sessions=10)
+        session = manager.record_call("sync-test", "exec")
+        assert session.total_calls == 1
+        # Backend should have data too
+        stored = manager._backend.get("sync-test")
+        assert stored is not None
+        assert stored["total_calls"] == 1
+
+    def test_add_taint_syncs_to_backend(self):
+        """Issue #78: add_taint writes through to backend."""
+        manager = SessionManager(ttl_seconds=3600, max_sessions=10)
+        manager.get_or_create("taint-test")
+        manager.add_taint("taint-test", PIIType.EMAIL)
+        stored = manager._backend.get("taint-test")
+        assert stored is not None
+        assert "EMAIL" in stored["taints"]

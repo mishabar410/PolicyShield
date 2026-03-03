@@ -222,13 +222,14 @@ class TestCompileAndApplyEndpoint:
         assert data["is_valid"] is True
         assert data["rules_count"] >= 1
 
-        # Verify the old conflicting rule was removed
+        # Verify new rule was added and existing rules with different IDs are preserved
         import yaml
 
         saved = yaml.safe_load(tmp.read_text(encoding="utf-8"))
         rule_ids = [r["id"] for r in saved["rules"]]
         assert "allow-exec" in rule_ids
-        assert "block-exec" not in rule_ids  # conflicting rule removed
+        # Issue #29: block-exec is preserved (different ID, should not be removed)
+        assert "block-exec" in rule_ids
 
     def test_compile_and_apply_failure(self):
         """Compilation failure returns errors without modifying file."""

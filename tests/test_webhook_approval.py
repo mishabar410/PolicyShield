@@ -42,22 +42,20 @@ def _make_backend(handler, **kwargs) -> WebhookApprovalBackend:
 
 
 def _patched_submit(backend, request):
-    """Run submit using mock transport."""
-    import policyshield.approval.webhook as wmod
-
-    original_client = httpx.Client
-
-    class MockClient(httpx.Client):
-        def __init__(self, **kwargs):
-            kwargs.pop("timeout", None)
-            super().__init__(transport=backend._mock_transport, **kwargs)
-
-    wmod.httpx.Client = MockClient
+    """Run submit using mock transport — call internal methods directly to avoid threading."""
+    # Replace the persistent client with a mock transport client
+    old_client = backend._client
+    backend._client = httpx.Client(transport=backend._mock_transport)
     try:
-        # Call original submit
-        WebhookApprovalBackend.submit(backend, request)
+        backend._requests[request.request_id] = request
+        if backend._mode == "sync":
+            resp = backend._sync_request(request)
+        else:
+            resp = backend._poll_request(request)
+        backend._responses[request.request_id] = resp
     finally:
-        wmod.httpx.Client = original_client
+        backend._client.close()
+        backend._client = old_client
 
 
 # ── Test 1: sync → approved ──────────────────────────────────────────
@@ -275,3 +273,13 @@ def test_verify_signature():
     assert verify_signature(payload, secret, sig) is True
     assert verify_signature(payload, secret, "sha256=wrong") is False
     assert verify_signature(b"different", secret, sig) is False
+
+
+# ── Test 13: context manager / close ─────────────────────────────────
+
+
+def test_webhook_context_manager():
+    """Issue #43: persistent client should be closeable via context manager."""
+    with WebhookApprovalBackend(webhook_url="https://example.com/hook") as backend:
+        assert backend is not None
+    # After exiting, internal client should be closed (no exception)

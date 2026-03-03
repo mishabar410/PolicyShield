@@ -32,7 +32,7 @@ class PolicyShieldClient:
     """Synchronous Python client for PolicyShield HTTP API.
 
     Usage:
-        with PolicyShieldClient("http://localhost:8100") as client:
+        with PolicyShieldClient("http://localhost:8000") as client:
             result = client.check("exec_command", {"cmd": "ls"})
             if result.verdict == "BLOCK":
                 print("Blocked!")
@@ -40,7 +40,7 @@ class PolicyShieldClient:
 
     def __init__(
         self,
-        base_url: str = "http://localhost:8100",
+        base_url: str = "http://localhost:8000",
         api_token: str | None = None,
         timeout: float = 30.0,
     ) -> None:
@@ -57,11 +57,14 @@ class PolicyShieldClient:
         args: dict | None = None,
         session_id: str = "default",
         sender: str | None = None,
+        context: dict | None = None,
     ) -> CheckResult:
         """Check a tool call against security rules."""
         payload: dict[str, Any] = {"tool_name": tool_name, "args": args or {}, "session_id": session_id}
         if sender:
             payload["sender"] = sender
+        if context is not None:
+            payload["context"] = context
         resp = self._client.post("/api/v1/check", json=payload)
         resp.raise_for_status()
         return CheckResult(**{k: v for k, v in resp.json().items() if k in CheckResult.__dataclass_fields__})
@@ -128,13 +131,13 @@ class AsyncPolicyShieldClient:
     """Async Python client for PolicyShield HTTP API.
 
     Usage:
-        async with AsyncPolicyShieldClient("http://localhost:8100") as client:
+        async with AsyncPolicyShieldClient("http://localhost:8000") as client:
             result = await client.check("exec_command", {"cmd": "ls"})
     """
 
     def __init__(
         self,
-        base_url: str = "http://localhost:8100",
+        base_url: str = "http://localhost:8000",
         api_token: str | None = None,
         timeout: float = 30.0,
     ) -> None:
@@ -151,11 +154,14 @@ class AsyncPolicyShieldClient:
         args: dict | None = None,
         session_id: str = "default",
         sender: str | None = None,
+        context: dict | None = None,
     ) -> CheckResult:
         """Check a tool call against security rules."""
         payload: dict[str, Any] = {"tool_name": tool_name, "args": args or {}, "session_id": session_id}
         if sender:
             payload["sender"] = sender
+        if context is not None:
+            payload["context"] = context
         resp = await self._client.post("/api/v1/check", json=payload)
         resp.raise_for_status()
         return CheckResult(**{k: v for k, v in resp.json().items() if k in CheckResult.__dataclass_fields__})
@@ -167,7 +173,7 @@ class AsyncPolicyShieldClient:
 
     async def kill(self, reason: str = "SDK kill switch") -> dict:
         """Activate kill switch."""
-        resp = await self._client.post("/api/v1/kill-switch", json={"reason": reason})
+        resp = await self._client.post("/api/v1/kill", json={"reason": reason})
         resp.raise_for_status()
         return resp.json()
 
@@ -179,6 +185,39 @@ class AsyncPolicyShieldClient:
 
     async def close(self) -> None:
         await self._client.aclose()
+
+    async def post_check(self, tool_name: str, result: str, session_id: str = "default") -> dict:
+        """Post-call check on tool output for PII."""
+        resp = await self._client.post(
+            "/api/v1/post-check",
+            json={"tool_name": tool_name, "result": result, "session_id": session_id},
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    async def reload(self) -> dict:
+        """Reload rules from disk."""
+        resp = await self._client.post("/api/v1/reload")
+        resp.raise_for_status()
+        return resp.json()
+
+    async def wait_for_approval(
+        self,
+        approval_id: str,
+        timeout: float = 60.0,
+        poll_interval: float = 2.0,
+    ) -> dict:
+        """Poll approval status until resolved or timeout."""
+        import asyncio as _asyncio
+
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            resp = await self._client.get(f"/api/v1/approval/{approval_id}/status")
+            data = resp.json()
+            if data.get("status") != "pending":
+                return data
+            await _asyncio.sleep(poll_interval)
+        raise TimeoutError(f"Approval {approval_id} not resolved within {timeout}s")
 
     async def __aenter__(self) -> AsyncPolicyShieldClient:
         return self

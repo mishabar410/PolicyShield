@@ -200,13 +200,9 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
     @app.middleware("http")
     async def payload_size_limit(request: Request, call_next):
         if request.method in ("POST", "PUT", "PATCH"):
-            # Quick reject by header
-            content_length = request.headers.get("content-length")
-            try:
-                cl_int = int(content_length) if content_length else 0
-            except (ValueError, TypeError):
-                cl_int = 0
-            if cl_int > _max_request_size:
+            # Issue #63: ALWAYS read actual body to prevent Content-Length spoofing
+            body = await request.body()
+            if len(body) > _max_request_size:
                 return JSONResponse(
                     status_code=413,
                     content={
@@ -215,19 +211,6 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
                         "max_bytes": _max_request_size,
                     },
                 )
-            # Only verify actual body size when Content-Length is missing/untrusted
-            # (Content-Length can be spoofed or absent with chunked encoding)
-            if not content_length or cl_int == 0:
-                body = await request.body()
-                if len(body) > _max_request_size:
-                    return JSONResponse(
-                        status_code=413,
-                        content={
-                            "error": "payload_too_large",
-                            "message": f"Request body exceeds {_max_request_size} bytes",
-                            "max_bytes": _max_request_size,
-                        },
-                    )
         return await call_next(request)
 
     # ── Middleware: Backpressure (307) ──
@@ -634,25 +617,36 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
                 if isinstance(r, dict):
                     r["priority"] = 0
 
-            # Remove existing rules that conflict (same tool)
+            # Issue #29: Remove only rules with the same ID, not by tool match
             new_ids = {r["id"] for r in new_rules if isinstance(r, dict)}
-            merged_rules = []
-            for r in existing_rules:
-                if r.get("id") in new_ids:
-                    continue  # replaced by new rule
-                tool = r.get("when", {}).get("tool") if isinstance(r.get("when"), dict) else None
-                if tool and tool in new_tools:
-                    continue  # conflicting tool — removed
-                merged_rules.append(r)
+            merged_rules = [r for r in existing_rules if r.get("id") not in new_ids]
             merged_rules.extend(new_rules)
 
             existing_data["rules"] = merged_rules
 
-            # Write back
-            rules_path.write_text(
-                yaml.dump(existing_data, default_flow_style=False, allow_unicode=True, sort_keys=False),
+            # Issue #154: Atomic write via tempfile + rename
+            import tempfile
+
+            tmp_fd = tempfile.NamedTemporaryFile(
+                mode="w",
+                dir=rules_path.parent,
+                suffix=".tmp",
+                delete=False,
                 encoding="utf-8",
             )
+            try:
+                tmp_fd.write(yaml.dump(existing_data, default_flow_style=False, allow_unicode=True, sort_keys=False))
+                tmp_fd.flush()
+                os.fsync(tmp_fd.fileno())
+                tmp_fd.close()
+                os.rename(tmp_fd.name, str(rules_path))
+            except Exception:
+                tmp_fd.close()
+                try:
+                    os.unlink(tmp_fd.name)
+                except OSError:
+                    pass
+                raise
 
             # Reload engine
             engine.reload_rules()

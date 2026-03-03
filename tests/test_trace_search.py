@@ -309,3 +309,51 @@ class TestSearchResult:
         engine = TraceSearchEngine(tmp_path / "does_not_exist")
         result = engine.search(SearchQuery())
         assert result.total == 0
+
+
+class TestEdgeCases:
+    def test_bad_json_line_skipped(self, trace_dir):
+        """Bad JSON lines should be silently skipped."""
+        p = trace_dir / "bad.jsonl"
+        p.write_text(
+            '{"tool": "ok", "verdict": "ALLOW", "session_id": "s1", "timestamp": "2025-01-01T12:00:00"}\nNOT-JSON\n'
+        )
+        engine = TraceSearchEngine(trace_dir)
+        result = engine.search(SearchQuery())
+        assert result.total == 1
+
+    def test_invalid_timestamp_filtered(self, trace_dir):
+        """Records with invalid timestamp should not match time-range queries."""
+        p = trace_dir / "ts.jsonl"
+        p.write_text('{"tool": "x", "verdict": "ALLOW", "session_id": "s1", "timestamp": "not-a-date"}\n')
+        engine = TraceSearchEngine(trace_dir)
+        result = engine.search(SearchQuery(time_from=datetime(2020, 1, 1)))
+        assert result.total == 0
+
+    def test_text_match_in_tool_name(self, trace_dir):
+        """Text search should match tool field."""
+        p = trace_dir / "tool.jsonl"
+        p.write_text(
+            '{"tool": "exec_command", "verdict": "ALLOW", "session_id": "s1", "timestamp": "2025-01-01T12:00:00"}\n'
+        )
+        engine = TraceSearchEngine(trace_dir)
+        result = engine.search(SearchQuery(text="exec_command"))
+        assert result.total == 1
+
+    def test_text_search_recursive_list(self, trace_dir):
+        """Text search should find values inside nested lists."""
+        p = trace_dir / "nested.jsonl"
+        p.write_text(
+            '{"tool": "x", "verdict": "ALLOW", "session_id": "s1", "timestamp": "2025-01-01T12:00:00", "args": {"tags": ["alpha", "beta_secret"]}}\n'
+        )
+        engine = TraceSearchEngine(trace_dir)
+        result = engine.search(SearchQuery(text="beta_secret"))
+        assert result.total == 1
+
+    def test_missing_timestamp_filtered(self, trace_dir):
+        """Records without timestamp field should not match time-range queries."""
+        p = trace_dir / "nots.jsonl"
+        p.write_text('{"tool": "x", "verdict": "ALLOW", "session_id": "s1"}\n')
+        engine = TraceSearchEngine(trace_dir)
+        result = engine.search(SearchQuery(time_from=datetime(2020, 1, 1)))
+        assert result.total == 0

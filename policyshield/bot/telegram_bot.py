@@ -70,8 +70,12 @@ class PolicyBot:
         self._update_offset: int = 0
         self._running = False
 
-        # Pending compilations: chat_id → yaml_text
-        self._pending: dict[int, str] = {}
+        # Issue #62: Chat ID whitelist for authentication
+        allowed = os.environ.get("POLICYSHIELD_BOT_ALLOWED_CHATS", "")
+        self._allowed_chats: set[int] = {int(x.strip()) for x in allowed.split(",") if x.strip()} if allowed else set()
+
+        # Issue #127: Pending compilations keyed by (chat_id, user_id)
+        self._pending: dict[tuple[int, int], str] = {}
 
     @property
     def _base_url(self) -> str:
@@ -169,9 +173,15 @@ class PolicyBot:
     async def _handle_message(self, msg: dict) -> None:
         """Handle an incoming text message."""
         chat_id = msg["chat"]["id"]
+        user_id = msg.get("from", {}).get("id", 0)
         text = msg.get("text", "").strip()
 
         if not text:
+            return
+
+        # Issue #62: Check chat whitelist
+        if self._allowed_chats and chat_id not in self._allowed_chats:
+            await self._send(chat_id, "⛔ Unauthorized. Your chat ID is not in the allowed list.")
             return
 
         # Command routing
@@ -180,7 +190,7 @@ class PolicyBot:
             return
 
         # Natural language → compile
-        await self._handle_compile(chat_id, text)
+        await self._handle_compile(chat_id, user_id, text)
 
     async def _handle_command(self, chat_id: int, text: str) -> None:
         """Route /commands."""
@@ -272,7 +282,7 @@ class PolicyBot:
     # Compile & Deploy
     # ------------------------------------------------------------------
 
-    async def _handle_compile(self, chat_id: int, description: str) -> None:
+    async def _handle_compile(self, chat_id: int, user_id: int, description: str) -> None:
         """Compile NL description to YAML and show preview."""
         await self._send(chat_id, "⏳ Compiling your policy...")
 
@@ -290,10 +300,10 @@ class PolicyBot:
             )
             return
 
-        # Store pending YAML
-        self._pending[chat_id] = result.yaml_text
+        # Issue #127: Store pending YAML by (chat_id, user_id)
+        self._pending[(chat_id, user_id)] = result.yaml_text
 
-        # Preview
+        # Preview — Issue #100: YAML in code block to prevent markdown injection
         yaml_preview = result.yaml_text
         if len(yaml_preview) > _MAX_PREVIEW_LEN:
             yaml_preview = yaml_preview[:_MAX_PREVIEW_LEN] + "\n# ... (truncated)"
@@ -316,22 +326,23 @@ class PolicyBot:
     async def _handle_callback(self, callback: dict) -> None:
         """Handle inline keyboard button press."""
         chat_id = callback["message"]["chat"]["id"]
+        user_id = callback.get("from", {}).get("id", 0)
         message_id = callback["message"]["message_id"]
         action = callback.get("data", "")
         callback_id = callback["id"]
 
         if action == "deploy":
-            await self._deploy(chat_id, message_id, callback_id)
+            await self._deploy(chat_id, user_id, message_id, callback_id)
         elif action == "cancel":
-            self._pending.pop(chat_id, None)
+            self._pending.pop((chat_id, user_id), None)
             await self._answer_callback(callback_id, "Cancelled")
             await self._edit_message(chat_id, message_id, "❌ Deployment cancelled.")
         else:
             await self._answer_callback(callback_id, "Unknown action")
 
-    async def _deploy(self, chat_id: int, message_id: int, callback_id: str) -> None:
-        """Write YAML to disk and reload the server."""
-        yaml_text = self._pending.pop(chat_id, None)
+    async def _deploy(self, chat_id: int, user_id: int, message_id: int, callback_id: str) -> None:
+        """Merge YAML into existing rules and reload the server."""
+        yaml_text = self._pending.pop((chat_id, user_id), None)
         if not yaml_text:
             await self._answer_callback(callback_id, "No pending rules")
             return
@@ -345,9 +356,36 @@ class PolicyBot:
             shutil.copy2(self._rules_path, backup)
             logger.info("Backed up rules to %s", backup)
 
-        # Write new rules
-        self._rules_path.parent.mkdir(parents=True, exist_ok=True)
-        self._rules_path.write_text(yaml_text, encoding="utf-8")
+        # Issue #101: Merge by ID instead of overwriting
+        import yaml
+
+        try:
+            new_data = yaml.safe_load(yaml_text)
+            new_rules = new_data.get("rules", []) if isinstance(new_data, dict) else []
+            new_ids = {r["id"] for r in new_rules if isinstance(r, dict) and "id" in r}
+
+            if self._rules_path.exists():
+                existing_data = yaml.safe_load(self._rules_path.read_text(encoding="utf-8"))
+                existing_rules = existing_data.get("rules", []) if isinstance(existing_data, dict) else []
+                merged_rules = [r for r in existing_rules if r.get("id") not in new_ids]
+                merged_rules.extend(new_rules)
+                if isinstance(existing_data, dict):
+                    existing_data["rules"] = merged_rules
+                else:
+                    existing_data = {"rules": merged_rules}
+            else:
+                existing_data = new_data
+
+            self._rules_path.parent.mkdir(parents=True, exist_ok=True)
+            self._rules_path.write_text(
+                yaml.dump(existing_data, default_flow_style=False, allow_unicode=True, sort_keys=False),
+                encoding="utf-8",
+            )
+        except Exception:
+            # Fallback: write raw yaml_text
+            self._rules_path.parent.mkdir(parents=True, exist_ok=True)
+            self._rules_path.write_text(yaml_text, encoding="utf-8")
+
         logger.info("Wrote new rules to %s", self._rules_path)
 
         # Reload server

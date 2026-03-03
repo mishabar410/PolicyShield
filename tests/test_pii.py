@@ -3,7 +3,15 @@
 import pytest
 
 from policyshield.core.models import PIIType
-from policyshield.shield.pii import PIIDetector, PIIPattern, _inn_check, _luhn_check, _snils_check
+from policyshield.shield.pii import (
+    PIIDetector,
+    PIIPattern,
+    _date_check,
+    _iban_check,
+    _inn_check,
+    _luhn_check,
+    _snils_check,
+)
 
 import re
 
@@ -190,3 +198,30 @@ class TestPIIDetector:
         types = {m.pii_type for m in matches}
         assert PIIType.INN in types
         assert PIIType.RU_PHONE in types
+
+
+class TestSnilsEdge:
+    def test_snils_wrong_length(self):
+        assert _snils_check("12345") is False
+
+
+class TestIbanCheck:
+    def test_valid_iban(self):
+        assert _iban_check("GB29 NWBK 6016 1331 9268 19") is True
+
+    def test_invalid_iban_short(self):
+        assert _iban_check("GB") is False
+
+    def test_invalid_iban_bad_char(self):
+        assert _iban_check("GB29!NWBK") is False
+
+
+class TestDateCheck:
+    def test_valid_date(self):
+        assert _date_check("15/06/1990") is True
+
+    def test_all_parts_above_12(self):
+        assert _date_check("32.33.34") is False
+
+    def test_ambiguous_valid(self):
+        assert _date_check("5.6.7") is True

@@ -63,12 +63,26 @@ class MCPProxy:
                 "rule_id": result.rule_id,
             }
 
+        # Issue #126: Handle APPROVE verdict explicitly
+        if result.verdict.value == "APPROVE":
+            return {
+                "blocked": False,
+                "verdict": "APPROVE",
+                "status": "pending_approval",
+                "message": result.message,
+                "rule_id": result.rule_id,
+            }
+
         # Use modified args if REDACT
         final_args = result.modified_args if result.modified_args else arguments
 
+        # Issue #75: Honestly report whether upstream was called
+        forwarded = self._upstream_proc is not None
         return {
             "blocked": False,
             "verdict": result.verdict.value,
+            "status": "forwarded" if forwarded else "checked",
+            "forwarded": forwarded,
             "tool_name": tool_name,
             "args": final_args,
             "message": result.message,
@@ -101,11 +115,34 @@ def create_mcp_proxy_server(engine: Any) -> Any:
         if result.get("blocked"):
             return [TextContent(type="text", text=f"🛡️ BLOCKED: {result['message']}")]
 
+        # Issue #126: Handle pending approval
+        if result.get("status") == "pending_approval":
+            return [
+                TextContent(
+                    type="text",
+                    text=json.dumps(
+                        {
+                            "status": "pending_approval",
+                            "tool": name,
+                            "verdict": "APPROVE",
+                            "message": result.get("message", ""),
+                        },
+                        indent=2,
+                    ),
+                )
+            ]
+
+        # Issue #75: Honestly report check vs forward status
         return [
             TextContent(
                 type="text",
                 text=json.dumps(
-                    {"status": "forwarded", "tool": name, "verdict": result["verdict"]},
+                    {
+                        "status": result.get("status", "checked"),
+                        "tool": name,
+                        "verdict": result["verdict"],
+                        "forwarded": result.get("forwarded", False),
+                    },
                     indent=2,
                 ),
             )

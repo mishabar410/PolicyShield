@@ -288,6 +288,11 @@ class PIIDetector:
                 )
         return matches
 
+    # Issue #145: Limit constants to prevent memory DoS
+    MAX_LIST_WIDTH = 1000
+    MAX_TOTAL_MATCHES = 10_000
+    MAX_STRING_LENGTH = 100_000
+
     def scan_dict(self, data: dict, prefix: str = "") -> list[PIIMatch]:
         """Scan all string values in a dict for PII.
 
@@ -300,24 +305,30 @@ class PIIDetector:
         """
         matches: list[PIIMatch] = []
         for key, value in data.items():
+            if len(matches) >= self.MAX_TOTAL_MATCHES:
+                break
             field_name = f"{prefix}.{key}" if prefix else key
             if isinstance(value, str):
-                matches.extend(self.scan(value, field_name))
+                if len(value) <= self.MAX_STRING_LENGTH:
+                    matches.extend(self.scan(value, field_name))
             elif isinstance(value, dict):
                 matches.extend(self.scan_dict(value, field_name))
             elif isinstance(value, list):
                 matches.extend(self._scan_list(value, field_name))
-        return matches
+        return matches[: self.MAX_TOTAL_MATCHES]
 
     def _scan_list(self, items: list, prefix: str, _depth: int = 0) -> list[PIIMatch]:
         """Recursively scan list items for PII, handling nested lists."""
         if _depth > 20:  # Prevent stack overflow on deeply nested input
             return []
         matches: list[PIIMatch] = []
-        for i, item in enumerate(items):
+        for i, item in enumerate(items[: self.MAX_LIST_WIDTH]):
+            if len(matches) >= self.MAX_TOTAL_MATCHES:
+                break
             field_name = f"{prefix}[{i}]"
             if isinstance(item, str):
-                matches.extend(self.scan(item, field_name))
+                if len(item) <= self.MAX_STRING_LENGTH:
+                    matches.extend(self.scan(item, field_name))
             elif isinstance(item, dict):
                 matches.extend(self.scan_dict(item, field_name))
             elif isinstance(item, list):

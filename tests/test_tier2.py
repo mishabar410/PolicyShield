@@ -341,6 +341,111 @@ class TestSDKClient:
         client = PolicyShieldClient("http://localhost:19999")
         client.close()
 
+    def test_check_with_context(self, tmp_path):
+        """Issue #14: check() should accept and pass context."""
+        rules = tmp_path / "rules.yaml"
+        rules.write_text(
+            "shield_name: t\nversion: '1'\nrules:\n  - id: r1\n    when: { tool: safe }\n    then: ALLOW\n"
+        )
+        engine = AsyncShieldEngine(rules=rules)
+        app = create_app(engine)
+
+        from policyshield.sdk.client import PolicyShieldClient
+
+        with TestClient(app) as tc:
+            client = PolicyShieldClient.__new__(PolicyShieldClient)
+            client._client = tc
+            result = client.check("safe", context={"env": "test"})
+            assert result.verdict == "ALLOW"
+
+    def test_post_check_context_via_sdk(self, tmp_path):
+        rules = tmp_path / "rules.yaml"
+        rules.write_text("shield_name: t\nversion: '1'\nrules:\n  - id: r1\n    when: { tool: x }\n    then: ALLOW\n")
+        engine = AsyncShieldEngine(rules=rules)
+        app = create_app(engine)
+
+        from policyshield.sdk.client import PolicyShieldClient
+
+        with TestClient(app) as tc:
+            client = PolicyShieldClient.__new__(PolicyShieldClient)
+            client._client = tc
+            data = client.post_check("x", "some result text")
+            assert isinstance(data, dict)
+
+    def test_default_port(self):
+        """Issue #2: all clients should default to port 8000."""
+        from policyshield.sdk.client import AsyncPolicyShieldClient, PolicyShieldClient
+
+        # Check __init__ default via inspect signature
+        import inspect
+
+        sync_sig = inspect.signature(PolicyShieldClient.__init__)
+        assert "8000" in str(sync_sig.parameters["base_url"].default)
+        async_sig = inspect.signature(AsyncPolicyShieldClient.__init__)
+        assert "8000" in str(async_sig.parameters["base_url"].default)
+
+    @pytest.mark.asyncio
+    async def test_async_check_with_context(self, tmp_path):
+        """Issue #14: async check() should accept context."""
+        from unittest.mock import AsyncMock, MagicMock
+
+        from policyshield.sdk.client import AsyncPolicyShieldClient
+
+        client = AsyncPolicyShieldClient.__new__(AsyncPolicyShieldClient)
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {"verdict": "ALLOW", "message": "ok"}
+        mock_resp.raise_for_status = MagicMock()
+
+        mock_client = MagicMock()
+        mock_client.post = AsyncMock(return_value=mock_resp)
+        mock_client.aclose = AsyncMock()
+        client._client = mock_client
+
+        result = await client.check("safe", context={"env": "prod"})
+        assert result.verdict == "ALLOW"
+        call_args = mock_client.post.call_args
+        assert call_args[1]["json"]["context"] == {"env": "prod"}
+
+    @pytest.mark.asyncio
+    async def test_async_post_check(self, tmp_path):
+        """Issue #41: async post_check()."""
+        from unittest.mock import AsyncMock, MagicMock
+
+        from policyshield.sdk.client import AsyncPolicyShieldClient
+
+        client = AsyncPolicyShieldClient.__new__(AsyncPolicyShieldClient)
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {"verdict": "ALLOW", "pii_matches": []}
+        mock_resp.raise_for_status = MagicMock()
+
+        mock_client = MagicMock()
+        mock_client.post = AsyncMock(return_value=mock_resp)
+        mock_client.aclose = AsyncMock()
+        client._client = mock_client
+
+        data = await client.post_check("tool1", "output text")
+        assert isinstance(data, dict)
+
+    @pytest.mark.asyncio
+    async def test_async_reload(self):
+        """Issue #41: async reload()."""
+        from unittest.mock import AsyncMock, MagicMock
+
+        from policyshield.sdk.client import AsyncPolicyShieldClient
+
+        client = AsyncPolicyShieldClient.__new__(AsyncPolicyShieldClient)
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {"status": "ok", "rules_count": 5}
+        mock_resp.raise_for_status = MagicMock()
+
+        mock_client = MagicMock()
+        mock_client.post = AsyncMock(return_value=mock_resp)
+        mock_client.aclose = AsyncMock()
+        client._client = mock_client
+
+        data = await client.reload()
+        assert data["status"] == "ok"
+
 
 # ── 533: Slack Backend ─────────────────────────────────────────────
 

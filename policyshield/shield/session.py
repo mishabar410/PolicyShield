@@ -31,6 +31,23 @@ class SessionManager:
         self._eviction_every_n = 100
         self._backend = backend or InMemorySessionBackend(max_size=max_sessions, ttl_seconds=ttl_seconds)
 
+    def _serialize_session(self, session: SessionState) -> dict:
+        """Serialize SessionState to dict for backend storage."""
+        return {
+            "session_id": session.session_id,
+            "created_at": session.created_at.isoformat(),
+            "total_calls": session.total_calls,
+            "tool_counts": dict(session.tool_counts),
+            "taints": [t.value if hasattr(t, "value") else str(t) for t in session.taints],
+        }
+
+    def _sync_to_backend(self, session: SessionState) -> None:
+        """Write-through: sync session state to backend."""
+        try:
+            self._backend.put(session.session_id, self._serialize_session(session))
+        except Exception:
+            pass  # fail-open on backend errors
+
     def get_or_create(self, session_id: str) -> SessionState:
         """Get an existing session or create a new one.
 
@@ -50,6 +67,7 @@ class SessionManager:
             session = self._sessions[session_id]
             if self._is_expired(session):
                 del self._sessions[session_id]
+                self._backend.delete(session_id)
             else:
                 return session
 
@@ -63,6 +81,7 @@ class SessionManager:
             event_buffer=EventRingBuffer(),
         )
         self._sessions[session_id] = session
+        self._sync_to_backend(session)
         return session
 
     def get(self, session_id: str) -> SessionState | None:
@@ -78,11 +97,15 @@ class SessionManager:
             session = self._sessions.get(session_id)
             if session and self._is_expired(session):
                 del self._sessions[session_id]
+                self._backend.delete(session_id)
                 return None
             return session
 
-    def increment(self, session_id: str, tool_name: str) -> SessionState:
-        """Increment tool call count for a session.
+    def record_call(self, session_id: str, tool_name: str) -> SessionState:
+        """Atomically record a tool call for a session (Issue #102).
+
+        This is the preferred way to increment counters — all operations
+        happen under a single lock acquisition.
 
         Args:
             session_id: Session identifier.
@@ -94,7 +117,20 @@ class SessionManager:
         with self._lock:
             session = self._get_or_create_unlocked(session_id)
             session.increment(tool_name)
+            self._sync_to_backend(session)
         return session
+
+    def increment(self, session_id: str, tool_name: str) -> SessionState:
+        """Increment tool call count for a session.
+
+        Args:
+            session_id: Session identifier.
+            tool_name: Name of the tool called.
+
+        Returns:
+            Updated SessionState.
+        """
+        return self.record_call(session_id, tool_name)
 
     def get_event_buffer(self, session_id: str) -> EventRingBuffer:
         """Get the event buffer for a session (lazy-initializes if needed)."""
@@ -114,6 +150,7 @@ class SessionManager:
         with self._lock:
             session = self._get_or_create_unlocked(session_id)
             session.taints.add(pii_type)
+            self._sync_to_backend(session)
 
     def remove(self, session_id: str) -> bool:
         """Remove a session.
@@ -127,6 +164,7 @@ class SessionManager:
         with self._lock:
             if session_id in self._sessions:
                 del self._sessions[session_id]
+                self._backend.delete(session_id)
                 return True
             return False
 

@@ -256,11 +256,25 @@ def _resolve_includes(data: dict, base_dir: Path, _visited: set[Path] | None = N
     return data
 
 
+def _deep_merge(base: dict, override: dict) -> dict:
+    """Recursively merge two dicts — override takes precedence for non-dict values."""
+    result = dict(base)
+    for k, v in override.items():
+        if k in result and isinstance(result[k], dict) and isinstance(v, dict):
+            result[k] = _deep_merge(result[k], v)
+        else:
+            result[k] = v
+    return result
+
+
 def _resolve_extends(rules: list[dict]) -> list[dict]:
     """Resolve ``extends:`` — child rule inherits parent fields.
 
     Iterates until stable to support multi-level inheritance (A → B → C)
     regardless of rule ordering in the YAML file.
+
+    Uses deep merge so nested dicts (e.g. ``when.args``) are merged
+    recursively rather than being completely overridden by the child.
     """
     rules_by_id = {r["id"]: r for r in rules if "id" in r}
     max_iterations = len(rules) + 1  # Prevent infinite loops
@@ -278,8 +292,8 @@ def _resolve_extends(rules: list[dict]) -> list[dict]:
                 if parent.get("extends"):
                     resolved.append(rule)
                     continue
-                # Merge: parent values as defaults, child overrides
-                merged = {**parent, **rule}
+                # Deep merge: parent values as defaults, child overrides (Issue #15)
+                merged = _deep_merge(parent, rule)
                 merged["id"] = rule["id"]  # Keep child's ID
                 merged.pop("extends", None)
                 resolved.append(merged)

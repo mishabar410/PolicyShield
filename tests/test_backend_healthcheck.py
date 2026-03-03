@@ -22,8 +22,7 @@ class TestWebhookHealth:
         mock_resp = Mock()
         mock_resp.status_code = 200
         with patch("httpx.Client") as MockClient:
-            client_inst = MockClient.return_value.__enter__.return_value
-            client_inst.head.return_value = mock_resp
+            MockClient.return_value.head.return_value = mock_resp
             backend = WebhookApprovalBackend(webhook_url="http://example.com/hook")
             health = backend.health()
         assert health["healthy"] is True
@@ -34,8 +33,7 @@ class TestWebhookHealth:
         mock_resp = Mock()
         mock_resp.status_code = 500
         with patch("httpx.Client") as MockClient:
-            client_inst = MockClient.return_value.__enter__.return_value
-            client_inst.head.return_value = mock_resp
+            MockClient.return_value.head.return_value = mock_resp
             backend = WebhookApprovalBackend(webhook_url="http://example.com/hook")
             health = backend.health()
         assert health["healthy"] is False
@@ -45,8 +43,7 @@ class TestWebhookHealth:
         import httpx
 
         with patch("httpx.Client") as MockClient:
-            client_inst = MockClient.return_value.__enter__.return_value
-            client_inst.head.side_effect = httpx.ConnectError("Connection refused")
+            MockClient.return_value.head.side_effect = httpx.ConnectError("Connection refused")
             backend = WebhookApprovalBackend(webhook_url="http://example.com/hook")
             health = backend.health()
         assert health["healthy"] is False

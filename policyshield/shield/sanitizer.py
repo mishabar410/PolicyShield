@@ -207,21 +207,33 @@ def _flatten_to_string(value: Any, max_size: int = 1_000_000) -> str:
     return " ".join(parts)
 
 
-def _flatten_recurse(value: Any, parts: list[str], _depth: int = 0, *, _max_size: int = 1_000_000) -> None:
+def _flatten_recurse(
+    value: Any, parts: list[str], _depth: int = 0, *, _max_size: int = 1_000_000, _total: list[int] | None = None
+) -> None:
+    if _total is None:
+        _total = [0]
     if _depth > 50:  # prevent stack overflow on deeply nested input
         return
-    # Check accumulated size to prevent memory exhaustion
-    if sum(len(p) for p in parts[-10:]) + len(parts) > _max_size and len(parts) > 100:
+    # Issue #103: Check accumulated total size to prevent OOM
+    if _total[0] > _max_size:
         return
     if isinstance(value, dict):
         for k, v in value.items():
+            if _total[0] > _max_size:
+                return
             if isinstance(k, str):
                 parts.append(k)
-            _flatten_recurse(v, parts, _depth + 1, _max_size=_max_size)
+                _total[0] += len(k)
+            _flatten_recurse(v, parts, _depth + 1, _max_size=_max_size, _total=_total)
     elif isinstance(value, list):
         for item in value:
-            _flatten_recurse(item, parts, _depth + 1, _max_size=_max_size)
+            if _total[0] > _max_size:
+                return
+            _flatten_recurse(item, parts, _depth + 1, _max_size=_max_size, _total=_total)
     elif isinstance(value, str):
         parts.append(value)
+        _total[0] += len(value)
     elif value is not None:
-        parts.append(str(value))
+        s = str(value)
+        parts.append(s)
+        _total[0] += len(s)

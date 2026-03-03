@@ -29,6 +29,7 @@ def shield(
     tool_name: str | None = None,
     session_id: str = "default",
     on_block: str = "raise",
+    context: dict | None = None,
 ) -> Callable:
     """Decorator that checks tool call before executing the function.
 
@@ -39,6 +40,7 @@ def shield(
         tool_name: Override tool name (defaults to function name).
         session_id: Session ID for the check.
         on_block: ``"raise"`` to raise PermissionError, ``"return_none"`` to return None.
+        context: Optional context dict for context-based conditions.
 
     Raises:
         PermissionError: If the tool call is blocked and on_block="raise".
@@ -52,7 +54,7 @@ def shield(
             @functools.wraps(func)
             async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
                 all_kwargs = _bind_args(func, args, kwargs)
-                result = await engine.check(name, all_kwargs, session_id=session_id)
+                result = await engine.check(name, all_kwargs, session_id=session_id, context=context)
                 if result.verdict == Verdict.BLOCK:
                     if on_block == "raise":
                         raise PermissionError(f"PolicyShield blocked: {result.message}")
@@ -66,7 +68,14 @@ def shield(
                 # cases, the fallback is kwargs-only rebuild.
                 if result.modified_args:
                     args, kwargs = _rebuild_args(func, result.modified_args, args, kwargs)
-                return await func(*args, **kwargs)
+                func_result = await func(*args, **kwargs)
+                # Post-check: scan output for PII (Issue #28)
+                if hasattr(engine, "post_check"):
+                    try:
+                        await engine.post_check(name, func_result, session_id=session_id)
+                    except Exception:
+                        pass  # fail-open on post_check errors
+                return func_result
 
             return async_wrapper
         else:
@@ -74,7 +83,7 @@ def shield(
             @functools.wraps(func)
             def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
                 all_kwargs = _bind_args(func, args, kwargs)
-                result = engine.check(name, all_kwargs, session_id=session_id)
+                result = engine.check(name, all_kwargs, session_id=session_id, context=context)
                 if result.verdict == Verdict.BLOCK:
                     if on_block == "raise":
                         raise PermissionError(f"PolicyShield blocked: {result.message}")
@@ -85,7 +94,14 @@ def shield(
                     return None
                 if result.modified_args:
                     args, kwargs = _rebuild_args(func, result.modified_args, args, kwargs)
-                return func(*args, **kwargs)
+                func_result = func(*args, **kwargs)
+                # Post-check: scan output for PII (Issue #28)
+                if hasattr(engine, "post_check"):
+                    try:
+                        engine.post_check(name, func_result, session_id=session_id)
+                    except Exception:
+                        pass  # fail-open on post_check errors
+                return func_result
 
             return sync_wrapper
 
@@ -97,6 +113,7 @@ def guard(
     tool_name: str,
     engine: Any = None,
     on_block: str = "raise",
+    session_id: str = "default",
 ) -> Callable:
     """Backward-compatible decorator — tool_name as first arg.
 
@@ -105,7 +122,7 @@ def guard(
         def run(cmd): ...
     """
     _engine = engine or _get_default_engine()
-    return shield(_engine, tool_name=tool_name, on_block=on_block)
+    return shield(_engine, tool_name=tool_name, on_block=on_block, session_id=session_id)
 
 
 _default_engine: Any = None
