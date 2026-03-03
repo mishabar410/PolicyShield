@@ -65,3 +65,10 @@ ISSUES.md
 issues/
 prompts/
 grafana/
+dist/
+traces/
+demo_traces/
+demo.tape
+.venv312/
+issues/critical.md
+issues/high.md
