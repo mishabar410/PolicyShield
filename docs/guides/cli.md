@@ -285,3 +285,35 @@ policyshield compile --file restrictions.md -o rules.yaml
 | `--model` | per-provider | Specific model name |
 
 Requires `pip install "policyshield[ai]"` and `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`.
+
+### `policyshield bot`
+
+Start the Telegram bot for NL rule management.
+
+```bash
+policyshield bot [--rules PATH] [--server-url URL] [--admin-token TOKEN]
+```
+
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `--rules` | `rules.yaml` | Path to YAML rules file |
+| `--server-url` | `http://localhost:8100` | PolicyShield server URL |
+| `--admin-token` | — | Admin token for server |
+
+Environment: `TELEGRAM_BOT_TOKEN` (required), `OPENAI_API_KEY` (for NL compilation).
+
+See [Telegram Integration](../integrations/telegram.md) for full details.
+
+### `policyshield openclaw`
+
+Manage the OpenClaw plugin integration.
+
+```bash
+# Install plugin, start server, configure OpenClaw
+policyshield openclaw setup
+
+# Remove plugin and stop server
+policyshield openclaw teardown
+```
+
+See [OpenClaw Integration](../integrations/openclaw.md) for full details.

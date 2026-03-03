@@ -19,13 +19,15 @@ PolicyShield lets you define YAML rules that control what tools an AI agent can 
 - 🤖 **AI Rule Writer** — Generate rules from natural language
 - 🌐 **HTTP Server** — Framework-agnostic REST API for tool call policy enforcement
 - 🔌 **OpenClaw Plugin** — Native plugin with before/after hooks
-- 🔗 **Integrations** — LangChain, CrewAI
+- 🤖 **Telegram Bot** — Manage rules and kill switch from Telegram
+- 🔗 **Integrations** — LangChain, CrewAI, MCP
 - 🧪 **Testing** — Validate rules before deployment
 - 🚀 **CLI** — Scaffold, validate, lint, test, serve from the command line
 - 🕐 **Conditional Rules** — Context-based: time of day, day of week, custom context
 - 🧠 **LLM Guard** — Async threat detection middleware with caching
 - 📝 **NL Policy Compiler** — `policyshield compile` — natural language → YAML rules
 - 💾 **Bounded Sessions** — LRU + TTL session storage with Redis support
+- 🔌 **MCP Server & Proxy** — Model Context Protocol support with admin auth
 
 ## Quick Start
 
@@ -76,4 +78,6 @@ print(result.verdict)  # Verdict.BLOCK
 - [Quick Start Guide](getting-started/quickstart.md)
 - [Writing Rules](guides/writing-rules.md)
 - [OpenClaw Integration](integrations/openclaw.md)
+- [Telegram Bot](integrations/telegram.md)
+- [MCP Integration](integrations/mcp.md)
 - [API Reference](api/core.md)
