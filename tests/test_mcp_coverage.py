@@ -6,6 +6,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from policyshield.core.models import Verdict
+
 
 def _has_mcp():
     try:
@@ -25,7 +27,7 @@ def mock_engine():
     engine.is_killed = False
 
     mock_result = MagicMock()
-    mock_result.verdict = MagicMock(value="ALLOW")
+    mock_result.verdict = Verdict.ALLOW
     mock_result.message = "Allowed"
     mock_result.rule_id = None
     mock_result.pii_matches = []
@@ -77,7 +79,7 @@ class TestMCPProxyCreation:
         from policyshield.mcp_proxy import MCPProxy
 
         block_result = MagicMock()
-        block_result.verdict = MagicMock(value="BLOCK")
+        block_result.verdict = Verdict.BLOCK
         block_result.message = "Blocked by rule"
         block_result.rule_id = "test_rule"
         mock_engine.check = AsyncMock(return_value=block_result)
@@ -92,7 +94,7 @@ class TestMCPProxyCreation:
         from policyshield.mcp_proxy import MCPProxy
 
         allow_result = MagicMock()
-        allow_result.verdict = MagicMock(value="ALLOW")
+        allow_result.verdict = Verdict.ALLOW
         allow_result.message = ""
         allow_result.modified_args = None
         mock_engine.check = AsyncMock(return_value=allow_result)
@@ -107,7 +109,7 @@ class TestMCPProxyCreation:
         from policyshield.mcp_proxy import MCPProxy
 
         approve_result = MagicMock()
-        approve_result.verdict = MagicMock(value="APPROVE")
+        approve_result.verdict = Verdict.APPROVE
         approve_result.message = "Needs approval"
         approve_result.rule_id = "approval_rule"
         mock_engine.check = AsyncMock(return_value=approve_result)

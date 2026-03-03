@@ -113,9 +113,9 @@ class TelegramApprovalBackend(ApprovalBackend):
         if not signaled:
             return None
         with self._lock:
-            # Clean up after consuming the response
+            # Issue #206: Preserve response for retry/polling (consistent with InMemoryBackend)
             self._events.pop(request_id, None)
-            return self._responses.pop(request_id, None)
+            return self._responses.get(request_id)
 
     def respond(
         self,

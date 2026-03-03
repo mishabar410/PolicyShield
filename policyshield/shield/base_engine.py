@@ -288,11 +288,16 @@ class BaseShieldEngine:
             matcher = self._matcher
             rule_set = self._rule_set
             pii_detector = self._pii  # Issue #170: snapshot like async path
+            event_buffer = self._session_mgr.get_event_buffer(session_id)  # Issue #207: inside lock
+
+        # NOTE: Issue #162 — LLM Guard uses asyncio.run() inside ThreadPool,
+        # creating nested event loops. This pattern works but has suboptimal
+        # overhead.  A sync httpx.Client in LLMGuard would be better but
+        # requires larger refactoring.
 
         # Find best matching rule
         try:
             # Pass event buffer for chain rule evaluation
-            event_buffer = self._session_mgr.get_event_buffer(session_id)
             match = matcher.find_best_match(
                 tool_name=tool_name,
                 args=args,
@@ -801,7 +806,8 @@ class BaseShieldEngine:
     @mode.setter
     def mode(self, value: ShieldMode) -> None:
         """Set operating mode."""
-        self._mode = value
+        with self._lock:  # Issue #213: thread-safe for free-threading
+            self._mode = value
 
     @property
     def rule_count(self) -> int:

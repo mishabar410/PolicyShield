@@ -1,20 +1,21 @@
-FROM python:3.12-slim AS base
+FROM python:3.13-slim AS base
 
 WORKDIR /app
 
-# Install only server dependencies
+# Copy source first, then create user, then install as non-root
 COPY pyproject.toml README.md ./
 COPY policyshield/ policyshield/
-RUN pip install --no-cache-dir ".[server]"
 
-# Default rules directory (can be overridden by volume mount)
-RUN mkdir -p /app/rules
-COPY examples/fastapi_agent/policies/rules.yaml /app/rules/rules.yaml
-
-# Create non-root user for security
+# Create non-root user for security (before pip install)
 RUN groupadd -r pshield && useradd -r -g pshield -d /app pshield \
     && chown -R pshield:pshield /app
+
+# Default rules directory (mount your rules via volume)
+RUN mkdir -p /app/rules && chown pshield:pshield /app/rules
+
+# Install as non-root
 USER pshield
+RUN pip install --no-cache-dir --user ".[server]"
 
 EXPOSE 8100
 

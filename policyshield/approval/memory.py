@@ -96,6 +96,14 @@ class InMemoryBackend(ApprovalBackend):
             if request_id in self._created_at:
                 elapsed = monotonic() - self._created_at[request_id]
                 if elapsed > self._timeout:
+                    # Issue #152: First-response-wins — check if respond() already wrote
+                    if request_id in self._responses:
+                        resp = self._responses[request_id]
+                        return {
+                            "status": "approved" if resp.approved else "denied",
+                            "responder": resp.responder,
+                            "approved": resp.approved,
+                        }
                     # Auto-resolve on timeout
                     auto_approved = self._on_timeout == "ALLOW"
                     self._responses[request_id] = ApprovalResponse(

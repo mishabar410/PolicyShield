@@ -69,6 +69,7 @@ class SessionManager:
                 del self._sessions[session_id]
                 self._backend.delete(session_id)
             else:
+                session.last_accessed = datetime.now(timezone.utc)  # Issue #173
                 return session
 
         # Evict oldest if at capacity
@@ -99,6 +100,8 @@ class SessionManager:
                 del self._sessions[session_id]
                 self._backend.delete(session_id)
                 return None
+            if session:
+                session.last_accessed = datetime.now(timezone.utc)  # Issue #173
             return session
 
     def record_call(self, session_id: str, tool_name: str) -> SessionState:
@@ -205,8 +208,10 @@ class SessionManager:
             }
 
     def _is_expired(self, session: SessionState) -> bool:
-        """Check if a session has exceeded its TTL."""
-        return datetime.now(timezone.utc) - session.created_at > timedelta(seconds=self._ttl_seconds)
+        """Check if a session has exceeded its TTL (by last access)."""
+        # Issue #173: Use last_accessed if available, otherwise created_at
+        last_active = session.last_accessed or session.created_at
+        return datetime.now(timezone.utc) - last_active > timedelta(seconds=self._ttl_seconds)
 
     def _maybe_evict(self) -> None:
         """Periodically evict expired sessions (amortized). Must be called with lock held."""

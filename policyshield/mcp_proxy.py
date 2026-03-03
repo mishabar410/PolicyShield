@@ -18,6 +18,8 @@ import json
 import logging
 from typing import Any
 
+from policyshield.core.models import Verdict
+
 logger = logging.getLogger(__name__)
 
 try:
@@ -55,7 +57,7 @@ class MCPProxy:
         """Check tool call, then forward if allowed."""
         result = await self.engine.check(tool_name, arguments, session_id=session_id)
 
-        if result.verdict.value == "BLOCK":
+        if result.verdict == Verdict.BLOCK:  # Issue #193: use enum
             return {
                 "blocked": True,
                 "verdict": "BLOCK",
@@ -63,8 +65,7 @@ class MCPProxy:
                 "rule_id": result.rule_id,
             }
 
-        # Issue #126: Handle APPROVE verdict explicitly
-        if result.verdict.value == "APPROVE":
+        if result.verdict == Verdict.APPROVE:  # Issue #193: use enum
             return {
                 "blocked": False,
                 "verdict": "APPROVE",

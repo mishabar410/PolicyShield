@@ -74,6 +74,9 @@ class ShieldEngine(BaseShieldEngine):
             else:
                 result = self._do_check_sync(tool_name, args, session_id, sender, context)
         except concurrent.futures.TimeoutError:
+            # NOTE: Issue #214 — Pre-check hooks may have already executed,
+            # but post-check hooks won't run. This is inherent to the timeout
+            # design; fixing it would require 2-phase commit for plugins.
             if self._fail_open:
                 logger.warning("Shield check timed out after %ss (fail-open)", self._engine_timeout)
                 result = self._verdict_builder.allow()

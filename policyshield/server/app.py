@@ -133,6 +133,12 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
             engine._approval_backend.stop()
         if enable_watcher:
             engine.stop_watching()
+        # Issue #216: Close LLM Guard HTTP client to prevent connection leaks
+        if hasattr(engine, "_llm_guard") and engine._llm_guard:
+            try:
+                await engine._llm_guard.close()
+            except Exception:
+                pass
         _logger.info("PolicyShield server stopped")
 
     app = FastAPI(
@@ -178,6 +184,8 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
         "/api/v1/check-approval",
         "/api/v1/clear-taint",
         "/api/v1/respond-approval",
+        "/api/v1/compile",  # Issue #174
+        "/api/v1/compile-and-apply",  # Issue #174
     }
 
     @app.middleware("http")
@@ -185,7 +193,7 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
         if request.method in ("POST", "PUT", "PATCH"):
             if request.url.path in _json_only_paths:
                 ct = request.headers.get("content-type", "")
-                if ct and "application/json" not in ct:
+                if not ct or "application/json" not in ct:  # Issue #165: reject missing CT too
                     return JSONResponse(
                         status_code=415,
                         content={
@@ -220,7 +228,12 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
 
     @app.middleware("http")
     async def backpressure_middleware(request: Request, call_next):
-        if request.url.path in ("/api/v1/check", "/api/v1/post-check", "/api/v1/check-approval"):
+        if request.url.path in (
+            "/api/v1/check",
+            "/api/v1/post-check",
+            "/api/v1/check-approval",
+            "/api/v1/compile-and-apply",
+        ):  # Issue #175
             try:
                 # Atomic try-acquire with tiny timeout (no TOCTOU race)
                 await asyncio.wait_for(_semaphore.acquire(), timeout=0.01)
@@ -275,7 +288,10 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
     async def rate_limit_admin(request: Request, call_next):
         admin_paths = ("/api/v1/reload", "/api/v1/kill")
         if any(request.url.path.startswith(p) for p in admin_paths):
-            client_ip = request.client.host if request.client else "unknown"
+            # Issue #189: Use X-Forwarded-For behind reverse proxy
+            client_ip = request.headers.get("x-forwarded-for", "").split(",")[0].strip() or (
+                request.client.host if request.client else "unknown"
+            )
             if not request.client:
                 _logger.warning("Admin rate-limit: request.client is None (proxy misconfiguration?)")
             if not _admin_limiter.is_allowed(client_ip):
@@ -460,9 +476,9 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
     @app.post("/api/v1/reload", response_model=ReloadResponse, dependencies=auth)
     async def reload() -> ReloadResponse:
         """Reload rules from disk."""
-        # Issue #204: Use _compile_lock to prevent race with compile-and-apply
+        # Issue #204/#215: Use _compile_lock + to_thread to avoid blocking event loop
         async with _compile_lock:
-            engine.reload_rules()
+            await asyncio.to_thread(engine.reload_rules)
         return ReloadResponse(
             rules_count=engine.rule_count,
             rules_hash=_rules_hash(engine),
@@ -608,6 +624,10 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
             try:
                 new_data = yaml.safe_load(result.yaml_text)
                 new_rules = new_data.get("rules", [])
+
+                # Issue #161: Handle directory rules_path
+                if rules_path.is_dir():
+                    rules_path = rules_path / "rules.yaml"
 
                 # Read existing rules
                 existing_data = yaml.safe_load(rules_path.read_text(encoding="utf-8"))

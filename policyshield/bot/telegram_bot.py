@@ -398,8 +398,9 @@ class PolicyBot:
                 if os.path.exists(tmp_path):
                     os.unlink(tmp_path)
                 raise
-        except Exception:
-            # Fallback: write raw yaml_text (still atomic)
+        except Exception as merge_err:
+            # Issue #190: Don't silently overwrite — warn about merge failure
+            logger.warning("Merge failed, falling back to raw yaml_text: %s", merge_err)
             import os
             import tempfile
 

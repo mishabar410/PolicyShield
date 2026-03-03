@@ -55,7 +55,10 @@ def shield(
             @functools.wraps(func)
             async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
                 all_kwargs = _bind_args(func, args, kwargs)
-                result = await engine.check(name, all_kwargs, session_id=session_id, context=context)
+                # Issue #205: support callable session_id for per-request resolution
+                sid = session_id() if callable(session_id) else session_id
+                ctx = context() if callable(context) else context
+                result = await engine.check(name, all_kwargs, session_id=sid, context=ctx)
                 if result.verdict == Verdict.BLOCK:
                     if on_block == "raise":
                         raise PermissionError(f"PolicyShield blocked: {result.message}")
@@ -91,7 +94,10 @@ def shield(
             @functools.wraps(func)
             def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
                 all_kwargs = _bind_args(func, args, kwargs)
-                result = engine.check(name, all_kwargs, session_id=session_id, context=context)
+                # Issue #205: support callable session_id for per-request resolution
+                sid = session_id() if callable(session_id) else session_id
+                ctx = context() if callable(context) else context
+                result = engine.check(name, all_kwargs, session_id=sid, context=ctx)
                 if result.verdict == Verdict.BLOCK:
                     if on_block == "raise":
                         raise PermissionError(f"PolicyShield blocked: {result.message}")

@@ -112,7 +112,8 @@ class AsyncShieldEngine(BaseShieldEngine):
 
         for hook_fn in _get_pre_hooks():
             try:
-                hook_fn(tool_name=tool_name, args=args, session_id=session_id, sender=sender)
+                # Issue #194: Run sync hooks in thread to avoid blocking event loop
+                await asyncio.to_thread(hook_fn, tool_name=tool_name, args=args, session_id=session_id, sender=sender)
             except Exception as e:
                 logger.warning("Pre-check hook error: %s", e)
 
@@ -189,16 +190,15 @@ class AsyncShieldEngine(BaseShieldEngine):
         # Session state for condition matching
         session_state = self._build_session_state(session_id)
 
-        # Snapshot matcher + rule_set + pii_detector atomically to avoid race with hot-reload
         with self._lock:
             matcher = self._matcher
             rule_set = self._rule_set
             pii_detector = self._pii  # Issue #109: snapshot PII detector
+            event_buffer = self._session_mgr.get_event_buffer(session_id)  # Issue #207: inside lock
 
         # Offload CPU-bound matching to thread
         try:
             # Pass event buffer for chain rule evaluation
-            event_buffer = self._session_mgr.get_event_buffer(session_id)
             match = await asyncio.to_thread(
                 matcher.find_best_match,
                 tool_name=tool_name,
@@ -317,7 +317,8 @@ class AsyncShieldEngine(BaseShieldEngine):
 
         for hook_fn in _get_post_hooks():
             try:
-                hook_fn(tool_name=tool_name, args=args, session_id=session_id, result=result)
+                # Issue #194: Run sync hooks in thread to avoid blocking event loop
+                await asyncio.to_thread(hook_fn, tool_name=tool_name, args=args, session_id=session_id, result=result)
             except Exception as e:
                 logger.warning("Post-check hook error: %s", e)
 

@@ -85,8 +85,22 @@ class PolicyShieldTool(BaseTool):
             tool_input = result.modified_args or tool_input
 
         if isinstance(tool_input, dict):
-            return self.wrapped_tool._run(**tool_input)
-        return self.wrapped_tool._run(tool_input)
+            output = self.wrapped_tool._run(**tool_input)
+        else:
+            output = self.wrapped_tool._run(tool_input)
+
+        # Issue #114: Post-check for output PII scanning (matches CrewAI wrapper)
+        if self.engine and hasattr(self.engine, "post_check"):
+            try:
+                self.engine.post_check(
+                    tool_name=self.name,
+                    result={"output": output} if isinstance(output, str) else output,
+                    session_id=self.session_id,
+                )
+            except Exception:
+                pass  # fail-open on post_check
+
+        return output
 
     async def _arun(self, *args: Any, **kwargs: Any) -> str:
         """Async version — uses async engine natively if available."""
@@ -122,12 +136,27 @@ class PolicyShieldTool(BaseTool):
             has_native_arun = type(self.wrapped_tool)._arun is not BaseTool._arun
             if has_native_arun:
                 if isinstance(tool_input, dict):
-                    return await self.wrapped_tool._arun(**tool_input)
-                return await self.wrapped_tool._arun(tool_input)
+                    output = await self.wrapped_tool._arun(**tool_input)
+                else:
+                    output = await self.wrapped_tool._arun(tool_input)
             else:
                 if isinstance(tool_input, dict):
-                    return await asyncio.to_thread(self.wrapped_tool._run, **tool_input)
-                return await asyncio.to_thread(self.wrapped_tool._run, tool_input)
+                    output = await asyncio.to_thread(self.wrapped_tool._run, **tool_input)
+                else:
+                    output = await asyncio.to_thread(self.wrapped_tool._run, tool_input)
+
+            # Issue #114: Post-check for output PII scanning
+            if self.async_engine and hasattr(self.async_engine, "post_check"):
+                try:
+                    await self.async_engine.post_check(
+                        tool_name=self.name,
+                        result={"output": output} if isinstance(output, str) else output,
+                        session_id=self.session_id,
+                    )
+                except Exception:
+                    pass  # fail-open on post_check
+
+            return output
 
         # Fallback: sync engine in thread
         return await asyncio.to_thread(self._run, *args, **kwargs)

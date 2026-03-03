@@ -109,11 +109,31 @@ class CrewAIShieldTool:
         output = self.wrapped_tool._run(**kwargs)
 
         # Post-check on output
-        self.engine.post_check(
-            tool_name=self.name,
-            result={"output": output} if isinstance(output, str) else output,
-            session_id=self.session_id,
-        )
+        # Issue #176: Handle async engine post_check coroutine
+        import inspect
+
+        post_result = {"output": output} if isinstance(output, str) else output
+        if hasattr(self.engine, "post_check"):
+            if inspect.iscoroutinefunction(self.engine.post_check):
+                import asyncio
+
+                try:
+                    asyncio.get_running_loop()
+                    # Already in async context — can't do asyncio.run(), skip
+                except RuntimeError:
+                    asyncio.run(
+                        self.engine.post_check(
+                            tool_name=self.name,
+                            result=post_result,
+                            session_id=self.session_id,
+                        )
+                    )
+            else:
+                self.engine.post_check(
+                    tool_name=self.name,
+                    result=post_result,
+                    session_id=self.session_id,
+                )
 
         return output
 

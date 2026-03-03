@@ -90,7 +90,7 @@ class TestShellInjection:
             "; rm -rf /",
             "; cat /etc/passwd",
             "| bash",
-            "`whoami`",
+            "`rm -rf /tmp`",  # Issue #92: narrowed backtick pattern requires actual shell command
             "$(id)",
             "> /etc/crontab",
         ],

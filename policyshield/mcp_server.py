@@ -84,18 +84,32 @@ def create_mcp_server(engine: Any, admin_token: str | None = None) -> Any:
                     "type": "object",
                     "properties": {
                         "reason": {"type": "string", "description": "Reason for kill switch activation"},
+                        "admin_token": {"type": "string", "description": "Admin authentication token"},
                     },
+                    "required": ["admin_token"],
                 },
             ),
             Tool(
                 name="resume",
                 description="Deactivate kill switch — resume normal operation",
-                inputSchema={"type": "object", "properties": {}},
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "admin_token": {"type": "string", "description": "Admin authentication token"},
+                    },
+                    "required": ["admin_token"],
+                },
             ),
             Tool(
                 name="reload",
                 description="Reload rules from disk",
-                inputSchema={"type": "object", "properties": {}},
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "admin_token": {"type": "string", "description": "Admin authentication token"},
+                    },
+                    "required": ["admin_token"],
+                },
             ),
             Tool(
                 name="constraints",

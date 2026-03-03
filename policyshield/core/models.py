@@ -201,6 +201,7 @@ class SessionState(BaseModel):
 
     session_id: str
     created_at: datetime
+    last_accessed: datetime | None = None  # Issue #173: TTL by last access
     tool_counts: dict[str, int] = Field(default_factory=dict)
     total_calls: int = 0
     taints: set[PIIType] = Field(default_factory=set)

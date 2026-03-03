@@ -87,7 +87,7 @@ SHELL_INJECTION = Detector(
     patterns=_compile(
         r";\s*(?:rm|cat|curl|wget|bash|sh|python|perl|ruby|nc|ncat)\b",
         r"\|\s*(?:sh|bash|zsh|cmd)\b",
-        r"`[^`]+`",  # backtick command substitution
+        r"`\s*(?:rm|cat|curl|wget|bash|sh|python|perl|ruby|nc|ls|chmod|chown|sudo|kill|dd)\b[^`]*`",  # Issue #92: backtick with actual shell command
         r"\$\([^)]+\)",  # $(cmd) substitution
         r">\s*/(?:etc|dev|tmp)/",  # redirect to sensitive paths
         flags=_I,
