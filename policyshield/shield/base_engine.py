@@ -200,7 +200,16 @@ class BaseShieldEngine:
         sender: str | None,
         context: dict | None = None,
     ) -> ShieldResult:
-        """Synchronous check logic: kill_switch → sanitize → rate-limit → taint → match → PII → verdict."""
+        """Synchronous check logic: hooks → kill_switch → sanitize → rate-limit → taint → match → PII → verdict."""
+        # Issue #30: Invoke pre-check plugin hooks (logging, auditing)
+        from policyshield.plugins import get_pre_check_hooks as _get_pre_hooks
+
+        for hook_fn in _get_pre_hooks():
+            try:
+                hook_fn(tool_name=tool_name, args=args, session_id=session_id, sender=sender)
+            except Exception as e:
+                logger.warning("Pre-check hook error: %s", e)
+
         # Kill switch — absolute first check, overrides everything
         if self._killed.is_set():
             return ShieldResult(
@@ -222,7 +231,8 @@ class BaseShieldEngine:
                     message=honeypot_match.message,
                 )
 
-        # Sanitize args
+        # Sanitize args (save raw for plugin detectors — Issue #18)
+        raw_args = args
         if self._sanitizer is not None:
             san_result = self._sanitizer.sanitize(args)
             if san_result.rejected:
@@ -233,13 +243,13 @@ class BaseShieldEngine:
                 )
             args = san_result.sanitized_args
 
-        # Plugin detectors
+        # Plugin detectors — use raw_args so sanitization doesn't hide threats
         from policyshield.plugins import DetectorResult as _DR
         from policyshield.plugins import get_detectors as _get_detectors
 
         for pname, detector_fn in _get_detectors().items():
             try:
-                det_result = detector_fn(tool_name=tool_name, args=args)
+                det_result = detector_fn(tool_name=tool_name, args=raw_args)
                 if isinstance(det_result, _DR) and det_result.detected:
                     logger.warning("Plugin detector '%s' triggered: %s", pname, det_result.message)
                     return ShieldResult(
@@ -394,6 +404,15 @@ class BaseShieldEngine:
                     )
             except Exception as e:
                 logger.warning("Shadow evaluation error: %s", e)
+
+        # Issue #30: Invoke post-check plugin hooks (auditing, metrics)
+        from policyshield.plugins import get_post_check_hooks as _get_post_hooks
+
+        for hook_fn in _get_post_hooks():
+            try:
+                hook_fn(tool_name=tool_name, args=args, session_id=session_id, result=result)
+            except Exception as e:
+                logger.warning("Post-check hook error: %s", e)
 
         return result
 
@@ -744,6 +763,12 @@ class BaseShieldEngine:
         with self._lock:
             self._rule_set = new_ruleset
             self._matcher = MatcherEngine(new_ruleset)
+
+            # Issue #5: Update taint chain settings on hot-reload
+            tc = new_ruleset.taint_chain
+            self._taint_enabled = tc.enabled
+            self._outgoing_tools = set(tc.outgoing_tools)
+
             # Refresh honeypot checker from reloaded rules
             honeypot_config = new_ruleset.honeypots
             if honeypot_config:

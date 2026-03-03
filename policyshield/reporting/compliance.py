@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html as html_module
 import json
 from collections import Counter
 from dataclasses import dataclass, field
@@ -81,6 +82,9 @@ def generate_report(trace_dir: str | Path, period_days: int = 30) -> ComplianceR
 
 def render_html(report: ComplianceReport) -> str:
     """Render compliance report as HTML."""
+    # Issue #157: Escape all dynamic values to prevent XSS
+    safe_start = html_module.escape(report.period_start)
+    safe_end = html_module.escape(report.period_end)
     html = f"""<!DOCTYPE html>
 <html><head><title>PolicyShield Compliance Report</title>
 <style>
@@ -92,7 +96,7 @@ th {{ background: #f5f5f5; }}
 .block {{ color: #dc3545; }} .allow {{ color: #28a745; }}
 </style></head><body>
 <h1>PolicyShield Compliance Report</h1>
-<p>Period: {report.period_start} &mdash; {report.period_end}</p>
+<p>Period: {safe_start} &mdash; {safe_end}</p>
 <h2>Summary</h2>
 <table>
 <tr><th>Metric</th><th>Value</th></tr>
@@ -107,14 +111,16 @@ th {{ background: #f5f5f5; }}
     for verdict, count in sorted(report.verdicts.items()):
         pct = (count / report.total_checks * 100) if report.total_checks else 0
         css = "block" if verdict == "BLOCK" else ("allow" if verdict == "ALLOW" else "")
-        html += f'<tr><td class="{css}">{verdict}</td><td>{count}</td><td>{pct:.1f}%</td></tr>'
+        safe_verdict = html_module.escape(str(verdict))
+        html += f'<tr><td class="{css}">{safe_verdict}</td><td>{count}</td><td>{pct:.1f}%</td></tr>'
 
     html += "</table>"
 
     if report.top_blocked_tools:
         html += "<h2>Top Blocked Tools</h2><table><tr><th>Tool</th><th>Blocks</th></tr>"
         for tool, count in report.top_blocked_tools:
-            html += f"<tr><td>{tool}</td><td>{count}</td></tr>"
+            safe_tool = html_module.escape(str(tool))
+            html += f"<tr><td>{safe_tool}</td><td>{count}</td></tr>"
         html += "</table>"
 
     html += "</body></html>"

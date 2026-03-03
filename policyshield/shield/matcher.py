@@ -53,6 +53,12 @@ class CompiledRule:
                 if tool_str == re.escape(tool_str):
                     compiled.tool_pattern = re.compile(f"^{re.escape(tool_str)}$")
                 else:
+                    # Issue #107: Reject patterns with catastrophic backtracking
+                    _dangerous_re = re.compile(r"(\(.+[+*]\)[+*])")
+                    if _dangerous_re.search(tool_str):
+                        raise ValueError(
+                            f"Rule '{rule.id}' contains a potentially catastrophic regex pattern: {tool_str!r}"
+                        )
                     compiled.tool_pattern = re.compile(f"^{tool_str}$")
 
         # Compile argument matchers (support both 'args' and 'args_match')

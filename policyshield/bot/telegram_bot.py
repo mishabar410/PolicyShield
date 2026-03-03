@@ -377,14 +377,42 @@ class PolicyBot:
                 existing_data = new_data
 
             self._rules_path.parent.mkdir(parents=True, exist_ok=True)
-            self._rules_path.write_text(
-                yaml.dump(existing_data, default_flow_style=False, allow_unicode=True, sort_keys=False),
-                encoding="utf-8",
+            # Issue #148: Atomic write to prevent watcher race
+            import os
+            import tempfile
+
+            yaml_content = yaml.dump(existing_data, default_flow_style=False, allow_unicode=True, sort_keys=False)
+            fd, tmp_path = tempfile.mkstemp(
+                dir=str(self._rules_path.parent),
+                suffix=".tmp",
             )
+            try:
+                os.write(fd, yaml_content.encode("utf-8"))
+                os.close(fd)
+                os.replace(tmp_path, str(self._rules_path))
+            except Exception:
+                os.close(fd) if not os.get_inheritable(fd) else None  # noqa: E702
+                if os.path.exists(tmp_path):
+                    os.unlink(tmp_path)
+                raise
         except Exception:
-            # Fallback: write raw yaml_text
+            # Fallback: write raw yaml_text (still atomic)
+            import os
+            import tempfile
+
             self._rules_path.parent.mkdir(parents=True, exist_ok=True)
-            self._rules_path.write_text(yaml_text, encoding="utf-8")
+            fd, tmp_path = tempfile.mkstemp(
+                dir=str(self._rules_path.parent),
+                suffix=".tmp",
+            )
+            try:
+                os.write(fd, yaml_text.encode("utf-8"))
+                os.close(fd)
+                os.replace(tmp_path, str(self._rules_path))
+            except Exception:
+                if os.path.exists(tmp_path):
+                    os.unlink(tmp_path)
+                raise
 
         logger.info("Wrote new rules to %s", self._rules_path)
 

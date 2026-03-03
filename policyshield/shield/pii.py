@@ -364,7 +364,23 @@ class PIIDetector:
         if not matches:
             return text
 
-        # Sort by start position, then merge overlapping spans
+        merged = self._merge_overlapping(matches, text)
+
+        # Apply masks in reverse order to preserve positions
+        result = text
+        for match in reversed(merged):
+            start, end = match.span
+            result = result[:start] + match.masked_value + result[end:]
+        return result
+
+    @staticmethod
+    def _merge_overlapping(matches: list[PIIMatch], text: str) -> list[PIIMatch]:
+        """Merge overlapping PIIMatch spans, using the wider span.
+
+        Issue #87/#108: Prevents double-masking when spans overlap.
+        """
+        if not matches:
+            return []
         sorted_matches = sorted(matches, key=lambda m: m.span[0])
         merged: list[PIIMatch] = [sorted_matches[0]]
         for match in sorted_matches[1:]:
@@ -373,7 +389,6 @@ class PIIDetector:
                 # Overlapping — extend span, keep whichever has larger coverage
                 if match.span[1] > prev.span[1]:
                     extended_text = text[prev.span[0] : match.span[1]]
-                    # Use the higher-priority PII type (prefer the more specific one)
                     pii_type = (
                         match.pii_type if match.span[1] - match.span[0] > prev.span[1] - prev.span[0] else prev.pii_type
                     )
@@ -381,17 +396,11 @@ class PIIDetector:
                         pii_type=pii_type,
                         span=(prev.span[0], match.span[1]),
                         field=prev.field,
-                        masked_value=self.mask(extended_text),
+                        masked_value=PIIDetector.mask(extended_text),
                     )
             else:
                 merged.append(match)
-
-        # Apply masks in reverse order to preserve positions
-        result = text
-        for match in reversed(merged):
-            start, end = match.span
-            result = result[:start] + match.masked_value + result[end:]
-        return result
+        return merged
 
     def redact_dict(self, data: dict) -> tuple[dict, list[PIIMatch]]:
         """Scan a dict and return a copy with PII values redacted.
@@ -416,8 +425,9 @@ class PIIDetector:
             # Simple top-level field redaction
             if field_name in redacted and isinstance(redacted[field_name], str):
                 value = redacted[field_name]
-                # Apply masks in reverse order to preserve positions
-                for match in sorted(matches, key=lambda m: m.span[0], reverse=True):
+                # Issue #87: Merge overlapping spans before applying masks
+                merged = self._merge_overlapping(matches, value)
+                for match in sorted(merged, key=lambda m: m.span[0], reverse=True):
                     start, end = match.span
                     value = value[:start] + match.masked_value + value[end:]
                 redacted[field_name] = value

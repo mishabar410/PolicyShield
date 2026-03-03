@@ -13,8 +13,10 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import threading
 import time
 from dataclasses import dataclass, field
+from typing import Any
 
 logger = logging.getLogger("policyshield")
 
@@ -95,6 +97,10 @@ class LLMGuard:
         self._config = config
         self._cache: dict[str, tuple[GuardResult, float]] = {}
         self._max_cache_size = 1000
+        # Issue #66: Thread-safe cache access
+        self._cache_lock = threading.Lock()
+        # Issue #131: Persistent httpx client (created lazily)
+        self._http_client: Any | None = None
 
     @property
     def enabled(self) -> bool:
@@ -149,21 +155,24 @@ class LLMGuard:
 
         prompt = self._build_prompt(tool_name, args)
 
-        async with httpx.AsyncClient(timeout=self._config.timeout) as client:
-            resp = await client.post(
-                f"{self._config.base_url}/chat/completions",
-                headers={"Authorization": f"Bearer {self._config.api_key}"},
-                json={
-                    "model": self._config.model,
-                    "messages": [
-                        {"role": "system", "content": _SYSTEM_PROMPT},
-                        {"role": "user", "content": prompt},
-                    ],
-                    "temperature": 0,
-                },
-            )
-            resp.raise_for_status()
-            data = resp.json()
+        # Issue #131: Reuse persistent httpx client
+        if self._http_client is None or self._http_client.is_closed:
+            self._http_client = httpx.AsyncClient(timeout=self._config.timeout)
+
+        resp = await self._http_client.post(
+            f"{self._config.base_url}/chat/completions",
+            headers={"Authorization": f"Bearer {self._config.api_key}"},
+            json={
+                "model": self._config.model,
+                "messages": [
+                    {"role": "system", "content": _SYSTEM_PROMPT},
+                    {"role": "user", "content": prompt},
+                ],
+                "temperature": 0,
+            },
+        )
+        resp.raise_for_status()
+        data = resp.json()
 
         return self._parse_response(data)
 
@@ -199,22 +208,33 @@ class LLMGuard:
         return hashlib.sha256(raw.encode()).hexdigest()[:32]
 
     def _get_cached(self, key: str) -> GuardResult | None:
-        entry = self._cache.get(key)
-        if entry is None:
-            return None
-        result, ts = entry
-        if time.monotonic() - ts > self._config.cache_ttl:
-            del self._cache[key]
-            return None
-        return result
+        # Issue #66: Thread-safe cache read
+        with self._cache_lock:
+            entry = self._cache.get(key)
+            if entry is None:
+                return None
+            result, ts = entry
+            if time.monotonic() - ts > self._config.cache_ttl:
+                del self._cache[key]
+                return None
+            return result
 
     def _put_cache(self, key: str, result: GuardResult) -> None:
-        if len(self._cache) >= self._max_cache_size:
-            # Evict oldest entry
-            oldest = next(iter(self._cache))
-            del self._cache[oldest]
-        self._cache[key] = (result, time.monotonic())
+        # Issue #66: Thread-safe cache write
+        with self._cache_lock:
+            if len(self._cache) >= self._max_cache_size:
+                # Evict oldest entry
+                oldest = next(iter(self._cache))
+                del self._cache[oldest]
+            self._cache[key] = (result, time.monotonic())
 
     def clear_cache(self) -> None:
         """Clear the result cache."""
-        self._cache.clear()
+        with self._cache_lock:
+            self._cache.clear()
+
+    async def close(self) -> None:
+        """Close persistent HTTP client."""
+        if self._http_client is not None and not self._http_client.is_closed:
+            await self._http_client.aclose()
+            self._http_client = None

@@ -150,7 +150,14 @@ def create_mcp_proxy_server(engine: Any) -> Any:
 
     @server.list_tools()
     async def handle_list_tools() -> list[Tool]:
-        """List tools from the engine's ruleset."""
+        """List tools from the engine's ruleset.
+
+        .. warning:: Issue #80
+            Currently generates tool list from PolicyShield rules, NOT from
+            an upstream MCP server. Tools without rules or with wildcard rules
+            will not appear. This will be fixed when upstream process
+            forwarding is implemented.
+        """
         # Snapshot rules to avoid race with hot-reload
         rules_snapshot = list(engine.rules.rules)
         tools = []

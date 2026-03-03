@@ -65,18 +65,26 @@ class CrewAIShieldTool:
         """Proxy description from wrapped tool."""
         return getattr(self.wrapped_tool, "description", "")
 
-    def _run(self, **kwargs: Any) -> str:
+    def _run(self, *args: Any, **kwargs: Any) -> str:
         """Run the tool with PolicyShield check.
 
         Args:
+            *args: Positional arguments (converted to kwargs dict).
             **kwargs: Arguments forwarded to the wrapped tool.
 
         Returns:
             Tool output string, or block message.
 
         Raises:
-            ToolCallBlockedError: When on_block='raise' and verdict is BLOCK.
+            ToolCallBlockedError: When on_block='raise' and verdict is BLOCK/APPROVE.
         """
+        # Issue #81: Merge positional args into kwargs
+        if args:
+            if len(args) == 1 and isinstance(args[0], str):
+                kwargs.setdefault("input", args[0])
+            elif len(args) == 1 and isinstance(args[0], dict):
+                kwargs.update(args[0])
+
         result = self.engine.check(
             tool_name=self.name,
             args=kwargs,
@@ -85,8 +93,15 @@ class CrewAIShieldTool:
 
         if result.verdict == Verdict.BLOCK:
             if self.on_block == "raise":
-                raise ToolCallBlockedError(f"🛡️ PolicyShield BLOCKED: {result.message}")
-            return f"🛡️ BLOCKED: {result.message}"
+                raise ToolCallBlockedError(f"PolicyShield BLOCKED: {result.message}")
+            return f"BLOCKED: {result.message}"
+
+        # Issue #47/#64: Handle APPROVE — don't fall through to execution
+        if result.verdict == Verdict.APPROVE:
+            approval_id = getattr(result, "approval_id", "") or ""
+            if self.on_block == "raise":
+                raise ToolCallBlockedError(f"PolicyShield requires approval: {result.message} (id={approval_id})")
+            return f"APPROVAL REQUIRED: {result.message} (approval_id={approval_id})"
 
         if result.verdict == Verdict.REDACT:
             kwargs = result.modified_args or kwargs
@@ -102,9 +117,9 @@ class CrewAIShieldTool:
 
         return output
 
-    def run(self, **kwargs: Any) -> str:
+    def run(self, *args: Any, **kwargs: Any) -> str:
         """Public run method (alias for ``_run``)."""
-        return self._run(**kwargs)
+        return self._run(*args, **kwargs)
 
 
 def shield_all_crewai_tools(

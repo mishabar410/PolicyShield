@@ -130,6 +130,10 @@ class TraceRecorder:
             args: Original arguments (hashed in privacy mode).
             approval_info: Optional approval audit trail data.
         """
+        # Issue #133: Silently drop records after close
+        if self._closed:
+            return
+
         entry: dict[str, Any] = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "session_id": session_id,
@@ -160,6 +164,9 @@ class TraceRecorder:
 
     def flush(self) -> None:
         """Write buffered records to the trace file."""
+        # Issue #86: Guard against flushing after close
+        if self._closed:
+            return
         with self._lock:
             self._flush_unlocked()
 

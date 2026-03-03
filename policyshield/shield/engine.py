@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import concurrent.futures
 import time
 from typing import Any
 
@@ -50,7 +51,26 @@ class ShieldEngine(BaseShieldEngine):
             span_ctx = self._otel.on_check_start(tool_name, session_id, args)
 
         try:
-            result = self._do_check_sync(tool_name, args, session_id, sender, context)
+            # Issue #33: Apply timeout to sync check (matches async path)
+            if self._engine_timeout and self._engine_timeout > 0:
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                    future = pool.submit(
+                        self._do_check_sync,
+                        tool_name,
+                        args,
+                        session_id,
+                        sender,
+                        context,
+                    )
+                    result = future.result(timeout=self._engine_timeout)
+            else:
+                result = self._do_check_sync(tool_name, args, session_id, sender, context)
+        except concurrent.futures.TimeoutError:
+            if self._fail_open:
+                logger.warning("Shield check timed out after %ss (fail-open)", self._engine_timeout)
+                result = self._verdict_builder.allow()
+            else:
+                raise PolicyShieldError(f"Shield check timed out after {self._engine_timeout}s")
         except Exception as e:
             if self._fail_open:
                 logger.warning("Shield error (fail-open): %s", e)

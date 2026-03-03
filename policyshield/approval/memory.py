@@ -123,7 +123,9 @@ class InMemoryBackend(ApprovalBackend):
 
         signaled = event.wait(timeout=timeout)
         if not signaled:
-            return None
+            # Issue #110: Trigger auto-resolve via get_status on timeout
+            self.get_status(request_id)
+            return self._responses.get(request_id)
 
         with self._lock:
             # Don't remove response — it must remain available for concurrent
@@ -177,9 +179,10 @@ class InMemoryBackend(ApprovalBackend):
             self._gc_timer = None
         with self._lock:
             self._requests.clear()
-            self._responses.clear()
             self._created_at.clear()
-            # Signal all waiting threads so they unblock
+            # Issue #130: Signal all waiting threads BEFORE clearing responses
             for event in self._events.values():
                 event.set()
             self._events.clear()
+            # Don't clear responses — let wait_for_response() read them
+            # They will be garbage collected when no references remain

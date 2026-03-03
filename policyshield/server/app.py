@@ -574,6 +574,9 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
             errors=result.errors,
         )
 
+    # Issue #6: Prevent data race on concurrent compile-and-apply
+    _compile_lock = asyncio.Lock()
+
     @app.post("/api/v1/compile-and-apply", response_model=CompileAndApplyResponse, dependencies=auth)
     async def compile_and_apply(req: CompileRequest) -> CompileAndApplyResponse:
         """Compile natural language description, merge into rules file, and reload."""
@@ -598,71 +601,75 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
                 errors=["No rules file path configured — cannot save"],
             )
 
-        try:
-            new_data = yaml.safe_load(result.yaml_text)
-            new_rules = new_data.get("rules", [])
-
-            # Read existing rules
-            existing_data = yaml.safe_load(rules_path.read_text(encoding="utf-8"))
-            existing_rules = existing_data.get("rules", [])
-
-            # Collect tools targeted by new rules
-            new_tools = set()
-            for r in new_rules:
-                if isinstance(r, dict) and isinstance(r.get("when"), dict):
-                    t = r["when"].get("tool")
-                    if t:
-                        new_tools.add(t)
-                # Ensure override rules get highest priority
-                if isinstance(r, dict):
-                    r["priority"] = 0
-
-            # Issue #29: Remove only rules with the same ID, not by tool match
-            new_ids = {r["id"] for r in new_rules if isinstance(r, dict)}
-            merged_rules = [r for r in existing_rules if r.get("id") not in new_ids]
-            merged_rules.extend(new_rules)
-
-            existing_data["rules"] = merged_rules
-
-            # Issue #154: Atomic write via tempfile + rename
-            import tempfile
-
-            tmp_fd = tempfile.NamedTemporaryFile(
-                mode="w",
-                dir=rules_path.parent,
-                suffix=".tmp",
-                delete=False,
-                encoding="utf-8",
-            )
+        # Issue #6: Lock around read-modify-write to prevent data race
+        async with _compile_lock:
             try:
-                tmp_fd.write(yaml.dump(existing_data, default_flow_style=False, allow_unicode=True, sort_keys=False))
-                tmp_fd.flush()
-                os.fsync(tmp_fd.fileno())
-                tmp_fd.close()
-                os.rename(tmp_fd.name, str(rules_path))
-            except Exception:
-                tmp_fd.close()
+                new_data = yaml.safe_load(result.yaml_text)
+                new_rules = new_data.get("rules", [])
+
+                # Read existing rules
+                existing_data = yaml.safe_load(rules_path.read_text(encoding="utf-8"))
+                existing_rules = existing_data.get("rules", [])
+
+                # Collect tools targeted by new rules
+                new_tools = set()
+                for r in new_rules:
+                    if isinstance(r, dict) and isinstance(r.get("when"), dict):
+                        t = r["when"].get("tool")
+                        if t:
+                            new_tools.add(t)
+                    # Ensure override rules get highest priority
+                    if isinstance(r, dict):
+                        r["priority"] = 0
+
+                # Issue #29: Remove only rules with the same ID, not by tool match
+                new_ids = {r["id"] for r in new_rules if isinstance(r, dict)}
+                merged_rules = [r for r in existing_rules if r.get("id") not in new_ids]
+                merged_rules.extend(new_rules)
+
+                existing_data["rules"] = merged_rules
+
+                # Issue #154: Atomic write via tempfile + rename
+                import tempfile
+
+                tmp_fd = tempfile.NamedTemporaryFile(
+                    mode="w",
+                    dir=rules_path.parent,
+                    suffix=".tmp",
+                    delete=False,
+                    encoding="utf-8",
+                )
                 try:
-                    os.unlink(tmp_fd.name)
-                except OSError:
-                    pass
-                raise
+                    tmp_fd.write(
+                        yaml.dump(existing_data, default_flow_style=False, allow_unicode=True, sort_keys=False)
+                    )
+                    tmp_fd.flush()
+                    os.fsync(tmp_fd.fileno())
+                    tmp_fd.close()
+                    os.rename(tmp_fd.name, str(rules_path))
+                except Exception:
+                    tmp_fd.close()
+                    try:
+                        os.unlink(tmp_fd.name)
+                    except OSError:
+                        pass
+                    raise
 
-            # Reload engine
-            engine.reload_rules()
+                # Reload engine
+                engine.reload_rules()
 
-            return CompileAndApplyResponse(
-                yaml_text=result.yaml_text,
-                is_valid=True,
-                applied=True,
-                rules_count=engine.rule_count,
-            )
-        except Exception as e:
-            _logger.error("compile-and-apply save/reload failed: %s", e)
-            return CompileAndApplyResponse(
-                yaml_text=result.yaml_text,
-                is_valid=True,
-                errors=[f"Save/reload failed: {e}"],
-            )
+                return CompileAndApplyResponse(
+                    yaml_text=result.yaml_text,
+                    is_valid=True,
+                    applied=True,
+                    rules_count=engine.rule_count,
+                )
+            except Exception as e:
+                _logger.error("compile-and-apply save/reload failed: %s", e)
+                return CompileAndApplyResponse(
+                    yaml_text=result.yaml_text,
+                    is_valid=True,
+                    errors=[f"Save/reload failed: {e}"],
+                )
 
     return app

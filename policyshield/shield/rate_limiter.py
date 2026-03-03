@@ -1,4 +1,8 @@
-"""Rate limiter engine for PolicyShield — sliding window per-tool/per-session limits."""
+"""Rate limiter engine for PolicyShield — sliding window per-tool/per-session limits.
+
+Note: `GlobalRateLimiter` and `AdaptiveRateLimiter` are deprecated and not
+integrated into the engine pipeline. Use `RateLimiter` configured via YAML.
+"""
 
 from __future__ import annotations
 
@@ -233,9 +237,20 @@ _logger = logging.getLogger(__name__)
 
 
 class GlobalRateLimiter:
-    """Rate limiter across all tools for a session."""
+    """Rate limiter across all tools for a session.
+
+    .. deprecated:: 0.9
+        Not integrated into the engine pipeline. Use ``RateLimiter`` instead.
+    """
 
     def __init__(self, max_calls: int = 1000, window: float = 3600.0) -> None:
+        import warnings
+
+        warnings.warn(
+            "GlobalRateLimiter is deprecated and not integrated into the engine. Use RateLimiter.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self._max_calls = max_calls
         self._window = window
         self._counters: dict[str, _SlidingWindow] = {}
@@ -273,6 +288,9 @@ class AdaptiveRateLimiter:
     """Automatically tightens rate limits on anomalous behavior.
 
     Tracks call history per-session to prevent cross-session DoS.
+
+    .. deprecated:: 0.9
+        Not integrated into the engine pipeline. Use ``RateLimiter`` instead.
     """
 
     def __init__(
@@ -283,6 +301,13 @@ class AdaptiveRateLimiter:
         tighten_factor: float = 0.5,
         cooldown: float = 300.0,
     ) -> None:
+        import warnings
+
+        warnings.warn(
+            "AdaptiveRateLimiter is deprecated and not integrated into the engine. Use RateLimiter.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self._base_limit = base_limit
         self._window = window
         self._burst_threshold = burst_threshold

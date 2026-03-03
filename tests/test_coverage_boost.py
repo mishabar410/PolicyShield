@@ -11,6 +11,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from policyshield.core.exceptions import ApprovalRequiredError
 from policyshield.core.models import PostCheckResult, ShieldMode, ShieldResult, Verdict
 from policyshield.decorators import _bind_args, _rebuild_args, guard, shield
 
@@ -62,17 +63,19 @@ class TestShieldDecoratorSync:
         def my_tool(x: int) -> int:
             return x
 
-        with pytest.raises(PermissionError, match="requires approval"):
+        with pytest.raises(ApprovalRequiredError, match="requires approval"):
             my_tool(5)
 
-    def test_approve_return_none(self):
+    def test_approve_return_dict(self):
         engine = self._make_engine(verdict=Verdict.APPROVE, message="approval needed")
 
         @shield(engine, on_block="return_none")
         def my_tool(x: int) -> int:
             return x
 
-        assert my_tool(5) is None
+        result = my_tool(5)
+        assert isinstance(result, dict)
+        assert result["approval_required"] is True
 
     def test_redact_modified_args(self):
         engine = self._make_engine(
@@ -147,18 +150,20 @@ class TestShieldDecoratorAsync:
         async def my_tool(x: int) -> int:
             return x
 
-        with pytest.raises(PermissionError, match="requires approval"):
+        with pytest.raises(ApprovalRequiredError, match="requires approval"):
             await my_tool(5)
 
     @pytest.mark.asyncio
-    async def test_approve_return_none(self):
+    async def test_approve_return_dict(self):
         engine = self._make_engine(verdict=Verdict.APPROVE, message="need approval")
 
         @shield(engine, on_block="return_none")
         async def my_tool(x: int) -> int:
             return x
 
-        assert await my_tool(5) is None
+        result = await my_tool(5)
+        assert isinstance(result, dict)
+        assert result["approval_required"] is True
 
     @pytest.mark.asyncio
     async def test_redact_modified_args(self):

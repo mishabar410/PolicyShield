@@ -18,10 +18,14 @@ except ImportError:
     HAS_MCP = False
 
 
-def create_mcp_server(engine: Any) -> Any:
+def create_mcp_server(engine: Any, admin_token: str | None = None) -> Any:
     """Create MCP server with PolicyShield tools.
 
     Requires the ``mcp`` package and an :class:`AsyncShieldEngine`.
+
+    Args:
+        engine: AsyncShieldEngine instance.
+        admin_token: If set, required for admin ops (kill, resume, reload).
     """
     if not HAS_MCP:
         raise ImportError("MCP support requires the 'mcp' package: pip install mcp")
@@ -144,15 +148,22 @@ def create_mcp_server(engine: Any) -> Any:
                 return [TextContent(type="text", text=json.dumps(info))]
 
             elif name == "kill_switch":
+                # Issue #132: Admin auth check
+                if admin_token and arguments.get("admin_token") != admin_token:
+                    return [TextContent(type="text", text=json.dumps({"error": "Unauthorized: invalid admin_token"}))]
                 reason = arguments.get("reason", "MCP kill switch")
                 engine.kill(reason)
                 return [TextContent(type="text", text=json.dumps({"status": "killed", "reason": reason}))]
 
             elif name == "resume":
+                if admin_token and arguments.get("admin_token") != admin_token:
+                    return [TextContent(type="text", text=json.dumps({"error": "Unauthorized: invalid admin_token"}))]
                 engine.resume()
                 return [TextContent(type="text", text=json.dumps({"status": "resumed"}))]
 
             elif name == "reload":
+                if admin_token and arguments.get("admin_token") != admin_token:
+                    return [TextContent(type="text", text=json.dumps({"error": "Unauthorized: invalid admin_token"}))]
                 engine.reload_rules()
                 return [
                     TextContent(

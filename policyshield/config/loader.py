@@ -196,6 +196,21 @@ def _build_config(data: dict) -> PolicyShieldConfig:
 # ────────────────────────────────────────────────────────────────────
 
 
+def _build_approval_backend(backend_name: str):  # noqa: ANN202
+    """Create approval backend from config name."""
+    if backend_name == "inmemory":
+        from policyshield.approval.memory import InMemoryBackend
+
+        return InMemoryBackend()
+    if backend_name == "none":
+        return None
+    # Unknown backends → warn and return None
+    import logging
+
+    logging.getLogger("policyshield").warning("Unknown approval backend '%s', using none", backend_name)
+    return None
+
+
 def build_engine_from_config(config: PolicyShieldConfig):  # noqa: ANN201
     """Create a fully configured :class:`ShieldEngine`."""
     from policyshield.shield.engine import ShieldEngine
@@ -226,7 +241,10 @@ def build_engine_from_config(config: PolicyShieldConfig):  # noqa: ANN201
 
     rate_limiter = RateLimiter.from_yaml_dict(config.rate_limits) if config.rate_limits else None
 
-    return ShieldEngine(
+    # Issue #50: Build approval backend from config
+    approval = _build_approval_backend(config.approval_backend)
+
+    engine = ShieldEngine(
         rules=config.rules_path,
         mode=config.mode,
         pii_detector=pii,
@@ -234,7 +252,14 @@ def build_engine_from_config(config: PolicyShieldConfig):  # noqa: ANN201
         fail_open=config.fail_open,
         sanitizer=sanitizer,
         rate_limiter=rate_limiter,
+        approval_backend=approval,
     )
+
+    # Issue #50/#106: Start watching if configured
+    if config.watch:
+        engine.start_watching(poll_interval=config.watch_interval)
+
+    return engine
 
 
 def build_async_engine_from_config(config: PolicyShieldConfig):  # noqa: ANN201
@@ -267,7 +292,10 @@ def build_async_engine_from_config(config: PolicyShieldConfig):  # noqa: ANN201
 
     rate_limiter = RateLimiter.from_yaml_dict(config.rate_limits) if config.rate_limits else None
 
-    return AsyncShieldEngine(
+    # Issue #83: Build approval backend from config
+    approval = _build_approval_backend(config.approval_backend)
+
+    engine = AsyncShieldEngine(
         rules=config.rules_path,
         mode=config.mode,
         pii_detector=pii,
@@ -275,7 +303,14 @@ def build_async_engine_from_config(config: PolicyShieldConfig):  # noqa: ANN201
         fail_open=config.fail_open,
         sanitizer=sanitizer,
         rate_limiter=rate_limiter,
+        approval_backend=approval,
     )
+
+    # Issue #83/#106: Start watching if configured
+    if config.watch:
+        engine.start_watching(poll_interval=config.watch_interval)
+
+    return engine
 
 
 # ────────────────────────────────────────────────────────────────────

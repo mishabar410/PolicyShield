@@ -21,6 +21,7 @@ import inspect
 import threading
 from typing import Any, Callable
 
+from policyshield.core.exceptions import ApprovalRequiredError
 from policyshield.core.models import Verdict
 
 
@@ -61,8 +62,15 @@ def shield(
                     return None
                 if result.verdict == Verdict.APPROVE:
                     if on_block == "raise":
-                        raise PermissionError(f"PolicyShield requires approval: {result.message}")
-                    return None
+                        raise ApprovalRequiredError(
+                            f"PolicyShield requires approval: {result.message}",
+                            approval_id=getattr(result, "approval_id", "") or "",
+                        )
+                    return {
+                        "approval_required": True,
+                        "approval_id": getattr(result, "approval_id", "") or "",
+                        "message": result.message,
+                    }
                 # NOTE: _rebuild_args may not correctly reconstruct calls for
                 # functions with *args or **kwargs variadic signatures. In such
                 # cases, the fallback is kwargs-only rebuild.
@@ -90,8 +98,15 @@ def shield(
                     return None
                 if result.verdict == Verdict.APPROVE:
                     if on_block == "raise":
-                        raise PermissionError(f"PolicyShield requires approval: {result.message}")
-                    return None
+                        raise ApprovalRequiredError(
+                            f"PolicyShield requires approval: {result.message}",
+                            approval_id=getattr(result, "approval_id", "") or "",
+                        )
+                    return {
+                        "approval_required": True,
+                        "approval_id": getattr(result, "approval_id", "") or "",
+                        "message": result.message,
+                    }
                 if result.modified_args:
                     args, kwargs = _rebuild_args(func, result.modified_args, args, kwargs)
                 func_result = func(*args, **kwargs)

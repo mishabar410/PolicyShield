@@ -62,8 +62,8 @@ class ContextEvaluator:
 
         parts = spec.split("-", 1)
         if len(parts) != 2:
-            logger.warning("Invalid time_of_day spec: %s", spec)
-            return True  # fail-open
+            logger.warning("Invalid time_of_day spec: %s — failing closed", spec)
+            return False  # Issue #49: fail-closed on malformed spec
 
         start_s, end_s = parts
         now_s = self._now().strftime("%H:%M")
@@ -95,8 +95,8 @@ class ContextEvaluator:
                 else:
                     in_range = today_i >= start_i or today_i <= end_i
             except ValueError:
-                logger.warning("Invalid day_of_week spec: %s", spec)
-                return True
+                logger.warning("Invalid day_of_week spec: %s — failing closed", spec)
+                return False  # Issue #49: fail-closed on malformed spec
         else:
             in_range = today in [d.strip() for d in spec.split(",")]
 

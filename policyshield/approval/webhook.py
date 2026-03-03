@@ -15,6 +15,7 @@ import hmac
 import json
 import logging
 import time
+from collections import OrderedDict
 from typing import Any, Literal
 
 import httpx
@@ -89,9 +90,10 @@ class WebhookApprovalBackend(ApprovalBackend):
         # Persistent client to avoid connection leak (Issue #43)
         self._client = httpx.Client(timeout=timeout)
 
-        # Internal storage to satisfy ApprovalBackend ABC
-        self._requests: dict[str, ApprovalRequest] = {}
-        self._responses: dict[str, ApprovalResponse] = {}
+        # Issue #20: Use OrderedDict with cap to prevent unbounded growth
+        self._requests: OrderedDict[str, ApprovalRequest] = OrderedDict()
+        self._responses: OrderedDict[str, ApprovalResponse] = OrderedDict()
+        self._max_entries: int = 10_000
 
     # ── ABC implementation ───────────────────────────────────────────
 
@@ -100,6 +102,12 @@ class WebhookApprovalBackend(ApprovalBackend):
         import threading
 
         self._requests[request.request_id] = request
+
+        # Issue #20: Evict oldest entries if over capacity
+        while len(self._requests) > self._max_entries:
+            self._requests.popitem(last=False)
+        while len(self._responses) > self._max_entries:
+            self._responses.popitem(last=False)
 
         if self._mode == "sync":
             resp = self._sync_request(request)

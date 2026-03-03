@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import threading
 from datetime import datetime
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, field_validator
 
 
 # --- Enums ---
@@ -183,7 +184,13 @@ class ShieldResult(BaseModel):
 
 
 class SessionState(BaseModel):
-    """Mutable session state."""
+    """Mutable session state.
+
+    Thread-safe: All mutating methods are protected by a per-session lock.
+    The threading.Lock used throughout SessionManager is fine for async
+    contexts because it is held for nanosecond-scale operations only
+    (counter increments, set additions) — Issue #4 documented.
+    """
 
     model_config = ConfigDict(frozen=False, arbitrary_types_allowed=True)
 
@@ -195,22 +202,27 @@ class SessionState(BaseModel):
     pii_tainted: bool = False
     taint_details: str | None = None
     event_buffer: object = Field(default=None, exclude=True)  # EventRingBuffer, lazy-init
+    # Issue #32: Per-session lock for thread-safe mutation
+    _session_lock: threading.Lock = PrivateAttr(default_factory=threading.Lock)
 
     def increment(self, tool_name: str) -> None:
-        """Increment tool call counters."""
-        self.tool_counts[tool_name] = self.tool_counts.get(tool_name, 0) + 1
-        self.total_calls += 1
+        """Increment tool call counters (thread-safe)."""
+        with self._session_lock:
+            self.tool_counts[tool_name] = self.tool_counts.get(tool_name, 0) + 1
+            self.total_calls += 1
 
     def set_taint(self, reason: str) -> None:
-        """Mark session as PII-tainted."""
-        self.pii_tainted = True
-        self.taint_details = reason
+        """Mark session as PII-tainted (thread-safe)."""
+        with self._session_lock:
+            self.pii_tainted = True
+            self.taint_details = reason
 
     def clear_taint(self) -> None:
-        """Clear PII taint from session."""
-        self.pii_tainted = False
-        self.taint_details = None
-        self.taints.clear()
+        """Clear PII taint from session (thread-safe)."""
+        with self._session_lock:
+            self.pii_tainted = False
+            self.taint_details = None
+            self.taints.clear()
 
 
 class TraceRecord(BaseModel):

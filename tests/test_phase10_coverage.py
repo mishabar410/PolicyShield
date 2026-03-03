@@ -227,8 +227,8 @@ class TestPolicyShieldClient:
 class TestContextEdgeCases:
     def test_invalid_time_spec(self):
         ev = ContextEvaluator()
-        # Invalid spec (no dash) → fail-open → True
-        assert ev._check_time("1234") is True
+        # Invalid spec (no dash) → fail-closed → False (Issue #49)
+        assert ev._check_time("1234") is False
 
     def test_overnight_range(self):
         ev = ContextEvaluator()
@@ -253,8 +253,8 @@ class TestContextEdgeCases:
 
     def test_invalid_day_spec(self):
         ev = ContextEvaluator()
-        # Invalid day → fail-open → True
-        assert ev._check_day("Xyz-Abc") is True
+        # Invalid day → fail-closed → False (Issue #49)
+        assert ev._check_day("Xyz-Abc") is False
 
     def test_value_list_match(self):
         ev = ContextEvaluator()

@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 
 import yaml
 
@@ -199,10 +200,27 @@ class PolicyCompiler:
     # LLM interaction
     # ------------------------------------------------------------------
 
+    def _sanitize_description(self, description: str) -> str:
+        """Strip common prompt injection patterns from user description.
+
+        Issue #85: Prevent user-supplied text from hijacking the LLM system prompt.
+        """
+        patterns = [
+            r"(?i)ignore\s+(all\s+)?previous\s+instructions?",
+            r"(?i)you\s+are\s+now\s+",
+            r"(?i)system\s*:\s*",
+            r"(?i)forget\s+(everything|all|your\s+instructions?)",
+            r"(?i)disregard\s+(all|previous)",
+        ]
+        sanitized = description
+        for pat in patterns:
+            sanitized = re.sub(pat, "[FILTERED]", sanitized)
+        return sanitized[:2000]
+
     async def _call_llm(self, description: str, errors: list[str]) -> str:
         import httpx
 
-        user_msg = f"Convert to PolicyShield YAML rules:\n\n{description}"
+        user_msg = f"Convert to PolicyShield YAML rules:\n\n{self._sanitize_description(description)}"
         if errors:
             user_msg += "\n\nPrevious attempt had errors:\n" + "\n".join(f"- {e}" for e in errors)
             user_msg += "\n\nFix these errors and output corrected YAML."

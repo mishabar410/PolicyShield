@@ -99,6 +99,15 @@ class AsyncShieldEngine(BaseShieldEngine):
         context: dict | None = None,
     ) -> ShieldResult:
         """Internal check logic — offloads CPU-bound work to threads."""
+        # Issue #30: Invoke pre-check plugin hooks
+        from policyshield.plugins import get_pre_check_hooks as _get_pre_hooks
+
+        for hook_fn in _get_pre_hooks():
+            try:
+                hook_fn(tool_name=tool_name, args=args, session_id=session_id, sender=sender)
+            except Exception as e:
+                logger.warning("Pre-check hook error: %s", e)
+
         # Kill switch — immediate block
         if self._killed.is_set():
             return ShieldResult(
@@ -120,7 +129,8 @@ class AsyncShieldEngine(BaseShieldEngine):
                     message=honeypot_match.message,
                 )
 
-        # Sanitize args
+        # Sanitize args (save raw for plugin detectors — Issue #18)
+        raw_args = args
         if self._sanitizer is not None:
             san_result = self._sanitizer.sanitize(args)
             if san_result.rejected:
@@ -131,13 +141,13 @@ class AsyncShieldEngine(BaseShieldEngine):
                 )
             args = san_result.sanitized_args
 
-        # Plugin detectors (mirror _do_check_sync)
+        # Plugin detectors — use raw_args so sanitization doesn't hide threats
         from policyshield.plugins import DetectorResult as _DR
         from policyshield.plugins import get_detectors as _get_detectors
 
         for pname, detector_fn in _get_detectors().items():
             try:
-                det_result = await asyncio.to_thread(detector_fn, tool_name=tool_name, args=args)
+                det_result = await asyncio.to_thread(detector_fn, tool_name=tool_name, args=raw_args)
                 if isinstance(det_result, _DR) and det_result.detected:
                     logger.warning("Plugin detector '%s' triggered: %s", pname, det_result.message)
                     return ShieldResult(
@@ -171,10 +181,11 @@ class AsyncShieldEngine(BaseShieldEngine):
         # Session state for condition matching
         session_state = self._build_session_state(session_id)
 
-        # Snapshot matcher + rule_set atomically to avoid race with hot-reload
+        # Snapshot matcher + rule_set + pii_detector atomically to avoid race with hot-reload
         with self._lock:
             matcher = self._matcher
             rule_set = self._rule_set
+            pii_detector = self._pii  # Issue #109: snapshot PII detector
 
         # Offload CPU-bound matching to thread
         try:
@@ -230,7 +241,7 @@ class AsyncShieldEngine(BaseShieldEngine):
             # PII detection on args (only for BLOCK to enrich the message)
             pii_matches = []
             try:
-                pii_matches = await asyncio.to_thread(self._pii.scan_dict, args)
+                pii_matches = await asyncio.to_thread(pii_detector.scan_dict, args)
             except Exception as e:
                 logger.warning("PII detection error (fail-open): %s", e)
             for pm in pii_matches:
@@ -244,7 +255,7 @@ class AsyncShieldEngine(BaseShieldEngine):
             )
         elif rule.then == Verdict.REDACT:
             # redact_dict scans for PII internally — no need for a separate scan
-            redacted, pii_matches = await asyncio.to_thread(self._pii.redact_dict, args)
+            redacted, pii_matches = await asyncio.to_thread(pii_detector.redact_dict, args)
             for pm in pii_matches:
                 self._session_mgr.add_taint(session_id, pm.pii_type)
             result = self._verdict_builder.redact(
@@ -292,6 +303,15 @@ class AsyncShieldEngine(BaseShieldEngine):
                     )
             except Exception as e:
                 logger.warning("Shadow evaluation error: %s", e)
+
+        # Issue #30: Invoke post-check plugin hooks
+        from policyshield.plugins import get_post_check_hooks as _get_post_hooks
+
+        for hook_fn in _get_post_hooks():
+            try:
+                hook_fn(tool_name=tool_name, args=args, session_id=session_id, result=result)
+            except Exception as e:
+                logger.warning("Post-check hook error: %s", e)
 
         return result
 
