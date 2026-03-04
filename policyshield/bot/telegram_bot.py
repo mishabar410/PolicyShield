@@ -75,7 +75,8 @@ class PolicyBot:
         self._allowed_chats: set[int] = {int(x.strip()) for x in allowed.split(",") if x.strip()} if allowed else set()
 
         # Issue #127: Pending compilations keyed by (chat_id, user_id)
-        self._pending: dict[tuple[int, int], str] = {}
+        self._pending: dict[tuple[int, int], tuple[str, float]] = {}  # Issue #153: (yaml, timestamp)
+        self._pending_ttl: float = 3600.0  # 1 hour TTL for pending compilations
 
     @property
     def _base_url(self) -> str:
@@ -300,8 +301,15 @@ class PolicyBot:
             )
             return
 
-        # Issue #127: Store pending YAML by (chat_id, user_id)
-        self._pending[(chat_id, user_id)] = result.yaml_text
+        # Issue #127/#153: Store pending YAML by (chat_id, user_id) with timestamp
+        import time as _time
+
+        self._pending[(chat_id, user_id)] = (result.yaml_text, _time.monotonic())
+        # Evict expired entries
+        now = _time.monotonic()
+        expired = [k for k, (_, ts) in self._pending.items() if now - ts > self._pending_ttl]
+        for k in expired:
+            del self._pending[k]
 
         # Preview — Issue #100: YAML in code block to prevent markdown injection
         yaml_preview = result.yaml_text
@@ -342,10 +350,11 @@ class PolicyBot:
 
     async def _deploy(self, chat_id: int, user_id: int, message_id: int, callback_id: str) -> None:
         """Merge YAML into existing rules and reload the server."""
-        yaml_text = self._pending.pop((chat_id, user_id), None)
-        if not yaml_text:
+        entry = self._pending.pop((chat_id, user_id), None)
+        if not entry:
             await self._answer_callback(callback_id, "No pending rules")
             return
+        yaml_text, _ts = entry
 
         await self._answer_callback(callback_id, "Deploying...")
 
@@ -495,4 +504,9 @@ def run_bot(
     try:
         asyncio.run(bot.run())
     except KeyboardInterrupt:
+        # Issue #120/#196: Ensure httpx client cleanup on interrupt
         logger.info("Bot stopped by user")
+        try:
+            asyncio.run(bot.stop())
+        except Exception:
+            pass

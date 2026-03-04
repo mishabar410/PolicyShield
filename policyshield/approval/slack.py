@@ -92,7 +92,22 @@ class SlackApprovalBackend(ApprovalBackend):
             logger.warning("Failed to send Slack notification for %s", request.request_id)
 
     def health(self) -> dict[str, Any]:
-        return {"healthy": True, "backend": "slack", "webhook_configured": bool(self._webhook_url)}
+        # Issue #59: Real connectivity check instead of always-true
+        webhook_ok = False
+        if self._webhook_url:
+            try:
+                import httpx
+
+                with httpx.Client(timeout=5.0) as client:
+                    resp = client.post(self._webhook_url, json={"text": ""})
+                    webhook_ok = resp.status_code < 500
+            except Exception:
+                webhook_ok = False
+        return {
+            "healthy": webhook_ok or not self._webhook_url,
+            "backend": "slack",
+            "webhook_configured": bool(self._webhook_url),
+        }
 
     def stop(self) -> None:
         """Stop the internal backend GC timer (Issue #185)."""

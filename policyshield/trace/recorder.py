@@ -58,6 +58,7 @@ class TraceRecorder:
         max_file_size: int = 100 * 1024 * 1024,  # 100MB
         rotation: str = "size",  # "size" | "daily" | "none"
         retention_days: int = 30,
+        on_buffer_overflow: Any | None = None,  # Issue #73: Callback(dropped_count)
     ):
         import atexit
 
@@ -67,10 +68,12 @@ class TraceRecorder:
         self._max_file_size = max_file_size
         self._rotation = rotation
         self._retention_days = retention_days
+        self._on_buffer_overflow = on_buffer_overflow  # Issue #73
         self._current_date = datetime.now(timezone.utc).strftime("%Y%m%d")
         self._buffer: list[dict] = []
         self._file_path: Path | None = None
         self._record_count = 0
+        self._flush_count = 0  # Issue #98: Track flushes for periodic cleanup
         self._lock = threading.Lock()
         self._closed = False
 
@@ -228,9 +231,22 @@ class TraceRecorder:
                 dropped = len(self._buffer) - max_retained
                 self._buffer = self._buffer[-max_retained:]
                 logger.warning("Trace buffer overflow: dropped %d oldest records", dropped)
+                # Issue #73: Notify via callback
+                if self._on_buffer_overflow:
+                    try:
+                        self._on_buffer_overflow(dropped)
+                    except Exception:
+                        pass
             return
 
         self._buffer.clear()
+        self._flush_count += 1
+        # Issue #98: Periodic cleanup every 100 flushes
+        if self._flush_count % 100 == 0:
+            try:
+                self.cleanup_old_traces()
+            except Exception:
+                pass
 
     @property
     def record_count(self) -> int:

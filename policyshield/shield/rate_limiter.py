@@ -41,7 +41,11 @@ class _SlidingWindow:
     def add(self, now: float) -> None:
         self.timestamps.append(now)
 
-    def count_in_window(self, now: float, window: float) -> int:
+    def _count_and_prune(self, now: float, window: float) -> int:
+        """Count timestamps in window, pruning expired ones (mutates deque).
+
+        Issue #143: Renamed from count_in_window to signal mutation side-effect.
+        """
         cutoff = now - window
         # Remove expired timestamps from left (oldest first) — O(1) amortized
         while self.timestamps and self.timestamps[0] <= cutoff:
@@ -139,7 +143,7 @@ class RateLimiter:
                     session_id if config.per_session else "__global__",
                 )
                 window = self._windows[key]
-                count = window.count_in_window(now, config.window_seconds)
+                count = window._count_and_prune(now, config.window_seconds)
 
                 if count >= config.max_calls:
                     return RateLimitResult(
@@ -172,7 +176,7 @@ class RateLimiter:
                     session_id if config.per_session else "__global__",
                 )
                 window = self._windows[key]
-                count = window.count_in_window(now, config.window_seconds)
+                count = window._count_and_prune(now, config.window_seconds)
 
                 if count >= config.max_calls:
                     return RateLimitResult(
@@ -275,7 +279,7 @@ class GlobalRateLimiter:
             if session_id not in self._counters:
                 self._counters[session_id] = _SlidingWindow()
             counter = self._counters[session_id]
-            count = counter.count_in_window(now, self._window)
+            count = counter._count_and_prune(now, self._window)
             if count >= self._max_calls:
                 return False
             counter.add(now)

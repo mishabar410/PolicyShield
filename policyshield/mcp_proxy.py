@@ -91,7 +91,10 @@ class MCPProxy:
         }
 
 
-def create_mcp_proxy_server(engine: Any) -> Any:
+def create_mcp_proxy_server(
+    engine: Any,
+    upstream_command: list[str] | None = None,  # Issue #142: Accept upstream command
+) -> Any:
     """Create an MCP server that proxies tool calls through PolicyShield.
 
     This creates a transparent proxy: it lists all tools from the upstream
@@ -99,6 +102,7 @@ def create_mcp_proxy_server(engine: Any) -> Any:
 
     Args:
         engine: AsyncShieldEngine with loaded rules.
+        upstream_command: Optional command to start upstream MCP server.
 
     Returns:
         An MCP Server instance.
@@ -107,7 +111,7 @@ def create_mcp_proxy_server(engine: Any) -> Any:
         raise ImportError("MCP proxy requires the 'mcp' package: pip install mcp")
 
     server = Server("policyshield-proxy")
-    proxy = MCPProxy(engine, [])
+    proxy = MCPProxy(engine, upstream_command or [])
 
     @server.call_tool()
     async def handle_call_tool(name: str, arguments: dict | None) -> list:
@@ -166,6 +170,16 @@ def create_mcp_proxy_server(engine: Any) -> Any:
         for rule in rules_snapshot:
             tool_pattern = rule.when.get("tool") if isinstance(rule.when, dict) else None
             if tool_pattern and tool_pattern != "*":
+                # Issue #169: Skip regex patterns — only expose literal tool names
+                import re as _re
+
+                try:
+                    _re.compile(tool_pattern)
+                    is_regex = any(c in tool_pattern for c in r".*+?[](){}|\^$")
+                except _re.error:
+                    is_regex = False
+                if is_regex:
+                    continue
                 tools.append(
                     Tool(
                         name=tool_pattern,

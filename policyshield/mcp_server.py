@@ -154,11 +154,11 @@ def create_mcp_server(engine: Any, admin_token: str | None = None) -> Any:
                 return [TextContent(type="text", text=json.dumps(post_payload))]
 
             elif name == "health":
+                # Issue #198: Don't expose kill switch status in unauthenticated health
                 info = {
                     "status": "ok",
                     "rules_count": engine.rule_count,
                     "mode": engine.mode.value,
-                    "killed": engine.is_killed,
                 }
                 return [TextContent(type="text", text=json.dumps(info))]
 

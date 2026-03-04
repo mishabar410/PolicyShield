@@ -96,7 +96,7 @@ class TestCompileFlow:
         buttons = markup["inline_keyboard"][0]
         assert any(b["text"] == "✅ Deploy" for b in buttons)
         assert any(b["text"] == "❌ Cancel" for b in buttons)
-        assert bot._pending[(123, 42)] == yaml_text
+        assert bot._pending[(123, 42)][0] == yaml_text  # Issue #153: (yaml, timestamp)
 
     @pytest.mark.asyncio
     async def test_failed_compile(self, bot: PolicyBot) -> None:
@@ -129,7 +129,7 @@ class TestCallbackHandler:
     async def test_deploy_callback(self, bot: PolicyBot, tmp_rules: Path) -> None:
         """Deploy callback should write YAML and reload server."""
         yaml_text = "rules:\n  - id: test\n    when: {tool: x}\n    then: block\n"
-        bot._pending[(123, 42)] = yaml_text
+        bot._pending[(123, 42)] = (yaml_text, 0.0)  # Issue #153: (yaml, timestamp)
         bot._answer_callback = AsyncMock()
         bot._edit_message = AsyncMock()
 
@@ -157,7 +157,7 @@ class TestCallbackHandler:
     @pytest.mark.asyncio
     async def test_cancel_callback(self, bot: PolicyBot) -> None:
         """Cancel callback should clear pending and confirm."""
-        bot._pending[(123, 42)] = "some yaml"
+        bot._pending[(123, 42)] = ("some yaml", 0.0)
         bot._answer_callback = AsyncMock()
         bot._edit_message = AsyncMock()
 
@@ -193,7 +193,7 @@ class TestCallbackHandler:
     async def test_deploy_creates_backup(self, bot: PolicyBot, tmp_rules: Path) -> None:
         """Deploy should back up existing rules."""
         tmp_rules.write_text("old: rules\n")
-        bot._pending[(123, 42)] = "new: rules\n"
+        bot._pending[(123, 42)] = ("new: rules\n", 0.0)
         bot._answer_callback = AsyncMock()
         bot._edit_message = AsyncMock()
 
@@ -218,7 +218,7 @@ class TestCallbackHandler:
     @pytest.mark.asyncio
     async def test_deploy_server_unreachable(self, bot: PolicyBot, tmp_rules: Path) -> None:
         """Deploy should warn if server reload fails."""
-        bot._pending[(123, 42)] = "rules:\n  - id: t\n    when: {tool: x}\n    then: block\n"
+        bot._pending[(123, 42)] = ("rules:\n  - id: t\n    when: {tool: x}\n    then: block\n", 0.0)
         bot._answer_callback = AsyncMock()
         bot._edit_message = AsyncMock()
         bot._client.post = AsyncMock(side_effect=Exception("Connection refused"))

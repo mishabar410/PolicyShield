@@ -25,7 +25,7 @@ class AsyncPolicyShieldClient:
         token: str | None = None,
         timeout: float = 30.0,
         max_retries: int = 3,
-        backoff_factor: float = 1.0,
+        backoff_factor: float = 0.5,  # Issue #166: Align with sync client default
         retries: int | None = None,  # Deprecated alias
     ) -> None:
         # Issue #119/#135: Unify retry params with sync client

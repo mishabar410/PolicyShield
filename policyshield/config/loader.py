@@ -7,6 +7,7 @@ validates, and can build fully-configured engine instances.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 from dataclasses import dataclass, field
@@ -18,6 +19,7 @@ from policyshield.core.models import ShieldMode
 
 _ENV_RE = re.compile(r"\$\{([^}:]+)(?::-([^}]*))?\}")
 _SCHEMA_PATH = Path(__file__).parent / "schema.json"
+logger = logging.getLogger(__name__)
 
 
 # ────────────────────────────────────────────────────────────────────
@@ -451,4 +453,12 @@ def generate_default_config() -> str:
 
 def load_schema() -> dict:
     """Load the JSON Schema for validation."""
-    return json.loads(_SCHEMA_PATH.read_text(encoding="utf-8"))
+    # Issue #97: Graceful fallback with user-friendly error
+    try:
+        return json.loads(_SCHEMA_PATH.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        logger.warning("Schema file not found at %s, skipping validation", _SCHEMA_PATH)
+        return {}
+    except json.JSONDecodeError as e:
+        logger.warning("Schema file at %s is invalid JSON: %s", _SCHEMA_PATH, e)
+        return {}

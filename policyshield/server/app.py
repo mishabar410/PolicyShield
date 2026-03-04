@@ -53,6 +53,12 @@ def _rules_hash(engine: AsyncShieldEngine) -> str:
     for r in ruleset.rules:
         # Issue #38: Include rule content in hash for modification detection
         raw += f"|{r.id}:{r.then.value}:{r.severity}:{r.enabled}:{r.priority}:{r.when}"
+    # Issue #179: Include output_rules, honeypots, taint_chain, default_verdict
+    raw += f"|dv:{ruleset.default_verdict.value}"
+    for orule in getattr(ruleset, 'output_rules', None) or []:
+        raw += f"|o:{getattr(orule, 'id', '')}"
+    for hp in getattr(ruleset, 'honeypots', None) or []:
+        raw += f"|h:{getattr(hp, 'id', '')}"
     return hashlib.sha256(raw.encode()).hexdigest()[:16]
 
 
@@ -105,7 +111,11 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
         """Run a quick self-test to verify engine is operational."""
         try:
             result = await engine.check("__self_test__", {})
-            _logger.info("Startup self-test passed: verdict=%s", result.verdict.value)
+            # Issue #218: Log verdict level — BLOCK from wildcard rules is still a valid engine
+            if result.verdict.value == "BLOCK":
+                _logger.warning("Self-test returned BLOCK (likely wildcard rule) — engine is operational")
+            else:
+                _logger.info("Startup self-test passed: verdict=%s", result.verdict.value)
         except Exception as e:
             _logger.critical("Startup self-test FAILED: %s", e)
             raise RuntimeError(f"Engine self-test failed: {e}") from e
@@ -516,7 +526,9 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
         backend = engine.approval_backend
         if backend is None:
             raise HTTPException(status_code=500, detail="No approval backend configured")
-        backend.respond(
+        # Issue #217: Run sync backend.respond() in thread to avoid blocking event loop
+        await asyncio.to_thread(
+            backend.respond,
             request_id=req.approval_id,
             approved=req.approved,
             responder=req.responder,

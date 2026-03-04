@@ -137,9 +137,7 @@ class CrewAIShieldTool:
 
         return output
 
-    def run(self, *args: Any, **kwargs: Any) -> str:
-        """Public run method (alias for ``_run``)."""
-        return self._run(*args, **kwargs)
+    # Issue #123: Removed run() alias — BaseTool.run() wraps _run() with\n    # additional logic. Overriding it bypassed CrewAI's built-in handling.
 
 
 def shield_all_crewai_tools(

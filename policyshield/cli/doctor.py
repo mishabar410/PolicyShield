@@ -88,6 +88,7 @@ def run_doctor(
 
     # --- Check 2: Rules file exists and parses ---
     rules: list[dict] = []
+    data: dict[str, Any] = {}
     if rules_path.exists():
         try:
             data = yaml.safe_load(rules_path.read_text()) or {}
@@ -118,12 +119,8 @@ def run_doctor(
         report.add(Check("Rules file", False, 10, f"✗ {rules_path} not found", "Run: policyshield init"))
 
     # --- Check 3: default_verdict ---
-    rules_data: dict[str, Any] = {}
-    if rules_path.exists():
-        try:
-            rules_data = yaml.safe_load(rules_path.read_text()) or {}
-        except Exception:
-            pass
+    # Issue #71: Reuse rules_data from check 2 instead of parsing again
+    rules_data = data if rules_path.exists() else {}
     default_v = rules_data.get("default_verdict", "allow")
     if default_v == "block":
         report.add(Check("Default verdict", True, 15, "✓ default_verdict: block (secure)"))

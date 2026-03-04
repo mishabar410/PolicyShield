@@ -175,8 +175,10 @@ def _bind_args(func: Callable, args: tuple, kwargs: dict) -> dict:
         bound.apply_defaults()
         return dict(bound.arguments)
     except (ValueError, TypeError):
-        # Fallback: return kwargs only (e.g. for builtins without signature)
-        return dict(kwargs)
+        # Issue #124: Fallback preserves positional args via enumerate
+        merged = {f"arg{i}": v for i, v in enumerate(args)}
+        merged.update(kwargs)
+        return merged
 
 
 def _rebuild_args(
@@ -210,6 +212,18 @@ def _rebuild_args(
         return tuple(new_args), new_kwargs
     except (ValueError, TypeError):
         # Fallback: just update kwargs (legacy behavior)
+        # NOTE Issue #58: Variadic (*args/**kwargs) functions may get incorrect
+        # args after REDACT modification. This is a known limitation.
         new_kwargs = dict(original_kwargs)
         new_kwargs.update(modified_args)
         return original_args, new_kwargs
+
+
+def cleanup_default_engine() -> None:
+    """Clean up the global default engine singleton.
+
+    Issue #208: Call this in test teardown to avoid state leakage.
+    """
+    global _default_engine
+    with _default_engine_lock:
+        _default_engine = None

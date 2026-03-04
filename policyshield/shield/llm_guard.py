@@ -13,6 +13,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+from collections import OrderedDict
 import os
 import threading
 import time
@@ -107,7 +108,8 @@ class LLMGuard:
 
     def __init__(self, config: LLMGuardConfig) -> None:
         self._config = config
-        self._cache: dict[str, tuple[GuardResult, float]] = {}
+        # Issue #61: Use OrderedDict for LRU eviction support
+        self._cache: OrderedDict[str, tuple[GuardResult, float]] = OrderedDict()
         self._max_cache_size = 1000
         # Issue #66: Thread-safe cache access
         self._cache_lock = threading.Lock()
@@ -193,7 +195,12 @@ class LLMGuard:
         return self._parse_response(data)
 
     def _build_prompt(self, tool_name: str, args: dict) -> str:
-        arg_str = json.dumps(args, default=str)[: self._config.max_arg_length]
+        # Issue #209: Safe JSON truncation — don't break JSON mid-token
+        full = json.dumps(args, default=str)
+        if len(full) > self._config.max_arg_length:
+            arg_str = full[: self._config.max_arg_length] + "...[truncated]"
+        else:
+            arg_str = full
         checks = ", ".join(self._config.checks)
         return f"Tool: {tool_name}\nArguments: {arg_str}\n\nCheck for: {checks}"
 
@@ -233,13 +240,17 @@ class LLMGuard:
             if time.monotonic() - ts > self._config.cache_ttl:
                 del self._cache[key]
                 return None
+            # Issue #61: Update last-access time for LRU
+            self._cache[key] = (result, time.monotonic())
+            # Move to end (most recently used)
+            self._cache.move_to_end(key)
             return result
 
     def _put_cache(self, key: str, result: GuardResult) -> None:
         # Issue #66: Thread-safe cache write
         with self._cache_lock:
             if len(self._cache) >= self._max_cache_size:
-                # Evict oldest entry
+                # Issue #61: Evict least-recently-used entry (first in OrderedDict)
                 oldest = next(iter(self._cache))
                 del self._cache[oldest]
             self._cache[key] = (result, time.monotonic())

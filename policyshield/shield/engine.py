@@ -113,4 +113,10 @@ class ShieldEngine(BaseShieldEngine):
         Returns:
             PostCheckResult with PII matches and optional redacted output.
         """
-        return self._post_check_sync(tool_name, result, session_id)
+        # Issue #178: Trace post_check latency
+        start = time.monotonic()
+        pc_result = self._post_check_sync(tool_name, result, session_id)
+        latency_ms = (time.monotonic() - start) * 1000
+        if latency_ms > 100:
+            logger.debug("post_check latency: %.1fms tool=%s", latency_ms, tool_name)
+        return pc_result

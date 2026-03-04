@@ -18,7 +18,8 @@ except ImportError:
 class CheckResult:
     """Result of a PolicyShield check."""
 
-    verdict: str
+    # Issue #60: Use Verdict enum for type safety
+    verdict: str  # Raw string from API, use verdict_enum for typed access
     message: str
     rule_id: str | None = None
     modified_args: dict | None = None
@@ -26,6 +27,13 @@ class CheckResult:
     approval_id: str | None = None
     shield_version: str | None = None
     request_id: str | None = None
+
+    @property
+    def verdict_enum(self) -> Any:
+        """Return verdict as Verdict enum for safe comparisons."""
+        from policyshield.core.models import Verdict
+
+        return Verdict(self.verdict)
 
 
 class PolicyShieldClient:

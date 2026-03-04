@@ -114,7 +114,7 @@ def test_e2e_crewai_wrap():
     assert len(wrapped) == 1
     assert isinstance(wrapped[0], CrewAIShieldTool)
 
-    result = wrapped[0].run()
+    result = wrapped[0]._run()  # Issue #123: run() alias removed
     assert "BLOCKED" in result
 
 

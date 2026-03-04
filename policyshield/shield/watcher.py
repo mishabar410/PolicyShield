@@ -46,10 +46,10 @@ class RuleWatcher:
         if self._path.is_file():
             self._mtimes[self._path] = self._path.stat().st_mtime
         elif self._path.is_dir():
-            for f in self._path.rglob("*.yaml"):
-                self._mtimes[f] = f.stat().st_mtime
-            for f in self._path.rglob("*.yml"):
-                self._mtimes[f] = f.stat().st_mtime
+            # Issue #210: Single pass for both extensions
+            for ext in ("*.yaml", "*.yml"):
+                for f in self._path.rglob(ext):
+                    self._mtimes[f] = f.stat().st_mtime
 
     def start(self) -> None:
         """Start watching in a background daemon thread."""
@@ -128,16 +128,13 @@ class RuleWatcher:
             except FileNotFoundError:
                 pass  # File deleted between is_file() and stat()
         elif self._path.is_dir():
-            for f in self._path.rglob("*.yaml"):
-                try:
-                    current[f] = f.stat().st_mtime
-                except FileNotFoundError:
-                    pass
-            for f in self._path.rglob("*.yml"):
-                try:
-                    current[f] = f.stat().st_mtime
-                except FileNotFoundError:
-                    pass
+            # Issue #210: Single pass for both extensions
+            for ext in ("*.yaml", "*.yml"):
+                for f in self._path.rglob(ext):
+                    try:
+                        current[f] = f.stat().st_mtime
+                    except FileNotFoundError:
+                        pass
 
         changed = current != self._mtimes
         if changed:

@@ -204,9 +204,13 @@ def test_crewai_post_check(allow_rules):
 
 
 def test_crewai_run_alias(allow_rules):
+    """Issue #123: run() alias was removed — CrewAIShieldTool no longer overrides it."""
     engine = ShieldEngine(allow_rules)
     fake_tool = FakeCrewAITool()
     safe_tool = CrewAIShieldTool(wrapped_tool=fake_tool, engine=engine)
 
-    result = safe_tool.run(query="hello")
+    # run() should NOT be defined directly on CrewAIShieldTool anymore
+    assert "run" not in CrewAIShieldTool.__dict__
+    # _run() should still work
+    result = safe_tool._run(query="hello")
     assert "hello" in result

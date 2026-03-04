@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import threading
@@ -651,7 +652,8 @@ class BaseShieldEngine:
         # Output rules check
         import re as _re
 
-        output_str = str(result) if not isinstance(result, str) else result
+        # Issue #12: Use JSON serialization for consistent output rule matching
+        output_str = json.dumps(result, default=str) if not isinstance(result, str) else result
         with self._lock:
             output_rules = getattr(self._rule_set, "output_rules", [])
 
@@ -833,11 +835,12 @@ class BaseShieldEngine:
 
     def get_policy_summary(self) -> str:
         """Return human-readable summary of active rules for LLM context."""
+        # Issue #167: Iterate under lock for consistency
         with self._lock:
             rule_set = self._rule_set
-        lines = [f"PolicyShield: {rule_set.shield_name} v{rule_set.version}"]
-        lines.append(f"Default: {rule_set.default_verdict.value}")
-        lines.append(f"Rules: {len(rule_set.rules)}")
-        for rule in rule_set.rules:
-            lines.append(f"  - [{rule.then.value}] {rule.id}: {rule.message or rule.description or rule.id}")
+            lines = [f"PolicyShield: {rule_set.shield_name} v{rule_set.version}"]
+            lines.append(f"Default: {rule_set.default_verdict.value}")
+            lines.append(f"Rules: {len(rule_set.rules)}")
+            for rule in rule_set.rules:
+                lines.append(f"  - [{rule.then.value}] {rule.id}: {rule.message or rule.description or rule.id}")
         return "\n".join(lines)
