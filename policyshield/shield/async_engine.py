@@ -177,6 +177,16 @@ class AsyncShieldEngine(BaseShieldEngine):
                     message=rl_result.message,
                 )
 
+        # Budget check — cost-based per-session/per-hour limits
+        if self._budget_tracker is not None:
+            budget_ok, budget_msg = self._budget_tracker.check_budget(session_id, tool_name)
+            if not budget_ok:
+                return ShieldResult(
+                    verdict=Verdict.BLOCK,
+                    rule_id="__budget__",
+                    message=budget_msg,
+                )
+
         # PII taint chain — block outgoing calls if session is tainted
         if self._taint_enabled and tool_name in self._outgoing_tools:
             session = self._session_mgr.get_or_create(session_id)

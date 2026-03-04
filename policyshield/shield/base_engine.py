@@ -50,6 +50,9 @@ class BaseShieldEngine:
         otel_exporter: Any = None,
         sanitizer: Any = None,
         llm_guard: Any = None,
+        budget_tracker: Any = None,
+        canary_router: Any = None,
+        webhook_notifier: Any = None,
     ):
         """Initialize engine components.
 
@@ -96,6 +99,9 @@ class BaseShieldEngine:
         self._otel = otel_exporter
         self._sanitizer = sanitizer
         self._llm_guard = llm_guard
+        self._budget_tracker = budget_tracker
+        self._canary_router = canary_router
+        self._webhook_notifier = webhook_notifier
         self._lock = threading.Lock()
         self._watcher: Any = None
         # Approval metadata for cache population after resolution
@@ -269,6 +275,16 @@ class BaseShieldEngine:
                     verdict=Verdict.BLOCK,
                     rule_id="__rate_limit__",
                     message=rl_result.message,
+                )
+
+        # Budget check — cost-based per-session/per-hour limits
+        if self._budget_tracker is not None:
+            budget_ok, budget_msg = self._budget_tracker.check_budget(session_id, tool_name)
+            if not budget_ok:
+                return ShieldResult(
+                    verdict=Verdict.BLOCK,
+                    rule_id="__budget__",
+                    message=budget_msg,
                 )
 
         # PII taint chain — block outgoing calls if session is tainted
@@ -606,12 +622,37 @@ class BaseShieldEngine:
         # Update session & rate-limit only when the tool will actually execute
         if result.verdict not in (Verdict.BLOCK, Verdict.APPROVE):
             self._session_mgr.increment(session_id, tool_name)
+            # Record budget spend for allowed calls
+            if self._budget_tracker is not None:
+                self._budget_tracker.record_spend(session_id, tool_name)
 
         # Record event in ring buffer for chain rule tracking
         # Only record events for actually executed calls (not blocked/pending-approval)
         if result.verdict not in (Verdict.BLOCK, Verdict.APPROVE):
             buf = self._session_mgr.get_event_buffer(session_id)
             buf.add(tool_name, result.verdict.value)
+
+        # Webhook notification — fire-and-forget on BLOCK/APPROVE
+        if self._webhook_notifier is not None and result.verdict in (Verdict.BLOCK, Verdict.APPROVE):
+            try:
+                import asyncio
+                import concurrent.futures
+
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                    pool.submit(
+                        asyncio.run,
+                        self._webhook_notifier.notify(
+                            verdict=result.verdict.value,
+                            tool_name=tool_name,
+                            details={
+                                "session_id": session_id,
+                                "rule_id": result.rule_id or "",
+                                "message": result.message,
+                            },
+                        ),
+                    )
+            except Exception as e:
+                logger.warning("Webhook notification error: %s", e)
 
         # Record trace
         self._trace(result, session_id, tool_name, latency_ms, args)

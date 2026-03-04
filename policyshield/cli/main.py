@@ -294,6 +294,18 @@ def app(args: list[str] | None = None) -> int:
     # quickstart command
     subparsers.add_parser("quickstart", help="Interactive setup wizard")
 
+    # report command (compliance)
+    report_parser = subparsers.add_parser("report", help="Generate compliance report from traces")
+    report_parser.add_argument("--dir", default="./traces", help="Trace directory (default: ./traces)")
+    report_parser.add_argument("--format", choices=["text", "html"], default="text", help="Output format")
+    report_parser.add_argument("--output", "-o", default=None, help="Output file (default: stdout)")
+
+    # timeline command (incident)
+    timeline_parser = subparsers.add_parser("timeline", help="Show incident timeline for a session")
+    timeline_parser.add_argument("--dir", default="./traces", help="Trace directory (default: ./traces)")
+    timeline_parser.add_argument("--session", required=True, help="Session ID to inspect")
+    timeline_parser.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+
     parsed = parser.parse_args(args)
 
     if parsed.command == "validate":
@@ -372,6 +384,10 @@ def app(args: list[str] | None = None) -> int:
         return _cmd_compile(parsed)
     elif parsed.command == "bot":
         return _cmd_bot(parsed)
+    elif parsed.command == "report":
+        return _cmd_report(parsed)
+    elif parsed.command == "timeline":
+        return _cmd_timeline(parsed)
     else:
         parser.print_help()
         return 1
@@ -1515,6 +1531,95 @@ def _cmd_bot(parsed: argparse.Namespace) -> int:
     except ValueError as e:
         print(f"✗ {e}", file=sys.stderr)
         return 1
-    except KeyboardInterrupt:
-        print("\nBot stopped.")
+
+
+def _cmd_report(parsed: argparse.Namespace) -> int:
+    """Generate compliance report from trace directory."""
+    from policyshield.reporting.compliance import generate_report, render_html
+
+    trace_dir = Path(parsed.dir)
+    if not trace_dir.exists():
+        print(f"✗ Trace directory not found: {parsed.dir}", file=sys.stderr)
+        return 1
+
+    report = generate_report(trace_dir)
+
+    if report.total_checks == 0:
+        print("⚠ No trace entries found.", file=sys.stderr)
         return 0
+
+    if parsed.format == "html":
+        output = render_html(report)
+    else:
+        lines = [
+            "PolicyShield Compliance Report",
+            f"  Period: {report.period_start} → {report.period_end}",
+            f"  Total checks: {report.total_checks}",
+            f"  Sessions: {report.sessions_analyzed}",
+            f"  PII detections: {report.pii_detections}",
+            f"  Rules active: {len(report.rules_used)}",
+            "",
+            "Verdicts:",
+        ]
+        for verdict, count in sorted(report.verdicts.items()):
+            pct = (count / report.total_checks * 100) if report.total_checks else 0
+            lines.append(f"  {verdict}: {count} ({pct:.1f}%)")
+        if report.top_blocked_tools:
+            lines.append("")
+            lines.append("Top blocked tools:")
+            for tool, count in report.top_blocked_tools:
+                lines.append(f"  {tool}: {count}")
+        output = "\n".join(lines)
+
+    if parsed.output:
+        Path(parsed.output).parent.mkdir(parents=True, exist_ok=True)
+        Path(parsed.output).write_text(output + "\n", encoding="utf-8")
+        print(f"✓ Report written to {parsed.output}", file=sys.stderr)
+    else:
+        print(output)
+
+    return 0
+
+
+def _cmd_timeline(parsed: argparse.Namespace) -> int:
+    """Show incident timeline for a session."""
+    from policyshield.reporting.incident import build_timeline, render_timeline_text
+
+    trace_dir = Path(parsed.dir)
+    if not trace_dir.exists():
+        print(f"✗ Trace directory not found: {parsed.dir}", file=sys.stderr)
+        return 1
+
+    timeline = build_timeline(parsed.session, trace_dir)
+
+    if timeline.total_checks == 0:
+        print(f"⚠ No events found for session: {parsed.session}", file=sys.stderr)
+        return 0
+
+    if parsed.format == "json":
+        import json as _json
+
+        out = {
+            "session_id": timeline.session_id,
+            "first_event": timeline.first_event,
+            "last_event": timeline.last_event,
+            "total_checks": timeline.total_checks,
+            "violations": timeline.violations,
+            "pii_events": timeline.pii_events,
+            "events": [
+                {
+                    "timestamp": e.timestamp,
+                    "tool": e.tool,
+                    "verdict": e.verdict,
+                    "rule_id": e.rule_id,
+                    "message": e.message,
+                    "pii_detected": e.pii_detected,
+                }
+                for e in timeline.events
+            ],
+        }
+        print(_json.dumps(out, indent=2))
+    else:
+        print(render_timeline_text(timeline))
+
+    return 0

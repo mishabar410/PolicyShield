@@ -25,7 +25,7 @@ class ComplianceReport:
     rules_used: set[str] = field(default_factory=set)
 
 
-def generate_report(trace_dir: str | Path, period_days: int = 30) -> ComplianceReport:
+def generate_report(trace_dir: str | Path) -> ComplianceReport:
     """Generate compliance report from trace files."""
     trace_path = Path(trace_dir)
     now = datetime.now(tz=timezone.utc)

@@ -65,6 +65,20 @@ class PolicyShieldConfig:
     # rate limits (YAML list passed to RateLimiter.from_yaml_dict)
     rate_limits: list[dict] = field(default_factory=list)
 
+    # budget
+    budget_enabled: bool = False
+    budget_max_per_session: float = 0
+    budget_max_per_hour: float = 0
+
+    # webhook notifications
+    webhook_url: str | None = None
+    webhook_events: list[str] = field(default_factory=lambda: ["BLOCK", "APPROVE"])
+
+    # remote rule loading
+    remote_rules_url: str | None = None
+    remote_rules_interval: float = 30.0
+    remote_rules_signature_key: str | None = None
+
 
 # ────────────────────────────────────────────────────────────────────
 # Loaders
@@ -170,6 +184,10 @@ def _build_config(data: dict) -> PolicyShieldConfig:
     if not isinstance(rate_limits_raw, list):
         rate_limits_raw = []
 
+    budget = _get_section(data, "budget")
+    webhook = _get_section(data, "webhook")
+    remote_rules = _get_section(data, "remote_rules")
+
     # Issue #57/#89: Validate numeric config values
     watch_interval = float(rules.get("watch_interval", 2.0))
     if watch_interval <= 0:
@@ -203,6 +221,14 @@ def _build_config(data: dict) -> PolicyShieldConfig:
         otel_endpoint=otel.get("endpoint"),
         approval_backend=approval.get("backend", "inmemory"),
         rate_limits=rate_limits_raw,
+        budget_enabled=budget.get("enabled", False),
+        budget_max_per_session=float(budget.get("max_per_session", 0)),
+        budget_max_per_hour=float(budget.get("max_per_hour", 0)),
+        webhook_url=webhook.get("url"),
+        webhook_events=webhook.get("events", ["BLOCK", "APPROVE"]),
+        remote_rules_url=remote_rules.get("url"),
+        remote_rules_interval=float(remote_rules.get("interval", 30.0)),
+        remote_rules_signature_key=remote_rules.get("signature_key"),
     )
 
 
@@ -286,6 +312,28 @@ def build_engine_from_config(config: PolicyShieldConfig):  # noqa: ANN201
             endpoint=config.otel_endpoint,
         )
 
+    # Budget tracker from config
+    budget_tracker = None
+    if config.budget_enabled:
+        from policyshield.shield.budget import BudgetConfig, BudgetTracker
+
+        budget_tracker = BudgetTracker(
+            BudgetConfig(
+                max_per_session=config.budget_max_per_session,
+                max_per_hour=config.budget_max_per_hour,
+            )
+        )
+
+    # Webhook notifier from config
+    webhook_notifier = None
+    if config.webhook_url:
+        from policyshield.server.webhook import WebhookNotifier
+
+        webhook_notifier = WebhookNotifier(
+            url=config.webhook_url,
+            events=config.webhook_events,
+        )
+
     engine = ShieldEngine(
         rules=config.rules_path,
         mode=config.mode,
@@ -296,7 +344,22 @@ def build_engine_from_config(config: PolicyShieldConfig):  # noqa: ANN201
         rate_limiter=rate_limiter,
         approval_backend=approval,
         otel_exporter=otel_exporter,
+        budget_tracker=budget_tracker,
+        webhook_notifier=webhook_notifier,
     )
+
+    # Remote rule loader — start polling in background
+    if config.remote_rules_url:
+        from policyshield.shield.remote_loader import RemoteRuleLoader
+
+        loader = RemoteRuleLoader(
+            url=config.remote_rules_url,
+            refresh_interval=config.remote_rules_interval,
+            signature_key=config.remote_rules_signature_key,
+            callback=lambda rs: engine._swap_rules(rs) if hasattr(engine, "_swap_rules") else engine.reload_rules(),
+        )
+        loader.start()
+        engine._remote_loader = loader  # type: ignore[attr-defined]
 
     # Issue #50/#106: Start watching if configured
     if config.watch:
@@ -348,6 +411,28 @@ def build_async_engine_from_config(config: PolicyShieldConfig):  # noqa: ANN201
             endpoint=config.otel_endpoint,
         )
 
+    # Budget tracker from config
+    budget_tracker = None
+    if config.budget_enabled:
+        from policyshield.shield.budget import BudgetConfig, BudgetTracker
+
+        budget_tracker = BudgetTracker(
+            BudgetConfig(
+                max_per_session=config.budget_max_per_session,
+                max_per_hour=config.budget_max_per_hour,
+            )
+        )
+
+    # Webhook notifier from config
+    webhook_notifier = None
+    if config.webhook_url:
+        from policyshield.server.webhook import WebhookNotifier
+
+        webhook_notifier = WebhookNotifier(
+            url=config.webhook_url,
+            events=config.webhook_events,
+        )
+
     engine = AsyncShieldEngine(
         rules=config.rules_path,
         mode=config.mode,
@@ -358,7 +443,22 @@ def build_async_engine_from_config(config: PolicyShieldConfig):  # noqa: ANN201
         rate_limiter=rate_limiter,
         approval_backend=approval,
         otel_exporter=otel_exporter,
+        budget_tracker=budget_tracker,
+        webhook_notifier=webhook_notifier,
     )
+
+    # Remote rule loader — start polling in background
+    if config.remote_rules_url:
+        from policyshield.shield.remote_loader import RemoteRuleLoader
+
+        loader = RemoteRuleLoader(
+            url=config.remote_rules_url,
+            refresh_interval=config.remote_rules_interval,
+            signature_key=config.remote_rules_signature_key,
+            callback=lambda rs: engine._swap_rules(rs) if hasattr(engine, "_swap_rules") else engine.reload_rules(),
+        )
+        loader.start()
+        engine._remote_loader = loader  # type: ignore[attr-defined]
 
     # Issue #83/#106: Start watching if configured
     if config.watch:
@@ -441,6 +541,20 @@ def render_config(config: PolicyShieldConfig) -> str:
                 "backend": config.approval_backend,
             },
             "rate_limits": config.rate_limits,  # Issue #137
+            "budget": {
+                "enabled": config.budget_enabled,
+                "max_per_session": config.budget_max_per_session,
+                "max_per_hour": config.budget_max_per_hour,
+            },
+            "webhook": {
+                "url": config.webhook_url,
+                "events": config.webhook_events,
+            },
+            "remote_rules": {
+                "url": config.remote_rules_url,
+                "interval": config.remote_rules_interval,
+                "signature_key": config.remote_rules_signature_key,
+            },
         }
     }
     return yaml.dump(d, default_flow_style=False, sort_keys=False)

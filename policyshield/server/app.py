@@ -55,9 +55,9 @@ def _rules_hash(engine: AsyncShieldEngine) -> str:
         raw += f"|{r.id}:{r.then.value}:{r.severity}:{r.enabled}:{r.priority}:{r.when}"
     # Issue #179: Include output_rules, honeypots, taint_chain, default_verdict
     raw += f"|dv:{ruleset.default_verdict.value}"
-    for orule in getattr(ruleset, 'output_rules', None) or []:
+    for orule in getattr(ruleset, "output_rules", None) or []:
         raw += f"|o:{getattr(orule, 'id', '')}"
-    for hp in getattr(ruleset, 'honeypots', None) or []:
+    for hp in getattr(ruleset, "honeypots", None) or []:
         raw += f"|h:{getattr(hp, 'id', '')}"
     return hashlib.sha256(raw.encode()).hexdigest()[:16]
 

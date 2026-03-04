@@ -40,11 +40,18 @@ class OTelExporter:
     def __init__(
         self,
         service_name: str = "policyshield",
-        endpoint: str | None = None,  # noqa: ARG002 — reserved for OTLP config
+        endpoint: str | None = None,
         enabled: bool = True,
     ) -> None:
         self._enabled = enabled and HAS_OTEL
         self._service_name = service_name
+        self._endpoint = endpoint
+
+        # Wire endpoint into OTel SDK via env var (standard OTLP config)
+        if endpoint and HAS_OTEL:
+            import os
+
+            os.environ.setdefault("OTEL_EXPORTER_OTLP_ENDPOINT", endpoint)
 
         if not self._enabled:
             if enabled and not HAS_OTEL:
