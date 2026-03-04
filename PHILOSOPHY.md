@@ -94,8 +94,6 @@ Both are needed. Neither replaces the other.
 
 PolicyShield does not rely on system prompts to enforce rules. System prompts are advisory — the LLM can hallucinate past them, ignore them under pressure, or be overridden by prompt injection. PolicyShield operates at the execution layer, where compliance is binary: the tool either runs or it doesn't, regardless of what the LLM "believes" about the policy.
 
-That said, PolicyShield *does* inject policy summaries into the system prompt. This is an optimization, not a security boundary — it helps the LLM avoid generating blocked calls in the first place, reducing latency and improving UX. The actual enforcement happens at the execution layer.
-
 ### Not a permission system
 
 Traditional permission systems ask: "Does this user have access to this resource?" PolicyShield asks: "Should this tool call, with these specific arguments, in this session context, be allowed right now?" The difference:
@@ -157,7 +155,7 @@ The mode is also explicit:
 
 ### 5. Clean core, thin adapters
 
-The PolicyShield engine is a pure function: `check(tool_name, args, session_id, sender) → ShieldResult`. It has no dependency on any agent framework.
+The PolicyShield engine exposes a simple interface: `check(tool_name, args, session_id, sender) → ShieldResult`. All complexity — rule matching, PII scanning, rate limiting, session tracking, approval flows — is encapsulated behind this boundary. The engine has no dependency on any agent framework.
 
 Integration with specific frameworks (OpenClaw, LangChain, CrewAI) is done through thin adapters that:
 
@@ -196,8 +194,6 @@ This enables:
 | **Audit trail** | JSONL trace recording, search, aggregation, export (CSV/HTML) | `trace.*` |
 | **Human approval flow** | APPROVE verdict pauses execution until a human confirms via CLI, Telegram, or Webhook | `approval.*` |
 | **Hot reload** | Polling-based file watcher reloads rules without restart | `shield.watcher` |
-| **System prompt enrichment** | Inject policy summaries into the LLM's context to reduce wasted blocked calls | `shield.engine` |
-| **Tool filtering** | Remove unconditionally blocked tools from LLM's view entirely | `shield.engine` |
 | **Zero-trust mode** | Explicit allow-list via `default_verdict: BLOCK` | `core.models` |
 | **Output scanning** | PII scan on tool return values via post-check endpoint | `server.app` |
 | **Input sanitizer** | Normalize and sanitize tool arguments before rule evaluation | `shield.sanitizer` |
@@ -223,7 +219,7 @@ This enables:
 
 ### Implemented (CLI)
 
-12 subcommands: `validate`, `lint`, `test`, `diff`, `trace` (show, violations, stats, search, cost, export, dashboard), `init`, `config`, `playground`, `server`, `replay`, `generate`, `openclaw`.
+20+ subcommands: `validate`, `lint`, `test`, `diff`, `trace` (show, violations, stats, search, cost, export, dashboard), `init`, `config` (validate, show, init), `playground`, `server`, `replay`, `generate`, `openclaw`, `kill`, `resume`, `doctor`, `generate-rules`, `simulate`, `openapi`, `check`, `quickstart`, `compile`, `bot`, `report`, `timeline`.
 
 ### Implemented (DevOps)
 
@@ -249,6 +245,8 @@ This enables:
 
 | Capability | Description |
 |---|---|
+| **System prompt enrichment** | Inject policy summaries into the LLM's context to help the model avoid generating blocked calls, reducing latency and improving UX. Optimization only — not a security boundary |
+| **Tool filtering** | Remove unconditionally blocked tools from the LLM's tool list entirely, so the model cannot attempt to call them |
 | **Anomaly detection** | ML-based detection of unusual tool call patterns |
 | **Temporal rules** | "Block `deploy` outside business hours" |
 | **Geo-aware rules** | Different policies based on user/data jurisdiction |
@@ -355,7 +353,7 @@ Every agent framework integration follows the same pattern:
 │              ▼                     │
 │   ┌──────────────────────┐         │
 │   │   PolicyShield Core  │         │
-│   │   (pure function)    │         │
+│   │   (engine)           │         │
 │   └──────────┬───────────┘         │
 │              │                     │
 │         verdict                    │
