@@ -1,44 +1,24 @@
-# 🧠 Tier 3 — LLM Guard (partially implemented in v0.14.0)
+# 🧠 Tier 3 — LLM Guard (Advanced Capabilities)
 
-Архитектура: **LLM Guard как опциональный middleware** в pipeline. Без LLM — всё работает как сейчас (0ms). С LLM — +200-500ms, но ловит то, что regex не может. Включается per-rule.
+Architecture: **LLM Guard as optional middleware** in the pipeline. Without LLM — everything works at 0ms. With LLM — +200-500ms, but catches what regex cannot. Enabled per-rule.
 
 ```
 Tool Call → Sanitizer → Regex Rules → [LLM Guard] → Verdict
 ```
 
-> **v0.14.0 status:** Core LLM Guard middleware is implemented with async threat detection, response caching, and fail-open/closed behavior. Advanced capabilities (semantic PII, intent classification, multi-step plan analysis) are planned for future releases.
+> **v0.14.0 status:** Core LLM Guard middleware is implemented with async threat detection, response caching, and fail-open/closed behavior. The capabilities below are **planned for future releases**.
 
-**Почему отдельный tier:** меняет value proposition с «бесплатный 0ms фаервол» на «платный медленный фаервол». Мощно, но не для первого знакомства.
-
-### Prompt Injection Guard
-
-LLM-классификатор проверяет аргументы тулов на prompt injection:
-
-```yaml
-sanitizer:
-  prompt_injection_guard:
-    enabled: true
-    model: gpt-4o-mini
-    action: BLOCK
-```
-
-- **Усилия**: Средние | **Latency**: +300ms
+---
 
 ### Semantic PII Detection
 
-LLM-based PII как второй проход после regex:
+LLM-based PII as a second pass after regex — catches context-dependent PII that patterns miss.
 
-```yaml
-pii:
-  llm_scan: true
-  llm_model: gpt-4o-mini
-```
-
-- **Усилия**: Средние | **Latency**: +300ms
+- **Effort**: Medium | **Latency**: +300ms
 
 ### Intent Classification
 
-LLM видит **намерение**: агент прочитал БД → вызывает `send_http` с теми же данными → exfiltration.
+LLM sees **intent**: agent read DB → calls `send_http` with the same data → exfiltration.
 
 ```yaml
 llm_guard:
@@ -49,11 +29,11 @@ llm_guard:
   on_malicious: BLOCK
 ```
 
-- **Усилия**: Большие | **Latency**: +500ms
+- **Effort**: Large | **Latency**: +500ms
 
 ### Explainable Verdicts
 
-LLM генерирует объяснение при блокировке:
+LLM generates explanations on block:
 
 ```json
 {
@@ -64,21 +44,21 @@ LLM генерирует объяснение при блокировке:
 }
 ```
 
-- **Усилия**: Маленькие | **Latency**: +200ms
+- **Effort**: Small | **Latency**: +200ms
 
 ### Anomaly Detection
 
-Статистический baseline: «агент обычно делает read_file 5-10 раз», 200 вызовов delete — аномалия.
+Statistical baseline: "agent usually calls read_file 5-10 times", 200 delete calls = anomaly.
 
-- **Усилия**: Большие | **Latency**: +5ms (статистика) или +500ms (LLM)
+- **Effort**: Large | **Latency**: +5ms (statistics) or +500ms (LLM)
 
 ### Multi-Step Plan Analysis
 
-Оценка плана агента целиком до выполнения:
+Evaluate the agent's entire plan before execution:
 
 ```
 Plan: 1) read_database → 2) format_csv → 3) send_email
 Risk: HIGH — data from step 1 leaves system at step 3
 ```
 
-- **Усилия**: Большие (нужен доступ к плану агента) | **Latency**: +500ms
+- **Effort**: Large (requires access to agent's plan) | **Latency**: +500ms
