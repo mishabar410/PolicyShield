@@ -207,6 +207,18 @@ This enables:
 | **Alert engine** | Route verdicts to alert backends (configurable) | `alerts.backends` |
 | **Dashboard** | Live web dashboard with WebSocket verdict streaming, REST API, and embedded SPA | `dashboard` |
 | **Prometheus** | Export metrics in Prometheus format | `dashboard.prometheus` |
+| **Kill switch** | Instantly block ALL tool calls across all sessions via API or CLI; resume when safe | `shield.base_engine` |
+| **Shadow mode** | Evaluate a new rule set in parallel (log-only, non-blocking) for safe A/B testing of policy changes | `shield.base_engine` |
+| **Plugin hooks** | Pre-check and post-check hook points for custom detectors, logging, and auditing plugins | `plugins` |
+| **LLM Guard** | Optional AI-based threat detection — runs an LLM-as-judge on unmatched tool calls for zero-day coverage | `shield.llm_guard` |
+| **Budget tracker** | Per-session and per-hour cost-based limits to prevent runaway agent spending | `shield.budget` |
+| **Canary router** | Route a percentage of traffic through alternative rule sets for gradual rollouts | `shield.canary` |
+| **Webhook notifier** | Fire-and-forget notifications to external systems on BLOCK/APPROVE verdicts | `server.webhook` |
+| **Remote rule loader** | Load rule sets from HTTP/HTTPS endpoints for centralized policy management | `shield.remote_loader` |
+| **Honeypots** | Define trap tool names that always BLOCK — detects probing/reconnaissance by the LLM | `shield.honeypots` |
+| **Context conditions** | Time-of-day (`HH:MM-HH:MM`) and day-of-week (`Mon-Fri`) conditions in rules | `shield.context` |
+| **MCP integration** | Model Context Protocol server and proxy for tool call interception via MCP | `mcp_server`, `mcp_proxy` |
+| **Compliance reports** | Generate compliance and incident timeline reports from trace data | `reporting` |
 
 ### Implemented (Integrations)
 
@@ -216,10 +228,11 @@ This enables:
 | **CrewAI** | Python adapter — wraps tool execution with policy checks | `integrations.crewai` |
 | **OpenClaw** | TypeScript plugin — hooks into OpenClaw's plugin API | `plugins/openclaw/` |
 | **HTTP server** | Standalone FastAPI server with check/post-check/approve endpoints | `server.app` |
+| **MCP server** | Model Context Protocol server for tool call interception and policy enforcement | `mcp_server` |
 
 ### Implemented (CLI)
 
-20+ subcommands: `validate`, `lint`, `test`, `diff`, `trace` (show, violations, stats, search, cost, export, dashboard), `init`, `config` (validate, show, init), `playground`, `server`, `replay`, `generate`, `openclaw`, `kill`, `resume`, `doctor`, `generate-rules`, `simulate`, `openapi`, `check`, `quickstart`, `compile`, `bot`, `report`, `timeline`.
+30+ subcommands: `validate`, `lint`, `test`, `diff`, `trace` (show, violations, stats, search, cost, export, dashboard), `init`, `config` (validate, show, init), `playground`, `server`, `replay`, `generate`, `openclaw`, `kill`, `resume`, `doctor`, `generate-rules`, `simulate`, `openapi`, `check`, `quickstart`, `compile`, `bot`, `report`, `timeline`.
 
 ### Implemented (DevOps)
 
@@ -248,7 +261,6 @@ This enables:
 | **System prompt enrichment** | Inject policy summaries into the LLM's context to help the model avoid generating blocked calls, reducing latency and improving UX. Optimization only — not a security boundary |
 | **Tool filtering** | Remove unconditionally blocked tools from the LLM's tool list entirely, so the model cannot attempt to call them |
 | **Anomaly detection** | ML-based detection of unusual tool call patterns |
-| **Temporal rules** | "Block `deploy` outside business hours" |
 | **Geo-aware rules** | Different policies based on user/data jurisdiction |
 
 ---
@@ -301,6 +313,8 @@ PolicyShield provides a pragmatic, targeted PII scan at the tool call boundary. 
 ### 7. Replacing human judgment
 
 The APPROVE verdict exists precisely because some decisions cannot be automated. PolicyShield should make it easy for humans to review critical actions, not try to automate the judgment itself.
+
+> **Note on LLM Guard:** PolicyShield includes an optional LLM Guard module (`shield.llm_guard`) that uses an external LLM to analyze unmatched tool calls. This is a **supplementary detector**, not a replacement for rule-based enforcement. It operates as a fallback when no YAML rule matches, providing defense-in-depth against novel threats. The verdict is still enforced at the code layer — LLM Guard produces a risk score, and the engine applies the BLOCK verdict programmatically. It does not replace rule matching, and it does not rely on the agent's own LLM.
 
 ---
 

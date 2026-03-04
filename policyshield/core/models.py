@@ -105,7 +105,7 @@ class TaintChainConfig(BaseModel):
 class ChainCondition(BaseModel):
     """A single step in a chain rule — requires a tool to have been called recently."""
 
-    model_config = ConfigDict(frozen=True, extra="forbid")
+    model_config = ConfigDict(frozen=True, extra="ignore")
 
     tool: str
     within_seconds: float = 300.0  # Default 5 min lookback
