@@ -2,13 +2,10 @@
 
 from __future__ import annotations
 
-import json
-import time
 from collections import OrderedDict
 from pathlib import Path
 from unittest.mock import MagicMock
 
-import pytest
 
 from policyshield.core.models import RuleConfig, RuleSet, Verdict
 from policyshield.shield.engine import ShieldEngine
@@ -121,7 +118,6 @@ class TestBufferOverflowCallback:
         )
         # Fill buffer past max_retained (batch_size * 10 = 50)
         # Make flush fail by removing output dir
-        import shutil
 
         rec._file_path = Path("/nonexistent/trace.jsonl")
         for i in range(60):
@@ -171,7 +167,7 @@ class TestBindArgsFallback:
 
 class TestCleanupDefaultEngine:
     def test_cleanup(self):
-        from policyshield.decorators import cleanup_default_engine, _default_engine_lock
+        from policyshield.decorators import cleanup_default_engine
 
         cleanup_default_engine()  # Should not raise
 
