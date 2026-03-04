@@ -138,7 +138,7 @@ Look for these lines in the output:
                               │
                               ▼
                     ┌─────────────────────────┐
-                    │ PolicyShield Plugin (TS) │─ before_tool_call → POST /api/v1/check
+                    │ PolicyShield Plugin (TS)│─ before_tool_call → POST /api/v1/check
                     │                         │← verdict: BLOCK ──  PolicyShield Server
                     └─────────────────────────┘
                               │
