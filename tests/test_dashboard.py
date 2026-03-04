@@ -122,3 +122,117 @@ class TestAppCreation:
     def test_creates_fastapi_app(self, trace_dir):
         app = create_dashboard_app(trace_dir)
         assert app.title == "PolicyShield Dashboard"
+
+
+class TestTraceSearch:
+    def test_search_all(self, test_client):
+        resp = test_client.get("/api/traces/search")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "total" in data
+        assert "records" in data
+        assert data["total"] == 4
+
+    def test_search_by_tool(self, test_client):
+        resp = test_client.get("/api/traces/search?tool=exec")
+        data = resp.json()
+        assert data["total"] == 2
+        assert all(r["tool"] == "exec" for r in data["records"])
+
+    def test_search_by_verdict(self, test_client):
+        resp = test_client.get("/api/traces/search?verdict=BLOCK")
+        data = resp.json()
+        assert data["total"] == 2
+
+    def test_search_by_session(self, test_client):
+        resp = test_client.get("/api/traces/search?session_id=s1")
+        data = resp.json()
+        assert data["total"] == 4
+
+    def test_search_by_text(self, test_client):
+        resp = test_client.get("/api/traces/search?text=web_fetch")
+        data = resp.json()
+        assert data["total"] == 1
+
+    def test_search_pagination(self, test_client):
+        resp = test_client.get("/api/traces/search?limit=2&offset=0")
+        data = resp.json()
+        assert data["total"] == 4
+        assert len(data["records"]) == 2
+
+    def test_search_missing_dir(self, tmp_path):
+        from starlette.testclient import TestClient
+
+        app = create_dashboard_app(tmp_path / "nonexistent")
+        client = TestClient(app)
+        resp = client.get("/api/traces/search")
+        data = resp.json()
+        assert data["total"] == 0
+
+    def test_search_no_results(self, test_client):
+        resp = test_client.get("/api/traces/search?tool=nonexistent_tool")
+        data = resp.json()
+        assert data["total"] == 0
+        assert data["records"] == []
+
+
+class TestRulesEndpoint:
+    def test_rules_no_engine(self, test_client):
+        resp = test_client.get("/api/rules")
+        data = resp.json()
+        assert "rules" in data
+        assert data["rules"] == []
+        assert "error" in data
+
+    def test_rules_with_engine(self, trace_dir, tmp_path):
+        from starlette.testclient import TestClient
+        from policyshield.shield.engine import ShieldEngine
+
+        rules_file = tmp_path / "rules.yaml"
+        rules_file.write_text('rules:\n  - id: test-rule\n    when:\n      tool: exec\n    then: block\n    severity: high\n')
+        engine = ShieldEngine(rules=str(rules_file))
+        app = create_dashboard_app(trace_dir, engine=engine)
+        client = TestClient(app)
+        resp = client.get("/api/rules")
+        data = resp.json()
+        assert data["count"] == 1
+        assert data["rules"][0]["id"] == "test-rule"
+        assert data["rules"][0]["then"] == "BLOCK"
+
+
+class TestServerDashboard:
+    """Test dashboard routes mounted in the server app."""
+
+    @pytest.fixture
+    def server_client(self, tmp_path):
+        from starlette.testclient import TestClient
+        from policyshield.shield.async_engine import AsyncShieldEngine
+        from policyshield.server.app import create_app
+
+        rules_file = tmp_path / "rules.yaml"
+        rules_file.write_text('rules:\n  - id: s-rule\n    when:\n      tool: exec\n    then: block\n    severity: critical\n')
+        engine = AsyncShieldEngine(rules=str(rules_file))
+        app = create_app(engine)
+        return TestClient(app, raise_server_exceptions=False)
+
+    def test_dashboard_route(self, server_client):
+        resp = server_client.get("/dashboard")
+        assert resp.status_code == 200
+        assert "PolicyShield" in resp.text
+
+    def test_dashboard_slash(self, server_client):
+        resp = server_client.get("/dashboard/")
+        assert resp.status_code == 200
+
+    def test_dashboard_missing_asset(self, server_client):
+        resp = server_client.get("/dashboard/nonexistent.js")
+        assert resp.status_code == 404
+
+    def test_api_v1_rules(self, server_client):
+        resp = server_client.get("/api/v1/rules")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["count"] == 1
+        assert data["rules"][0]["id"] == "s-rule"
+        assert data["rules"][0]["then"] == "BLOCK"
+        assert data["rules"][0]["severity"] == "CRITICAL"
