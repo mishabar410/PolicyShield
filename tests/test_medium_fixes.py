@@ -57,6 +57,7 @@ class TestSessionLastAccessed:
         old_created = session1.created_at
 
         import time
+
         time.sleep(0.01)
 
         # Second call: session is expired, should delete and recreate
@@ -170,6 +171,7 @@ class TestMemoryBackendFirstResponseWins:
         backend.respond("req-1", approved=True, responder="human")
 
         import time
+
         time.sleep(0.01)  # let timeout expire
 
         status = backend.get_status("req-1")
@@ -200,6 +202,7 @@ class TestSessionEdgeCases:
         mgr.get_or_create("exp-1")
         mgr.get_or_create("exp-2")
         import time
+
         time.sleep(0.01)
         # Force eviction via stats() which calls _evict_expired
         stats = mgr.stats()
@@ -210,6 +213,7 @@ class TestSessionEdgeCases:
         mgr = SessionManager(max_sessions=10, ttl_seconds=0.001)
         mgr.get_or_create("taint-sess")
         import time
+
         time.sleep(0.01)
         assert mgr.clear_taint("taint-sess") is False
 
@@ -237,7 +241,9 @@ class TestSessionEdgeCases:
         from policyshield.shield.engine import ShieldEngine
         import os
 
-        rules_path = os.path.join(os.path.dirname(__file__), "..", "examples", "fastapi_agent", "policies", "rules.yaml")
+        rules_path = os.path.join(
+            os.path.dirname(__file__), "..", "examples", "fastapi_agent", "policies", "rules.yaml"
+        )
         if not os.path.exists(rules_path):
             pytest.skip("rules.yaml not found")
         engine = ShieldEngine(rules=rules_path)
@@ -245,4 +251,3 @@ class TestSessionEdgeCases:
         assert engine.mode == ShieldMode.AUDIT
         engine.mode = ShieldMode.ENFORCE
         assert engine.mode == ShieldMode.ENFORCE
-
