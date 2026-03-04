@@ -235,6 +235,7 @@ class TestRecorderPeriodicCleanup:
         old_file = tmp_path / "trace_20200101_000000.jsonl"
         old_file.write_text("{}\n")
         import os
+
         # Set mtime to old
         os.utime(old_file, (0, 0))
         removed = rec.cleanup_old_traces()
