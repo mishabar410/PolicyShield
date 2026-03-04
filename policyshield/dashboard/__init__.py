@@ -4,15 +4,25 @@ import asyncio
 import json
 import logging
 from pathlib import Path
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
 
-def create_dashboard_app(trace_dir: str | Path = "./traces"):
-    """Create and return a FastAPI app for the dashboard."""
+def create_dashboard_app(
+    trace_dir: str | Path = "./traces",
+    engine: Any = None,
+):
+    """Create and return a FastAPI app for the dashboard.
+
+    Args:
+        trace_dir: Path to the JSONL trace directory.
+        engine: Optional AsyncShieldEngine or ShieldEngine for rules/management APIs.
+    """
     try:
-        from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+        from fastapi import FastAPI, Query, WebSocket, WebSocketDisconnect
         from fastapi.responses import FileResponse, HTMLResponse
+        from starlette.middleware.cors import CORSMiddleware
     except ImportError:
         raise ImportError("Dashboard requires 'fastapi'. Install with: pip install policyshield[dashboard]")
 
@@ -20,6 +30,14 @@ def create_dashboard_app(trace_dir: str | Path = "./traces"):
 
     trace_dir = Path(trace_dir)
     app = FastAPI(title="PolicyShield Dashboard", version=__version__)
+
+    # Allow all origins for dashboard (development-friendly)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_methods=["GET", "POST"],
+        allow_headers=["*"],
+    )
 
     @app.get("/api/metrics")
     def get_metrics():
@@ -70,6 +88,64 @@ def create_dashboard_app(trace_dir: str | Path = "./traces"):
         estimator = CostEstimator(model=model)
         est = estimator.estimate_from_traces(trace_dir)
         return est.to_dict()
+
+    # ── Trace search endpoint ──
+    @app.get("/api/traces/search")
+    def search_traces(
+        tool: Optional[str] = Query(None),
+        verdict: Optional[str] = Query(None),
+        session_id: Optional[str] = Query(None),
+        text: Optional[str] = Query(None),
+        rule_id: Optional[str] = Query(None),
+        pii_type: Optional[str] = Query(None),
+        limit: int = Query(50, ge=1, le=500),
+        offset: int = Query(0, ge=0),
+    ):
+        from policyshield.trace.search import SearchQuery, TraceSearchEngine
+
+        if not trace_dir.exists():
+            return {"total": 0, "records": []}
+        se = TraceSearchEngine(trace_dir)
+        q = SearchQuery(
+            tool=tool,
+            verdict=verdict,
+            session_id=session_id,
+            text=text,
+            rule_id=rule_id,
+            pii_type=pii_type,
+            limit=limit,
+            offset=offset,
+        )
+        result = se.search(q)
+        return {"total": result.total, "records": result.records}
+
+    # ── Rules endpoint ──
+    @app.get("/api/rules")
+    def get_rules():
+        if engine is None:
+            return {"rules": [], "error": "No engine connected"}
+        try:
+            ruleset = engine.rules
+            rules_list = []
+            for r in ruleset.rules:
+                rule_dict: dict[str, Any] = {"id": r.id, "then": r.then.value, "severity": r.severity}
+                if hasattr(r, "enabled"):
+                    rule_dict["enabled"] = r.enabled
+                if hasattr(r, "priority"):
+                    rule_dict["priority"] = r.priority
+                if hasattr(r, "message") and r.message:
+                    rule_dict["message"] = r.message
+                # Extract tool from when clause
+                when = r.when
+                if hasattr(when, "tool"):
+                    rule_dict["tool"] = when.tool
+                if hasattr(when, "args_match") and when.args_match:
+                    rule_dict["args_match"] = str(when.args_match)
+                rules_list.append(rule_dict)
+            return {"rules": rules_list, "count": len(rules_list)}
+        except Exception as e:
+            logger.error("Failed to load rules: %s", e)
+            return {"rules": [], "error": str(e)}
 
     # WebSocket for live verdict stream
     app.state.ws_clients = set()

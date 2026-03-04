@@ -325,6 +325,24 @@ policyshield compile "Block file deletions and redact PII" -o rules.yaml
 
 ---
 
+## 🖥️ Web Dashboard
+
+Built-in web UI — no extra dependencies. Monitor verdicts, search traces, manage rules, and hit the kill switch from your browser.
+
+```bash
+policyshield server --rules rules.yaml --port 8100
+# Open http://localhost:8100/dashboard
+```
+
+**Overview** — verdict breakdown, block rate, cost savings, top tools, PII heatmap, live WebSocket feed.
+**Rules** — browse active rules with expandable YAML detail.
+**Traces** — full-text search with filters (tool, verdict, session, date range).
+**Controls** — 🔴 Kill Switch, 🟢 Resume, ♻️ Reload Rules, approve/deny pending requests.
+
+Standalone analytics mode (no server required): `policyshield trace dashboard --port 8000`
+
+---
+
 ## 🔌 Works With Everything
 
 | Integration | How |

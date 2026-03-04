@@ -8,11 +8,14 @@ import hmac
 import os
 import uuid
 from contextlib import asynccontextmanager
+from pathlib import Path
+from typing import Any
 
 import logging
 
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
+from fastapi.responses import FileResponse
 from starlette.middleware.cors import CORSMiddleware
 from starlette.responses import JSONResponse
 
@@ -578,6 +581,28 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
         engine.resume()
         return ResumeResponse(status="resumed")
 
+    # ── Rules listing endpoint ──
+    @app.get("/api/v1/rules", dependencies=auth)
+    async def list_rules():
+        """Return all active rules as JSON."""
+        ruleset = engine.rules
+        rules_list = []
+        for r in ruleset.rules:
+            rd: dict[str, Any] = {"id": r.id, "then": r.then.value, "severity": r.severity}
+            if hasattr(r, "enabled"):
+                rd["enabled"] = r.enabled
+            if hasattr(r, "priority"):
+                rd["priority"] = r.priority
+            if hasattr(r, "message") and r.message:
+                rd["message"] = r.message
+            when = r.when
+            if hasattr(when, "tool"):
+                rd["tool"] = when.tool
+            if hasattr(when, "args_match") and when.args_match:
+                rd["args_match"] = str(when.args_match)
+            rules_list.append(rd)
+        return {"rules": rules_list, "count": len(rules_list)}
+
     @app.get("/api/v1/status", response_model=StatusResponse, dependencies=auth)
     async def server_status() -> StatusResponse:
         """Get server and engine status."""
@@ -694,5 +719,25 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
                     is_valid=True,
                     errors=[f"Save/reload failed: {e}"],
                 )
+
+    # ── Dashboard static files ──
+    _dashboard_static = Path(__file__).parent.parent / "dashboard" / "static"
+
+    @app.get("/dashboard")
+    @app.get("/dashboard/")
+    async def dashboard_index():
+        """Serve the PolicyShield Dashboard SPA."""
+        index_path = _dashboard_static / "index.html"
+        if index_path.exists():
+            return FileResponse(index_path, media_type="text/html")
+        return JSONResponse({"error": "Dashboard frontend not found"}, status_code=404)
+
+    @app.get("/dashboard/{path:path}")
+    async def dashboard_static(path: str):
+        """Serve dashboard static assets."""
+        file_path = _dashboard_static / path
+        if file_path.exists() and file_path.is_file():
+            return FileResponse(file_path)
+        return JSONResponse({"error": "Not found"}, status_code=404)
 
     return app

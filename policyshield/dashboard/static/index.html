@@ -1,188 +1,1447 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PolicyShield Dashboard</title>
+    <meta name="description" content="PolicyShield — Runtime firewall dashboard for AI agent tool calls">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
-        .header { background: linear-gradient(135deg, #1e293b, #334155); padding: 1.5rem 2rem; border-bottom: 1px solid #475569; display: flex; align-items: center; gap: 1rem; }
-        .header h1 { font-size: 1.5rem; font-weight: 700; color: #f8fafc; }
-        .header .badge { background: #3b82f6; color: white; padding: 0.25rem 0.75rem; border-radius: 1rem; font-size: 0.75rem; font-weight: 600; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; padding: 2rem; }
-        .card { background: #1e293b; border-radius: 0.75rem; padding: 1.5rem; border: 1px solid #334155; transition: box-shadow 0.2s; }
-        .card:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
-        .card h2 { font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; margin-bottom: 1rem; }
-        .stat { font-size: 2.5rem; font-weight: 700; color: #f8fafc; }
-        .stat-label { font-size: 0.875rem; color: #64748b; margin-top: 0.25rem; }
-        .stat-row { display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid #334155; }
-        .stat-row:last-child { border-bottom: none; }
-        .bar { height: 8px; border-radius: 4px; background: #334155; margin-top: 0.5rem; overflow: hidden; }
-        .bar-fill { height: 100%; border-radius: 4px; transition: width 0.3s; }
-        .bar-fill.green { background: #22c55e; }
-        .bar-fill.red { background: #ef4444; }
-        .bar-fill.yellow { background: #eab308; }
-        .bar-fill.blue { background: #3b82f6; }
-        .verdict-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
-        .verdict-item { text-align: center; padding: 1rem; background: #0f172a; border-radius: 0.5rem; }
-        .verdict-count { font-size: 1.75rem; font-weight: 700; }
-        .allow { color: #22c55e; }
-        .block { color: #ef4444; }
-        .redact { color: #eab308; }
-        .approve { color: #3b82f6; }
-        .live-feed { max-height: 300px; overflow-y: auto; font-family: monospace; font-size: 0.8rem; }
-        .live-item { padding: 0.5rem; border-bottom: 1px solid #1e293b; }
-        .wide { grid-column: span 2; }
-        .refresh-btn { background: #3b82f6; color: white; border: none; padding: 0.5rem 1rem; border-radius: 0.5rem; cursor: pointer; font-size: 0.875rem; }
-        .refresh-btn:hover { background: #2563eb; }
-        .status { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 0.5rem; }
-        .status.online { background: #22c55e; }
-        .status.offline { background: #ef4444; }
-        @media (max-width: 640px) { .wide { grid-column: span 1; } }
+        :root {
+            --bg-primary: #0a0e1a;
+            --bg-secondary: #111827;
+            --bg-card: #1a2035;
+            --bg-card-hover: #1f2847;
+            --bg-elevated: #243052;
+            --border: #2a3555;
+            --border-hover: #3d4f7a;
+            --text-primary: #f0f4ff;
+            --text-secondary: #8b99c2;
+            --text-muted: #5c6a94;
+            --accent: #6366f1;
+            --accent-glow: rgba(99, 102, 241, .25);
+            --green: #22c55e;
+            --green-bg: rgba(34, 197, 94, .12);
+            --red: #ef4444;
+            --red-bg: rgba(239, 68, 68, .12);
+            --yellow: #eab308;
+            --yellow-bg: rgba(234, 179, 8, .12);
+            --blue: #3b82f6;
+            --blue-bg: rgba(59, 130, 246, .12);
+            --sidebar-w: 220px;
+            --sidebar-collapsed: 60px;
+            --header-h: 56px;
+            --radius: 12px;
+            --radius-sm: 8px;
+            --font: 'Inter', system-ui, -apple-system, sans-serif;
+            --mono: 'JetBrains Mono', 'Fira Code', monospace;
+            --transition: .2s cubic-bezier(.4, 0, .2, 1);
+        }
+
+        *,
+        *::before,
+        *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            font-size: 14px;
+        }
+
+        body {
+            font-family: var(--font);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 3px;
+        }
+
+        a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        button {
+            font-family: var(--font);
+            cursor: pointer;
+            border: none;
+            outline: none;
+        }
+
+        input,
+        select {
+            font-family: var(--font);
+            outline: none;
+        }
+
+        /* ─── Sidebar ─── */
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: var(--sidebar-w);
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            z-index: 100;
+            transition: width var(--transition);
+        }
+
+        .sidebar-logo {
+            height: var(--header-h);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 0 16px;
+            border-bottom: 1px solid var(--border);
+            font-weight: 800;
+            font-size: 1.05rem;
+            white-space: nowrap;
+        }
+
+        .sidebar-logo span {
+            color: var(--accent);
+        }
+
+        .sidebar-nav {
+            flex: 1;
+            padding: 12px 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 12px;
+            border-radius: var(--radius-sm);
+            color: var(--text-secondary);
+            font-weight: 500;
+            font-size: .9rem;
+            transition: all var(--transition);
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .nav-item:hover {
+            background: var(--bg-card);
+            color: var(--text-primary);
+        }
+
+        .nav-item.active {
+            background: var(--accent);
+            color: white;
+            box-shadow: 0 2px 12px var(--accent-glow);
+        }
+
+        .nav-item svg {
+            width: 18px;
+            height: 18px;
+            flex-shrink: 0;
+        }
+
+        .sidebar-footer {
+            padding: 12px 16px;
+            border-top: 1px solid var(--border);
+            font-size: .75rem;
+            color: var(--text-muted);
+        }
+
+        /* ─── Main ─── */
+        .main {
+            margin-left: var(--sidebar-w);
+            min-height: 100vh;
+            transition: margin-left var(--transition);
+        }
+
+        .topbar {
+            height: var(--header-h);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 0 24px;
+            border-bottom: 1px solid var(--border);
+            background: rgba(10, 14, 26, .8);
+            backdrop-filter: blur(12px);
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
+
+        .topbar-title {
+            font-weight: 700;
+            font-size: 1.1rem;
+            flex: 1;
+        }
+
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: .75rem;
+            font-weight: 600;
+        }
+
+        .status-pill.online {
+            background: var(--green-bg);
+            color: var(--green);
+        }
+
+        .status-pill.offline {
+            background: var(--red-bg);
+            color: var(--red);
+        }
+
+        .status-pill.killed {
+            background: var(--red-bg);
+            color: var(--red);
+        }
+
+        .status-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: currentColor;
+        }
+
+        .status-dot.pulse {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1
+            }
+
+            50% {
+                opacity: .4
+            }
+        }
+
+        .mode-pill {
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: .7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .05em;
+        }
+
+        .mode-pill.enforce {
+            background: var(--green-bg);
+            color: var(--green);
+        }
+
+        .mode-pill.shadow {
+            background: var(--yellow-bg);
+            color: var(--yellow);
+        }
+
+        .mode-pill.killed-mode {
+            background: var(--red-bg);
+            color: var(--red);
+        }
+
+        /* ─── Pages ─── */
+        .page {
+            display: none;
+            padding: 24px;
+            animation: fadeIn .3s;
+        }
+
+        .page.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(8px)
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0)
+            }
+        }
+
+        /* ─── Cards ─── */
+        .grid {
+            display: grid;
+            gap: 20px;
+        }
+
+        .grid-4 {
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        }
+
+        .grid-3 {
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        }
+
+        .grid-2 {
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px;
+            transition: all var(--transition);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--accent), transparent);
+            opacity: 0;
+            transition: opacity var(--transition);
+        }
+
+        .card:hover {
+            border-color: var(--border-hover);
+            box-shadow: 0 4px 24px rgba(0, 0, 0, .2);
+        }
+
+        .card:hover::before {
+            opacity: 1;
+        }
+
+        .card-title {
+            font-size: .75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            color: var(--text-muted);
+            margin-bottom: 16px;
+        }
+
+        .card.wide {
+            grid-column: 1 / -1;
+        }
+
+        .stat-big {
+            font-size: 2.4rem;
+            font-weight: 800;
+            line-height: 1;
+        }
+
+        .stat-label {
+            font-size: .8rem;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        /* ─── Verdict colors ─── */
+        .c-allow {
+            color: var(--green);
+        }
+
+        .c-block {
+            color: var(--red);
+        }
+
+        .c-redact {
+            color: var(--yellow);
+        }
+
+        .c-approve {
+            color: var(--blue);
+        }
+
+        .verdict-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+        }
+
+        .verdict-cell {
+            text-align: center;
+            padding: 14px 8px;
+            background: var(--bg-primary);
+            border-radius: var(--radius-sm);
+            transition: transform var(--transition);
+        }
+
+        .verdict-cell:hover {
+            transform: translateY(-2px);
+        }
+
+        .verdict-num {
+            font-size: 1.6rem;
+            font-weight: 800;
+        }
+
+        .verdict-label {
+            font-size: .7rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+            text-transform: uppercase;
+            letter-spacing: .05em;
+        }
+
+        /* ─── Progress bar ─── */
+        .bar-track {
+            height: 8px;
+            border-radius: 4px;
+            background: var(--bg-primary);
+            overflow: hidden;
+            margin-top: 8px;
+        }
+
+        .bar-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width .6s cubic-bezier(.4, 0, .2, 1);
+        }
+
+        /* ─── Table ─── */
+        .table-wrap {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: .85rem;
+        }
+
+        thead th {
+            text-align: left;
+            padding: 10px 12px;
+            font-weight: 600;
+            color: var(--text-muted);
+            font-size: .75rem;
+            text-transform: uppercase;
+            letter-spacing: .06em;
+            border-bottom: 1px solid var(--border);
+        }
+
+        tbody tr {
+            border-bottom: 1px solid var(--border);
+            transition: background var(--transition);
+        }
+
+        tbody tr:hover {
+            background: var(--bg-elevated);
+        }
+
+        tbody td {
+            padding: 10px 12px;
+            color: var(--text-secondary);
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: .72rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge-allow {
+            background: var(--green-bg);
+            color: var(--green);
+        }
+
+        .badge-block {
+            background: var(--red-bg);
+            color: var(--red);
+        }
+
+        .badge-redact {
+            background: var(--yellow-bg);
+            color: var(--yellow);
+        }
+
+        .badge-approve {
+            background: var(--blue-bg);
+            color: var(--blue);
+        }
+
+        .badge-critical {
+            background: var(--red-bg);
+            color: var(--red);
+        }
+
+        .badge-high {
+            background: rgba(249, 115, 22, .12);
+            color: #f97316;
+        }
+
+        .badge-medium {
+            background: var(--yellow-bg);
+            color: var(--yellow);
+        }
+
+        .badge-low {
+            background: var(--blue-bg);
+            color: var(--blue);
+        }
+
+        /* ─── Buttons ─── */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            border-radius: var(--radius-sm);
+            font-weight: 600;
+            font-size: .85rem;
+            transition: all var(--transition);
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5558e6;
+            box-shadow: 0 2px 12px var(--accent-glow);
+        }
+
+        .btn-danger {
+            background: var(--red);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+            box-shadow: 0 2px 12px rgba(239, 68, 68, .3);
+        }
+
+        .btn-success {
+            background: var(--green);
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #16a34a;
+        }
+
+        .btn-ghost {
+            background: transparent;
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
+        }
+
+        .btn-ghost:hover {
+            background: var(--bg-card);
+            color: var(--text-primary);
+        }
+
+        .btn-sm {
+            padding: 5px 10px;
+            font-size: .78rem;
+        }
+
+        .btn:disabled {
+            opacity: .5;
+            cursor: not-allowed;
+        }
+
+        /* ─── Inputs ─── */
+        .input {
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            color: var(--text-primary);
+            padding: 8px 12px;
+            font-size: .85rem;
+            width: 100%;
+            transition: border-color var(--transition);
+        }
+
+        .input:focus {
+            border-color: var(--accent);
+        }
+
+        .input-row {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+
+        .input-row .input {
+            flex: 1;
+            min-width: 140px;
+        }
+
+        select.input {
+            appearance: none;
+            cursor: pointer;
+        }
+
+        /* ─── Live Feed ─── */
+        .feed {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .feed-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--border);
+            font-size: .82rem;
+            animation: slideIn .3s;
+            font-family: var(--mono);
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-10px)
+            }
+        }
+
+        .feed-item .time {
+            color: var(--text-muted);
+            font-size: .75rem;
+            min-width: 75px;
+        }
+
+        .feed-item .tool {
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        /* ─── Controls ─── */
+        .control-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+        }
+
+        .control-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 24px;
+            text-align: center;
+        }
+
+        .control-card h3 {
+            font-size: 1rem;
+            margin-bottom: 6px;
+        }
+
+        .control-card p {
+            font-size: .82rem;
+            color: var(--text-secondary);
+            margin-bottom: 16px;
+        }
+
+        .control-card .icon {
+            font-size: 2.4rem;
+            margin-bottom: 12px;
+        }
+
+        /* ─── Rule detail ─── */
+        .rule-yaml {
+            background: var(--bg-primary);
+            border-radius: var(--radius-sm);
+            padding: 12px;
+            font-family: var(--mono);
+            font-size: .78rem;
+            color: var(--text-secondary);
+            white-space: pre-wrap;
+            display: none;
+            margin-top: 10px;
+            border: 1px solid var(--border);
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .rule-yaml.show {
+            display: block;
+            animation: fadeIn .2s;
+        }
+
+        .rule-toggle {
+            cursor: pointer;
+        }
+
+        .rule-toggle:hover {
+            color: var(--accent);
+        }
+
+        /* ─── Modal ─── */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, .6);
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity .2s;
+        }
+
+        .modal-overlay.show {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .modal {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 28px;
+            max-width: 420px;
+            width: 90%;
+            text-align: center;
+        }
+
+        .modal h3 {
+            margin-bottom: 8px;
+        }
+
+        .modal p {
+            color: var(--text-secondary);
+            font-size: .88rem;
+            margin-bottom: 20px;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        /* ─── Donut Chart (CSS) ─── */
+        .donut-wrap {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+        }
+
+        .donut {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .donut-center {
+            width: 72px;
+            height: 72px;
+            background: var(--bg-card);
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            z-index: 1;
+        }
+
+        .donut-center .num {
+            font-size: 1.3rem;
+            font-weight: 800;
+        }
+
+        .donut-center .lbl {
+            font-size: .6rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        .donut-legend {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: .8rem;
+        }
+
+        .legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 3px;
+        }
+
+        /* ─── Responsive ─── */
+        @media(max-width:768px) {
+            .sidebar {
+                width: var(--sidebar-collapsed);
+            }
+
+            .sidebar .nav-label,
+            .sidebar-logo .logo-text,
+            .sidebar-footer {
+                display: none;
+            }
+
+            .main {
+                margin-left: var(--sidebar-collapsed);
+            }
+
+            .verdict-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
     </style>
 </head>
+
 <body>
-    <div class="header">
-        <h1>🛡️ PolicyShield</h1>
-        <span class="badge">v0.6</span>
-        <span style="flex:1"></span>
-        <span id="connection-status"><span class="status offline"></span>Disconnected</span>
-        <button class="refresh-btn" onclick="refresh()">↻ Refresh</button>
+
+    <!-- Sidebar -->
+    <nav class="sidebar">
+        <div class="sidebar-logo">🛡️ <span class="logo-text">PolicyShield</span></div>
+        <div class="sidebar-nav">
+            <div class="nav-item active" data-page="overview">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="7" height="7" rx="1" />
+                    <rect x="14" y="3" width="7" height="7" rx="1" />
+                    <rect x="3" y="14" width="7" height="7" rx="1" />
+                    <rect x="14" y="14" width="7" height="7" rx="1" />
+                </svg>
+                <span class="nav-label">Overview</span>
+            </div>
+            <div class="nav-item" data-page="rules">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                    <line x1="16" y1="13" x2="8" y2="13" />
+                    <line x1="16" y1="17" x2="8" y2="17" />
+                </svg>
+                <span class="nav-label">Rules</span>
+            </div>
+            <div class="nav-item" data-page="traces">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8" />
+                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+                <span class="nav-label">Traces</span>
+            </div>
+            <div class="nav-item" data-page="controls">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3" />
+                    <path
+                        d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
+                </svg>
+                <span class="nav-label">Controls</span>
+            </div>
+            <div class="nav-item" data-page="live">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+                </svg>
+                <span class="nav-label">Live Feed</span>
+            </div>
+        </div>
+        <div class="sidebar-footer">
+            <div id="sidebar-version">PolicyShield</div>
+        </div>
+    </nav>
+
+    <!-- Main -->
+    <div class="main">
+        <header class="topbar">
+            <div class="topbar-title" id="page-title">Overview</div>
+            <div class="mode-pill enforce" id="mode-pill">ENFORCE</div>
+            <div class="status-pill online" id="ws-status">
+                <span class="status-dot pulse"></span> Connected
+            </div>
+            <button class="btn btn-ghost btn-sm" onclick="refreshAll()">↻ Refresh</button>
+        </header>
+
+        <!-- ═══ OVERVIEW ═══ -->
+        <div class="page active" id="page-overview">
+            <div class="grid grid-4" style="margin-bottom:20px">
+                <div class="card">
+                    <div class="card-title">Total Checks</div>
+                    <div class="stat-big" id="total-calls">—</div>
+                    <div class="stat-label">policy evaluations</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">Block Rate</div>
+                    <div class="stat-big c-block" id="block-rate">—</div>
+                    <div class="bar-track">
+                        <div class="bar-fill" id="block-rate-bar" style="width:0%;background:var(--red)"></div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-title">Active Rules</div>
+                    <div class="stat-big" id="rules-count">—</div>
+                    <div class="stat-label" id="health-mode">—</div>
+                </div>
+                <div class="card">
+                    <div class="card-title">Cost Saved</div>
+                    <div class="stat-big c-allow" id="cost-saved">—</div>
+                    <div class="stat-label" id="cost-model-label">—</div>
+                </div>
+            </div>
+
+            <div class="grid grid-2" style="margin-bottom:20px">
+                <div class="card">
+                    <div class="card-title">Verdict Breakdown</div>
+                    <div class="donut-wrap">
+                        <div class="donut" id="donut-chart">
+                            <div class="donut-center">
+                                <div class="num" id="donut-total">0</div>
+                                <div class="lbl">total</div>
+                            </div>
+                        </div>
+                        <div class="donut-legend">
+                            <div class="legend-item">
+                                <div class="legend-dot" style="background:var(--green)"></div>Allow <strong
+                                    id="v-allow">0</strong>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-dot" style="background:var(--red)"></div>Block <strong
+                                    id="v-block">0</strong>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-dot" style="background:var(--yellow)"></div>Redact <strong
+                                    id="v-redact">0</strong>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-dot" style="background:var(--blue)"></div>Approve <strong
+                                    id="v-approve">0</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-title">Cost Breakdown</div>
+                    <div style="display:flex;flex-direction:column;gap:12px">
+                        <div style="display:flex;justify-content:space-between"><span class="stat-label">Total
+                                estimated</span><span id="cost-total" style="font-weight:700">—</span></div>
+                        <div style="display:flex;justify-content:space-between"><span class="stat-label">Allowed
+                                cost</span><span id="cost-allowed">—</span></div>
+                        <div style="display:flex;justify-content:space-between"><span class="stat-label">Blocked
+                                savings</span><span id="cost-blocked" class="c-allow">—</span></div>
+                        <div style="display:flex;justify-content:space-between"><span
+                                class="stat-label">Model</span><span id="cost-model">—</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-2">
+                <div class="card">
+                    <div class="card-title">Top Tools</div>
+                    <div id="tools-list">
+                        <div class="stat-label">Loading...</div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-title">PII Detections</div>
+                    <div id="pii-list">
+                        <div class="stat-label">No PII detected</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══ RULES ═══ -->
+        <div class="page" id="page-rules">
+            <div class="card wide">
+                <div class="card-title">Active Rules <span id="rules-total-badge" class="badge badge-allow"
+                        style="margin-left:8px">0</span></div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Tool</th>
+                                <th>Verdict</th>
+                                <th>Severity</th>
+                                <th>Priority</th>
+                                <th>Status</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="rules-table">
+                            <tr>
+                                <td colspan="7" class="stat-label">Loading...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══ TRACES ═══ -->
+        <div class="page" id="page-traces">
+            <div class="card wide" style="margin-bottom:20px">
+                <div class="card-title">Search Traces</div>
+                <div class="input-row">
+                    <input class="input" id="trace-tool" placeholder="Tool name">
+                    <select class="input" id="trace-verdict">
+                        <option value="">All verdicts</option>
+                        <option>ALLOW</option>
+                        <option>BLOCK</option>
+                        <option>REDACT</option>
+                        <option>APPROVE</option>
+                    </select>
+                    <input class="input" id="trace-session" placeholder="Session ID">
+                    <input class="input" id="trace-text" placeholder="Free text search">
+                    <button class="btn btn-primary" onclick="searchTraces()">Search</button>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Tool</th>
+                                <th>Verdict</th>
+                                <th>Rule</th>
+                                <th>Session</th>
+                                <th>Message</th>
+                            </tr>
+                        </thead>
+                        <tbody id="traces-table">
+                            <tr>
+                                <td colspan="6" class="stat-label">Enter search criteria above</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div id="traces-pagination" style="margin-top:12px;display:flex;gap:8px;align-items:center"></div>
+            </div>
+        </div>
+
+        <!-- ═══ CONTROLS ═══ -->
+        <div class="page" id="page-controls">
+            <div class="control-grid" style="margin-bottom:24px">
+                <div class="control-card">
+                    <div class="icon">🔴</div>
+                    <h3>Kill Switch</h3>
+                    <p>Emergency stop — blocks ALL tool calls instantly</p>
+                    <button class="btn btn-danger" id="btn-kill" onclick="showModal('kill')">Activate Kill
+                        Switch</button>
+                </div>
+                <div class="control-card">
+                    <div class="icon">🟢</div>
+                    <h3>Resume</h3>
+                    <p>Deactivate kill switch and resume normal operation</p>
+                    <button class="btn btn-success" id="btn-resume" onclick="doResume()">Resume Operations</button>
+                </div>
+                <div class="control-card">
+                    <div class="icon">♻️</div>
+                    <h3>Reload Rules</h3>
+                    <p>Hot-reload rules from disk without restart</p>
+                    <button class="btn btn-primary" id="btn-reload" onclick="doReload()">Reload Rules</button>
+                </div>
+            </div>
+
+            <div class="card wide" style="margin-bottom:20px">
+                <div class="card-title">Server Status</div>
+                <div id="server-status"
+                    style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px"></div>
+            </div>
+
+            <div class="card wide">
+                <div class="card-title">Pending Approvals <span id="approvals-badge"
+                        class="badge badge-approve">0</span></div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Tool</th>
+                                <th>Rule</th>
+                                <th>Message</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="approvals-table">
+                            <tr>
+                                <td colspan="5" class="stat-label">No pending approvals</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══ LIVE FEED ═══ -->
+        <div class="page" id="page-live">
+            <div class="card wide">
+                <div class="card-title">Live Verdict Stream <span class="status-dot pulse c-allow" id="live-dot"
+                        style="display:none"></span></div>
+                <div class="feed" id="live-feed">
+                    <div class="stat-label" style="padding:20px;text-align:center">Waiting for events...</div>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <div class="grid">
-        <div class="card">
-            <h2>Verdict Breakdown</h2>
-            <div class="verdict-grid">
-                <div class="verdict-item"><div class="verdict-count allow" id="v-allow">—</div><div class="stat-label">Allow</div></div>
-                <div class="verdict-item"><div class="verdict-count block" id="v-block">—</div><div class="stat-label">Block</div></div>
-                <div class="verdict-item"><div class="verdict-count redact" id="v-redact">—</div><div class="stat-label">Redact</div></div>
-                <div class="verdict-item"><div class="verdict-count approve" id="v-approve">—</div><div class="stat-label">Approve</div></div>
+    <!-- Kill Switch Modal -->
+    <div class="modal-overlay" id="modal-kill">
+        <div class="modal">
+            <h3>⚠️ Activate Kill Switch?</h3>
+            <p>This will immediately block ALL tool calls. The AI agent will not be able to use any tools until you
+                resume.</p>
+            <input class="input" id="kill-reason" placeholder="Reason (optional)" style="margin-bottom:16px">
+            <div class="modal-actions">
+                <button class="btn btn-ghost" onclick="hideModal('kill')">Cancel</button>
+                <button class="btn btn-danger" onclick="doKill()">🔴 Activate Kill Switch</button>
             </div>
-        </div>
-
-        <div class="card">
-            <h2>Block Rate</h2>
-            <div class="stat" id="block-rate">—</div>
-            <div class="stat-label">of all tool calls blocked</div>
-            <div class="bar"><div class="bar-fill red" id="block-rate-bar" style="width:0%"></div></div>
-        </div>
-
-        <div class="card">
-            <h2>Total Calls</h2>
-            <div class="stat" id="total-calls">—</div>
-            <div class="stat-label">policy evaluations</div>
-        </div>
-
-        <div class="card wide">
-            <h2>Top Tools</h2>
-            <div id="tools-list"></div>
-        </div>
-
-        <div class="card">
-            <h2>PII Detections</h2>
-            <div id="pii-list"><div class="stat-label">No PII detected</div></div>
-        </div>
-
-        <div class="card">
-            <h2>Estimated Cost</h2>
-            <div class="stat" id="cost-total">—</div>
-            <div class="stat-label" id="cost-model">Model: —</div>
-            <div style="margin-top:1rem">
-                <div class="stat-row"><span class="stat-label">Allowed cost</span><span id="cost-allowed">—</span></div>
-                <div class="stat-row"><span class="stat-label">Blocked savings</span><span class="allow" id="cost-blocked">—</span></div>
-            </div>
-        </div>
-
-        <div class="card wide">
-            <h2>Live Feed <span class="status online" id="ws-dot" style="display:none"></span></h2>
-            <div class="live-feed" id="live-feed"><div class="stat-label">Waiting for events...</div></div>
         </div>
     </div>
 
     <script>
+        /* ─── Config ─── */
         const API = window.location.origin;
+        let wsConn = null;
+        let traceOffset = 0;
+        const TRACE_LIMIT = 50;
 
-        async function refresh() {
+        /* ─── Navigation ─── */
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', () => {
+                document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+                document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+                item.classList.add('active');
+                const page = item.dataset.page;
+                document.getElementById('page-' + page).classList.add('active');
+                document.getElementById('page-title').textContent =
+                    { overview: 'Overview', rules: 'Rules', traces: 'Traces', controls: 'Controls', live: 'Live Feed' }[page];
+                if (page === 'rules') loadRules();
+                if (page === 'controls') { loadStatus(); loadApprovals(); }
+            });
+        });
+
+        /* ─── API helpers ─── */
+        async function api(path, opts = {}) {
             try {
-                const [metrics, cost] = await Promise.all([
-                    fetch(`${API}/api/metrics`).then(r => r.json()),
-                    fetch(`${API}/api/metrics/cost`).then(r => r.json()),
-                ]);
+                const r = await fetch(API + path, opts);
+                return await r.json();
+            } catch (e) { console.error('API error:', path, e); return null; }
+        }
 
-                if (metrics.error) return;
+        function verdictBadge(v) {
+            const cls = { ALLOW: 'allow', BLOCK: 'block', REDACT: 'redact', APPROVE: 'approve' }[v] || 'allow';
+            return `<span class="badge badge-${cls}">${v || '?'}</span>`;
+        }
 
-                const vb = metrics.verdict_breakdown;
-                document.getElementById('v-allow').textContent = vb.allow;
-                document.getElementById('v-block').textContent = vb.block;
-                document.getElementById('v-redact').textContent = vb.redact;
-                document.getElementById('v-approve').textContent = vb.approve;
-                document.getElementById('total-calls').textContent = vb.total.toLocaleString();
+        function severityBadge(s) {
+            const cls = { critical: 'critical', high: 'high', medium: 'medium', low: 'low' }[String(s).toLowerCase()] || 'low';
+            return `<span class="badge badge-${cls}">${s || '—'}</span>`;
+        }
 
-                const rate = vb.total > 0 ? (vb.block / vb.total * 100).toFixed(1) : '0.0';
-                document.getElementById('block-rate').textContent = rate + '%';
-                document.getElementById('block-rate-bar').style.width = rate + '%';
+        function escapeHtml(s) {
+            const d = document.createElement('div'); d.textContent = String(s); return d.innerHTML;
+        }
 
-                const toolsEl = document.getElementById('tools-list');
-                toolsEl.innerHTML = '';
-                (metrics.top_tools || []).forEach(t => {
-                    const pct = t.call_count > 0 ? (t.block_count / t.call_count * 100).toFixed(0) : 0;
-                    toolsEl.innerHTML += `
-                        <div class="stat-row">
-                            <span>${t.tool}</span>
-                            <span>${t.call_count} calls (${pct}% blocked)</span>
-                        </div>
-                        <div class="bar"><div class="bar-fill ${pct > 30 ? 'red' : pct > 10 ? 'yellow' : 'green'}" style="width:${pct}%"></div></div>
-                    `;
-                });
+        function shortTime(ts) {
+            if (!ts) return '—';
+            try { return new Date(ts).toLocaleTimeString(); } catch { return ts; }
+        }
 
-                const piiEl = document.getElementById('pii-list');
-                const pii = metrics.pii_heatmap || [];
-                if (pii.length > 0) {
-                    piiEl.innerHTML = pii.map(p =>
-                        `<div class="stat-row"><span>${p.pii_type}</span><span>${p.count} in ${p.tool}</span></div>`
-                    ).join('');
-                }
+        /* ─── Overview ─── */
+        async function loadOverview() {
+            const [metrics, cost] = await Promise.all([
+                api('/api/metrics'), api('/api/metrics/cost')
+            ]);
+            if (!metrics || metrics.error) return;
 
-                if (!cost.error) {
-                    document.getElementById('cost-total').textContent = '$' + cost.estimated_cost_total.toFixed(2);
-                    document.getElementById('cost-model').textContent = 'Model: ' + cost.model;
-                    document.getElementById('cost-allowed').textContent = '$' + cost.estimated_cost_allowed.toFixed(2);
-                    document.getElementById('cost-blocked').textContent = '-$' + cost.estimated_cost_blocked.toFixed(2);
-                }
-            } catch (e) {
-                console.error('Refresh failed:', e);
+            const vb = metrics.verdict_breakdown;
+            document.getElementById('v-allow').textContent = vb.allow;
+            document.getElementById('v-block').textContent = vb.block;
+            document.getElementById('v-redact').textContent = vb.redact;
+            document.getElementById('v-approve').textContent = vb.approve;
+            document.getElementById('total-calls').textContent = vb.total.toLocaleString();
+            document.getElementById('donut-total').textContent = vb.total;
+
+            const rate = vb.total > 0 ? (vb.block / vb.total * 100).toFixed(1) : '0.0';
+            document.getElementById('block-rate').textContent = rate + '%';
+            document.getElementById('block-rate-bar').style.width = rate + '%';
+
+            // Donut chart (conic-gradient)
+            const t = vb.total || 1;
+            const pcts = [vb.allow / t * 100, vb.block / t * 100, vb.redact / t * 100, vb.approve / t * 100];
+            let cum = 0;
+            const stops = [];
+            const colors = ['var(--green)', 'var(--red)', 'var(--yellow)', 'var(--blue)'];
+            pcts.forEach((p, i) => { stops.push(`${colors[i]} ${cum}% ${cum + p}%`); cum += p; });
+            document.getElementById('donut-chart').style.background = `conic-gradient(${stops.join(',')})`;
+
+            // Tools
+            const el = document.getElementById('tools-list');
+            const tools = metrics.top_tools || [];
+            el.innerHTML = tools.length ? tools.map(t => {
+                const pct = t.call_count > 0 ? (t.block_count / t.call_count * 100).toFixed(0) : 0;
+                const color = pct > 30 ? 'var(--red)' : pct > 10 ? 'var(--yellow)' : 'var(--green)';
+                return `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)">
+            <span style="font-weight:500;font-family:var(--mono);font-size:.82rem">${escapeHtml(t.tool)}</span>
+            <span class="stat-label">${t.call_count} calls · ${pct}% blocked</span>
+        </div><div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div>`;
+            }).join('') : '<div class="stat-label">No tool calls yet</div>';
+
+            // PII
+            const piiEl = document.getElementById('pii-list');
+            const pii = metrics.pii_heatmap || [];
+            piiEl.innerHTML = pii.length ? pii.map(p =>
+                `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)">
+            <span class="badge badge-redact">${escapeHtml(p.pii_type)}</span>
+            <span class="stat-label">${p.count}× in ${escapeHtml(p.tool)}</span>
+        </div>`
+            ).join('') : '<div class="stat-label">No PII detected</div>';
+
+            // Cost
+            if (cost && !cost.error) {
+                document.getElementById('cost-total').textContent = '$' + cost.estimated_cost_total.toFixed(2);
+                document.getElementById('cost-allowed').textContent = '$' + cost.estimated_cost_allowed.toFixed(2);
+                document.getElementById('cost-blocked').textContent = '-$' + cost.estimated_cost_blocked.toFixed(2);
+                document.getElementById('cost-saved').textContent = '-$' + cost.estimated_cost_blocked.toFixed(2);
+                document.getElementById('cost-model').textContent = cost.model;
+                document.getElementById('cost-model-label').textContent = 'Model: ' + cost.model;
             }
         }
 
+        /* ─── Health ─── */
+        async function loadHealth() {
+            const h = await api('/api/v1/health');
+            if (!h || h.detail) return;
+            document.getElementById('rules-count').textContent = h.rules_count ?? '—';
+            document.getElementById('health-mode').textContent = 'Mode: ' + (h.mode || '—');
+            const ver = h.version != null ? h.version : '';
+            const rc = h.rules_count != null ? h.rules_count : '?';
+            document.getElementById('sidebar-version').textContent = ver ? `v${ver} · ${rc} rules` : `${rc} rules`;
+
+            const pill = document.getElementById('mode-pill');
+            const mode = h.mode || 'enforce';
+            pill.textContent = mode.toUpperCase();
+            pill.className = 'mode-pill ' + (mode === 'enforce' ? 'enforce' : mode === 'shadow' ? 'shadow' : 'enforce');
+        }
+
+        async function loadStatus() {
+            const s = await api('/api/v1/status');
+            if (!s || s.detail) return;
+
+            if (s.killed) {
+                const pill = document.getElementById('mode-pill');
+                pill.textContent = '🔴 KILLED'; pill.className = 'mode-pill killed-mode';
+            }
+
+            const el = document.getElementById('server-status');
+            el.innerHTML = [
+                { label: 'Status', value: s.killed ? '🔴 KILLED' : '🟢 Running' },
+                { label: 'Mode', value: s.mode || '—' },
+                { label: 'Rules', value: s.rules_count ?? '—' },
+                { label: 'Version', value: s.version || '—' },
+            ].map(i => `<div style="background:var(--bg-primary);padding:12px;border-radius:var(--radius-sm)">
+        <div class="stat-label">${i.label}</div>
+        <div style="font-weight:700;margin-top:4px">${i.value}</div>
+    </div>`).join('');
+        }
+
+        /* ─── Rules ─── */
+        async function loadRules() {
+            const data = await api('/api/rules');
+            const tb = document.getElementById('rules-table');
+            if (!data || !data.rules) {
+                tb.innerHTML = '<tr><td colspan="7" class="stat-label">Could not load rules</td></tr>';
+                return;
+            }
+            const rules = data.rules;
+            document.getElementById('rules-total-badge').textContent = rules.length;
+            tb.innerHTML = rules.map((r, i) => `<tr class="rule-toggle" onclick="toggleYaml(${i})">
+        <td style="font-family:var(--mono);font-weight:500">${escapeHtml(r.id)}</td>
+        <td>${escapeHtml(r.tool || r.when?.tool || '*')}</td>
+        <td>${verdictBadge(String(r.then || r.verdict || '').toUpperCase())}</td>
+        <td>${severityBadge(r.severity)}</td>
+        <td>${r.priority ?? '—'}</td>
+        <td>${r.enabled !== false ? '<span class="c-allow">●</span>' : '<span class="c-block">●</span>'}</td>
+        <td style="font-size:.75rem;color:var(--text-muted)">▶</td>
+    </tr><tr><td colspan="7" style="padding:0"><pre class="rule-yaml" id="yaml-${i}">${escapeHtml(JSON.stringify(r, null, 2))}</pre></td></tr>`).join('');
+        }
+
+        function toggleYaml(i) {
+            document.getElementById('yaml-' + i).classList.toggle('show');
+        }
+
+        /* ─── Traces ─── */
+        async function searchTraces(offset = 0) {
+            traceOffset = offset;
+            const params = new URLSearchParams();
+            const tool = document.getElementById('trace-tool').value;
+            const verdict = document.getElementById('trace-verdict').value;
+            const session = document.getElementById('trace-session').value;
+            const text = document.getElementById('trace-text').value;
+            if (tool) params.set('tool', tool);
+            if (verdict) params.set('verdict', verdict);
+            if (session) params.set('session_id', session);
+            if (text) params.set('text', text);
+            params.set('limit', TRACE_LIMIT);
+            params.set('offset', offset);
+
+            const data = await api('/api/traces/search?' + params);
+            const tb = document.getElementById('traces-table');
+            if (!data || !data.records) {
+                tb.innerHTML = '<tr><td colspan="6" class="stat-label">No results</td></tr>';
+                return;
+            }
+            tb.innerHTML = data.records.length ? data.records.map(r => `<tr>
+        <td style="font-size:.78rem;white-space:nowrap">${shortTime(r.timestamp)}</td>
+        <td style="font-family:var(--mono);font-size:.8rem">${escapeHtml(r.tool || '?')}</td>
+        <td>${verdictBadge(r.verdict)}</td>
+        <td style="font-size:.78rem">${escapeHtml(r.rule_id || '—')}</td>
+        <td style="font-size:.78rem">${escapeHtml(r.session_id || '—')}</td>
+        <td style="font-size:.78rem;max-width:200px;overflow:hidden;text-overflow:ellipsis">${escapeHtml(r.message || '—')}</td>
+    </tr>`).join('') : '<tr><td colspan="6" class="stat-label">No matching traces</td></tr>';
+
+            // Pagination
+            const pg = document.getElementById('traces-pagination');
+            const totalPages = Math.ceil((data.total || 0) / TRACE_LIMIT);
+            const currentPage = Math.floor(offset / TRACE_LIMIT) + 1;
+            pg.innerHTML = totalPages > 1 ? `
+        <span class="stat-label">${data.total} results · Page ${currentPage}/${totalPages}</span>
+        <button class="btn btn-ghost btn-sm" ${currentPage <= 1 ? 'disabled' : ''} onclick="searchTraces(${offset - TRACE_LIMIT})">← Prev</button>
+        <button class="btn btn-ghost btn-sm" ${currentPage >= totalPages ? 'disabled' : ''} onclick="searchTraces(${offset + TRACE_LIMIT})">Next →</button>
+    ` : data.total ? `<span class="stat-label">${data.total} results</span>` : '';
+        }
+
+        /* ─── Controls ─── */
+        function showModal(id) { document.getElementById('modal-' + id).classList.add('show'); }
+        function hideModal(id) { document.getElementById('modal-' + id).classList.remove('show'); }
+
+        async function doKill() {
+            const reason = document.getElementById('kill-reason').value || 'Kill switch activated via Dashboard';
+            await fetch(API + '/api/v1/kill', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ reason })
+            });
+            hideModal('kill');
+            loadStatus(); loadHealth();
+        }
+
+        async function doResume() {
+            await fetch(API + '/api/v1/resume', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+            loadStatus(); loadHealth();
+        }
+
+        async function doReload() {
+            const btn = document.getElementById('btn-reload');
+            btn.disabled = true; btn.textContent = 'Reloading...';
+            await fetch(API + '/api/v1/reload', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+            btn.disabled = false; btn.textContent = 'Reload Rules';
+            loadHealth(); loadRules();
+        }
+
+        async function loadApprovals() {
+            const data = await api('/api/v1/pending-approvals');
+            const tb = document.getElementById('approvals-table');
+            if (!data || !data.approvals || !data.approvals.length) {
+                tb.innerHTML = '<tr><td colspan="5" class="stat-label">No pending approvals</td></tr>';
+                document.getElementById('approvals-badge').textContent = '0';
+                return;
+            }
+            document.getElementById('approvals-badge').textContent = data.approvals.length;
+            tb.innerHTML = data.approvals.map(a => `<tr>
+        <td style="font-family:var(--mono);font-size:.78rem">${escapeHtml(a.approval_id).slice(0, 12)}...</td>
+        <td>${escapeHtml(a.tool_name)}</td>
+        <td>${escapeHtml(a.rule_id)}</td>
+        <td style="font-size:.8rem">${escapeHtml(a.message)}</td>
+        <td>
+            <button class="btn btn-success btn-sm" onclick="respondApproval('${a.approval_id}',true)">✓</button>
+            <button class="btn btn-danger btn-sm" onclick="respondApproval('${a.approval_id}',false)">✕</button>
+        </td>
+    </tr>`).join('');
+        }
+
+        async function respondApproval(id, approved) {
+            await fetch(API + '/api/v1/respond-approval', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ approval_id: id, approved, responder: 'dashboard' })
+            });
+            loadApprovals();
+        }
+
+        /* ─── WebSocket ─── */
         function connectWS() {
             const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const ws = new WebSocket(`${proto}//${location.host}/ws/verdicts`);
-            ws.onopen = () => {
-                document.getElementById('connection-status').innerHTML = '<span class="status online"></span>Connected';
-                document.getElementById('ws-dot').style.display = 'inline-block';
+            wsConn = new WebSocket(`${proto}//${location.host}/ws/verdicts`);
+            wsConn.onopen = () => {
+                document.getElementById('ws-status').className = 'status-pill online';
+                document.getElementById('ws-status').innerHTML = '<span class="status-dot pulse"></span> Connected';
+                document.getElementById('live-dot').style.display = 'inline-block';
             };
-            ws.onmessage = (e) => {
+            wsConn.onmessage = (e) => {
                 const data = JSON.parse(e.data);
                 const feed = document.getElementById('live-feed');
-                const icon = data.verdict === 'BLOCK' ? '🚫' : data.verdict === 'ALLOW' ? '✅' : '🔄';
+                if (feed.querySelector('.stat-label')) feed.innerHTML = '';
+                const icon = { BLOCK: '🚫', ALLOW: '✅', REDACT: '🔄', APPROVE: '⏳' }[data.verdict] || '❓';
                 const item = document.createElement('div');
-                item.className = 'live-item';
-                item.textContent = `${icon} ${data.timestamp || '—'} | ${data.tool || '?'} → ${data.verdict || '?'}`;
+                item.className = 'feed-item';
+                item.innerHTML = `<span class="time">${shortTime(data.timestamp)}</span>
+            <span>${icon}</span>
+            <span class="tool">${escapeHtml(data.tool || '?')}</span>
+            <span>→</span>
+            ${verdictBadge(data.verdict)}
+            <span class="stat-label" style="flex:1;text-align:right">${escapeHtml(data.rule_id || '')}</span>`;
                 feed.insertBefore(item, feed.firstChild);
-                if (feed.children.length > 100) feed.removeChild(feed.lastChild);
+                if (feed.children.length > 200) feed.removeChild(feed.lastChild);
             };
-            ws.onclose = () => {
-                document.getElementById('connection-status').innerHTML = '<span class="status offline"></span>Disconnected';
-                document.getElementById('ws-dot').style.display = 'none';
+            wsConn.onclose = () => {
+                document.getElementById('ws-status').className = 'status-pill offline';
+                document.getElementById('ws-status').innerHTML = '<span class="status-dot"></span> Disconnected';
+                document.getElementById('live-dot').style.display = 'none';
                 setTimeout(connectWS, 3000);
             };
         }
 
-        refresh();
-        setInterval(refresh, 10000);
+        /* ─── Init ─── */
+        async function refreshAll() {
+            await Promise.all([loadOverview(), loadHealth()]);
+        }
+
+        refreshAll();
+        setInterval(refreshAll, 15000);
         connectWS();
     </script>
 </body>
+
 </html>
