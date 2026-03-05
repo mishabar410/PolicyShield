@@ -1,27 +1,47 @@
+# E2E test rules for real PolicyShield server integration tests.
+# These use the standard when/then format supported by the parser.
+
 version: "1"
 default_verdict: allow
 
 rules:
   - id: block-rm
-    tool: exec
-    match:
-      args:
+    description: Block destructive rm -rf commands
+    when:
+      tool: exec
+      args_match:
         command:
           contains: "rm -rf"
     then: block
+    severity: critical
     message: "Destructive command blocked"
 
-  - id: redact-email
-    tool: "*"
-    match:
-      pii: [EMAIL]
+  - id: redact-pii-messages
+    description: Redact PII in outgoing messages
+    when:
+      tool: send_message
     then: redact
+    severity: high
+    message: "PII redacted in message"
 
-  - id: approve-write
-    tool: write_file
-    match:
-      args:
+  - id: approve-etc-write
+    description: System file writes require approval
+    when:
+      tool: write_file
+      args_match:
         path:
-          glob: "/etc/**"
+          contains: "/etc/"
     then: approve
+    severity: critical
     message: "System file write requires approval"
+
+  - id: block-env-dump
+    description: Block env/printenv commands
+    when:
+      tool: exec
+      args_match:
+        command:
+          regex: "\\benv\\b|\\bprintenv\\b"
+    then: block
+    severity: high
+    message: "Environment dump blocked"
