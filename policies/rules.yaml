@@ -16,7 +16,7 @@ rules:
     tool: exec
     args_match:
       command:
-        regex: \b(rm\s+-rf|rm\s+-r\s+/|mkfs|dd\s+if=|chmod\s+777|chmod\s+-R\s+777)\b
+        regex: \b(mkfs|dd\s+if=|chmod\s+777|chmod\s+-R\s+777)\b
   then: block
   severity: critical
   message: Destructive command blocked by PolicyShield

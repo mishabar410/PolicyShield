@@ -189,7 +189,9 @@ class TestRulesEndpoint:
         from policyshield.shield.engine import ShieldEngine
 
         rules_file = tmp_path / "rules.yaml"
-        rules_file.write_text('rules:\n  - id: test-rule\n    when:\n      tool: exec\n    then: block\n    severity: high\n')
+        rules_file.write_text(
+            "rules:\n  - id: test-rule\n    when:\n      tool: exec\n    then: block\n    severity: high\n"
+        )
         engine = ShieldEngine(rules=str(rules_file))
         app = create_dashboard_app(trace_dir, engine=engine)
         client = TestClient(app)
@@ -210,7 +212,9 @@ class TestServerDashboard:
         from policyshield.server.app import create_app
 
         rules_file = tmp_path / "rules.yaml"
-        rules_file.write_text('rules:\n  - id: s-rule\n    when:\n      tool: exec\n    then: block\n    severity: critical\n')
+        rules_file.write_text(
+            "rules:\n  - id: s-rule\n    when:\n      tool: exec\n    then: block\n    severity: critical\n"
+        )
         engine = AsyncShieldEngine(rules=str(rules_file))
         app = create_app(engine)
         return TestClient(app, raise_server_exceptions=False)
