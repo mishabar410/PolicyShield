@@ -6,10 +6,10 @@
         "strict": true,
         "esModuleInterop": true,
         "skipLibCheck": true,
-        "outDir": "dist",
-        "rootDir": "."
+        "noEmit": true
     },
     "include": [
-        "*.ts"
+        "*.ts",
+        "../../plugins/openclaw/src/**/*.ts"
     ]
 }

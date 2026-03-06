@@ -22,6 +22,9 @@ import type { AddressInfo } from "node:net";
 // Import plugin (same as OpenClaw would)
 import pluginModule from "../../plugins/openclaw/src/index.js";
 
+// register is typed as optional in OpenClawPluginDefinition but always present on our plugin
+const registerPlugin_ = pluginModule.register!.bind(pluginModule);
+
 // ─── OpenClaw Hook System Replica ───────────────────────────────────────────
 
 type PluginHookName =
@@ -265,7 +268,7 @@ describe("E2E Scenarios: Full Hook Dispatch Cycle", () => {
         it("blocks rm -rf via before_tool_call hook", async () => {
             const hooks: HookRegistration[] = [];
             const api = createMockApi(hooks, { url: serverUrl });
-            await pluginModule.register(api as any);
+            await registerPlugin_(api as any);
             await new Promise((r) => setTimeout(r, 200));
 
             const result = await runChainHook(
@@ -288,7 +291,7 @@ describe("E2E Scenarios: Full Hook Dispatch Cycle", () => {
         it("redacts email address and returns modified params", async () => {
             const hooks: HookRegistration[] = [];
             const api = createMockApi(hooks, { url: serverUrl });
-            await pluginModule.register(api as any);
+            await registerPlugin_(api as any);
             await new Promise((r) => setTimeout(r, 200));
 
             const result = await runChainHook(
@@ -316,7 +319,7 @@ describe("E2E Scenarios: Full Hook Dispatch Cycle", () => {
         it("returns undefined (proceed) for safe operations", async () => {
             const hooks: HookRegistration[] = [];
             const api = createMockApi(hooks, { url: serverUrl });
-            await pluginModule.register(api as any);
+            await registerPlugin_(api as any);
             await new Promise((r) => setTimeout(r, 200));
 
             const result = await runChainHook(
@@ -341,7 +344,7 @@ describe("E2E Scenarios: Full Hook Dispatch Cycle", () => {
                 approve_timeout_ms: 500, // Short timeout for test
                 approve_poll_interval_ms: 100,
             });
-            await pluginModule.register(api as any);
+            await registerPlugin_(api as any);
             await new Promise((r) => setTimeout(r, 200));
 
             // Keep approval status as "pending" — no one approves
@@ -374,7 +377,7 @@ describe("E2E Scenarios: Full Hook Dispatch Cycle", () => {
                 approve_timeout_ms: 3000,
                 approve_poll_interval_ms: 100,
             });
-            await pluginModule.register(api as any);
+            await registerPlugin_(api as any);
             await new Promise((r) => setTimeout(r, 200));
 
             // Approve after a short delay
@@ -402,7 +405,7 @@ describe("E2E Scenarios: Full Hook Dispatch Cycle", () => {
                 approve_timeout_ms: 3000,
                 approve_poll_interval_ms: 100,
             });
-            await pluginModule.register(api as any);
+            await registerPlugin_(api as any);
             await new Promise((r) => setTimeout(r, 200));
 
             // Deny after a short delay
@@ -435,7 +438,7 @@ describe("E2E Scenarios: Full Hook Dispatch Cycle", () => {
                 fail_open: true,
                 timeout_ms: 300,
             });
-            await pluginModule.register(api as any);
+            await registerPlugin_(api as any);
             await new Promise((r) => setTimeout(r, 200));
 
             const result = await runChainHook(
@@ -458,7 +461,7 @@ describe("E2E Scenarios: Full Hook Dispatch Cycle", () => {
                 fail_open: true,
                 timeout_ms: 300,
             });
-            await pluginModule.register(api as any);
+            await registerPlugin_(api as any);
             await new Promise((r) => setTimeout(r, 200));
 
             // after_tool_call should silently fail — fire-and-forget

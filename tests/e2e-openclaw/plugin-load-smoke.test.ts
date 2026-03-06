@@ -17,6 +17,9 @@ import { resolve } from "node:path";
 // Import our plugin via relative path (simulating OpenClaw loading from extensions dir)
 import pluginModule from "../../plugins/openclaw/src/index.js";
 
+// register is typed as optional in OpenClawPluginDefinition but always present on our plugin
+const registerPlugin_ = pluginModule.register!.bind(pluginModule);
+
 // ── OpenClaw Plugin Discovery Simulation ────────────────────────────────────
 
 describe("Plugin Discovery (simulating OpenClaw discovery.ts)", () => {
@@ -109,7 +112,7 @@ describe("Plugin Registration (simulating OpenClaw registry.ts createApi)", () =
         };
 
         // This should not throw even when server is unreachable
-        await pluginModule.register(mockApi as any);
+        await registerPlugin_(mockApi as any);
 
         // Wait for the non-blocking health check to settle
         await new Promise((r) => setTimeout(r, 300));
@@ -151,7 +154,7 @@ describe("Plugin Registration (simulating OpenClaw registry.ts createApi)", () =
         };
 
         // fire-and-forget — we only care about hooks array, not async result
-        pluginModule.register(mockApi as any);
+        registerPlugin_(mockApi as any);
 
         const btc = hooks.find((h) => h.hookName === "before_tool_call");
         expect(btc).toBeDefined();

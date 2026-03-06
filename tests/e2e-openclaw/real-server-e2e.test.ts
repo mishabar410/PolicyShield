@@ -31,6 +31,9 @@ import { existsSync } from "node:fs";
 // Import the real plugin
 import pluginModule from "../../plugins/openclaw/src/index.js";
 
+// register is typed as optional in OpenClawPluginDefinition but always present on our plugin
+const registerPlugin_ = pluginModule.register!.bind(pluginModule);
+
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 type PluginHookName =
@@ -257,7 +260,7 @@ async function registerPlugin(
     config: Record<string, unknown> = {},
 ): Promise<ReturnType<typeof createMockApi>> {
     const api = createMockApi(hooks, { url: SERVER_URL, ...config });
-    await pluginModule.register(api as any);
+    await registerPlugin_(api as any);
     await new Promise((r) => setTimeout(r, 500));
     return api;
 }
@@ -571,13 +574,14 @@ describe("Real Server E2E: Plugin ↔ PolicyShield Server", () => {
                 registeredCommand = cmd;
             });
 
-            await pluginModule.register(api as any);
+            await registerPlugin_(api as any);
             await new Promise((r) => setTimeout(r, 500));
 
             expect(registeredCommand).not.toBeNull();
-            expect(registeredCommand!.name).toBe("policyshield");
+            const cmd = registeredCommand!;
+            expect(cmd.name).toBe("policyshield");
 
-            const result = await registeredCommand!.handler({ args: "status" });
+            const result = await cmd.handler({ args: "status" });
             expect(result.text).toContain("online");
         });
 
@@ -589,9 +593,10 @@ describe("Real Server E2E: Plugin ↔ PolicyShield Server", () => {
                 registeredCommand = cmd;
             });
 
-            await pluginModule.register(api as any);
+            await registerPlugin_(api as any);
             await new Promise((r) => setTimeout(r, 500));
 
+            expect(registeredCommand).not.toBeNull();
             const result = await registeredCommand!.handler({ args: "rules" });
             expect(result.text).toContain("4 rules");
         });
