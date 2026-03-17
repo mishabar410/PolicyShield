@@ -32,7 +32,7 @@ class PolicyShieldConfig:
     """Resolved configuration for the shield engine."""
 
     mode: ShieldMode = ShieldMode.ENFORCE
-    fail_open: bool = True
+    fail_open: bool = False
 
     # rules
     rules_path: str = "./policies/"
@@ -203,7 +203,7 @@ def _build_config(data: dict) -> PolicyShieldConfig:
 
     return PolicyShieldConfig(
         mode=mode,
-        fail_open=data.get("fail_open", True),
+        fail_open=data.get("fail_open", False),
         rules_path=rules.get("path", "./policies/"),
         watch=rules.get("watch", False),
         watch_interval=watch_interval,

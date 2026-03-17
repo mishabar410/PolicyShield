@@ -189,6 +189,15 @@ class PolicyCompiler:
                     errors.append(f"Rule {i}: missing 'id'")
                 if "when" not in rule:
                     errors.append(f"Rule {i}: missing 'when'")
+                elif isinstance(rule["when"], dict):
+                    import re as _re
+                    for field_name in ("tool", "args_match"):
+                        pattern_val = rule["when"].get(field_name)
+                        if pattern_val and isinstance(pattern_val, str):
+                            try:
+                                _re.compile(pattern_val)
+                            except _re.error as e:
+                                errors.append(f"Rule {i}: invalid regex in 'when.{field_name}': {e}")
                 if "then" not in rule:
                     errors.append(f"Rule {i}: missing 'then'")
                 elif rule["then"] not in ("BLOCK", "ALLOW", "REDACT", "APPROVE"):

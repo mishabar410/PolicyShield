@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import ipaddress
 import logging
+import socket
 import threading
 from typing import Any
+from urllib.parse import urlparse
 
 import httpx
 
@@ -14,6 +17,45 @@ from policyshield.core.models import RuleSet
 from policyshield.core.parser import parse_rules_from_string
 
 logger = logging.getLogger(__name__)
+
+_RFC1918_NETWORKS = [
+    ipaddress.ip_network("10.0.0.0/8"),
+    ipaddress.ip_network("172.16.0.0/12"),
+    ipaddress.ip_network("192.168.0.0/16"),
+    ipaddress.ip_network("127.0.0.0/8"),
+    ipaddress.ip_network("169.254.0.0/16"),
+    ipaddress.ip_network("::1/128"),
+    ipaddress.ip_network("fc00::/7"),
+    ipaddress.ip_network("fe80::/10"),
+]
+
+
+def _is_private_address(host: str) -> bool:
+    try:
+        addr = ipaddress.ip_address(host)
+        return any(addr in net for net in _RFC1918_NETWORKS)
+    except ValueError:
+        pass
+    try:
+        resolved = socket.getaddrinfo(host, None)
+        for _, _, _, _, sockaddr in resolved:
+            addr = ipaddress.ip_address(sockaddr[0])
+            if any(addr in net for net in _RFC1918_NETWORKS):
+                return True
+    except OSError:
+        pass
+    return False
+
+
+def _validate_remote_url(url: str) -> None:
+    parsed = urlparse(url)
+    if parsed.scheme != "https":
+        raise ValueError(f"Remote rules URL must use https://, got: {parsed.scheme!r}")
+    host = parsed.hostname or ""
+    if not host:
+        raise ValueError("Remote rules URL has no host")
+    if _is_private_address(host):
+        raise ValueError(f"Remote rules URL resolves to a private/internal address: {host!r}")
 
 
 class RemoteRuleLoader:
@@ -35,6 +77,7 @@ class RemoteRuleLoader:
         callback: Any = None,
         timeout: float = 10.0,
     ) -> None:
+        _validate_remote_url(url)
         self._url = url
         self._refresh_interval = refresh_interval
         self._signature_key = signature_key
@@ -44,6 +87,11 @@ class RemoteRuleLoader:
         self._last_hash: str | None = None
         self._stop_event = threading.Event()
         self._thread: threading.Thread | None = None
+        # NOTE: DNS rebinding limitation — the IP is validated at URL-check time via
+        # _validate_remote_url(), but the actual TCP connection may resolve to a
+        # different IP (DNS rebinding). TLS verification (verify=True) mitigates this
+        # for HTTPS endpoints by requiring a valid certificate for the target hostname.
+        self._client = httpx.Client(timeout=self._timeout, verify=True)
 
     def start(self) -> None:
         self._stop_event.clear()
@@ -59,6 +107,10 @@ class RemoteRuleLoader:
         self._stop_event.set()
         if self._thread:
             self._thread.join(timeout=5.0)
+        try:
+            self._client.close()
+        except Exception:
+            pass
 
     def fetch_once(self) -> RuleSet | None:
         """Fetch rules once (for initial load or manual refresh)."""
@@ -67,8 +119,7 @@ class RemoteRuleLoader:
             if self._last_etag:
                 headers["If-None-Match"] = self._last_etag
 
-            with httpx.Client(timeout=self._timeout) as client:
-                resp = client.get(self._url, headers=headers)
+            resp = self._client.get(self._url, headers=headers)
 
             if resp.status_code == 304:
                 return None  # Not modified

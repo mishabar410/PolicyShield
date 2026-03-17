@@ -6,6 +6,7 @@ import asyncio
 import hashlib
 import hmac
 import os
+import time
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -52,22 +53,45 @@ from policyshield.shield.async_engine import AsyncShieldEngine
 def _rules_hash(engine: AsyncShieldEngine) -> str:
     """Compute a stable hash of the current ruleset for change detection."""
     ruleset = engine.rules
-    raw = f"{ruleset.shield_name}:{ruleset.version}:{len(ruleset.rules)}"
+    parts = [f"{ruleset.shield_name}:{ruleset.version}:{len(ruleset.rules)}"]
     for r in ruleset.rules:
-        # Issue #38: Include rule content in hash for modification detection
-        raw += f"|{r.id}:{r.then.value}:{r.severity}:{r.enabled}:{r.priority}:{r.when}"
-    # Issue #179: Include output_rules, honeypots, taint_chain, default_verdict
-    raw += f"|dv:{ruleset.default_verdict.value}"
+        parts.append(f"|{r.id}:{r.then.value}:{r.severity}:{r.enabled}:{r.priority}:{r.when}")
+    parts.append(f"|dv:{ruleset.default_verdict.value}")
     for orule in getattr(ruleset, "output_rules", None) or []:
-        raw += f"|o:{getattr(orule, 'id', '')}"
+        parts.append(f"|o:{getattr(orule, 'id', '')}")
     for hp in getattr(ruleset, "honeypots", None) or []:
-        raw += f"|h:{getattr(hp, 'id', '')}"
-    return hashlib.sha256(raw.encode()).hexdigest()[:16]
+        parts.append(f"|h:{getattr(hp, 'id', '')}")
+    return hashlib.sha256("".join(parts).encode()).hexdigest()[:16]
 
 
 def _get_api_token() -> str | None:
-    """Read API token from environment. Returns None if not configured."""
-    return os.environ.get("POLICYSHIELD_API_TOKEN") or None
+    """Read API token from environment. Returns None if not configured. Rejects empty string."""
+    val = os.environ.get("POLICYSHIELD_API_TOKEN")
+    if val == "":
+        logging.getLogger("policyshield.server").warning(
+            "POLICYSHIELD_API_TOKEN is set to empty string — this is misconfiguration; treating as unset"
+        )
+        return None
+    return val or None
+
+
+# Token cache with 5-second TTL so token rotation takes effect without restart
+_TOKEN_CACHE_TTL = 5.0
+_token_cache_ts: float = 0.0
+_CACHED_API_TOKEN: str | None = None
+_CACHED_ADMIN_TOKEN: str | None = None
+
+
+def _get_cached_tokens() -> tuple[str | None, str | None]:
+    """Return (api_token, admin_token) re-read from env at most every 5 seconds."""
+    global _CACHED_API_TOKEN, _CACHED_ADMIN_TOKEN, _token_cache_ts
+    now = time.monotonic()
+    if now - _token_cache_ts >= _TOKEN_CACHE_TTL:
+        _CACHED_API_TOKEN = _get_api_token()
+        raw_admin = os.environ.get("POLICYSHIELD_ADMIN_TOKEN")
+        _CACHED_ADMIN_TOKEN = None if raw_admin == "" else (raw_admin or None)
+        _token_cache_ts = now
+    return _CACHED_API_TOKEN, _CACHED_ADMIN_TOKEN
 
 
 async def verify_token(request: Request) -> None:
@@ -77,8 +101,7 @@ async def verify_token(request: Request) -> None:
     Admin endpoints (/reload, /kill-switch) require ADMIN_TOKEN if set.
     When no token is configured, all endpoints are open (dev mode).
     """
-    api_token = _get_api_token()
-    admin_token = os.environ.get("POLICYSHIELD_ADMIN_TOKEN") or None
+    api_token, admin_token = _get_cached_tokens()
 
     admin_paths = ("/api/v1/reload", "/api/v1/kill")
     is_admin = any(request.url.path.startswith(p) for p in admin_paths)
@@ -169,12 +192,19 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
     # CORS middleware (env config, disabled by default)
     cors_origins = os.environ.get("POLICYSHIELD_CORS_ORIGINS", "").split(",")
     cors_origins = [o.strip() for o in cors_origins if o.strip()]
+    _wildcard_origins = [o for o in cors_origins if o == "*"]
+    if _wildcard_origins:
+        _logger.warning(
+            "POLICYSHIELD_CORS_ORIGINS contains '*' — wildcard CORS is not allowed; ignoring wildcard entries"
+        )
+        cors_origins = [o for o in cors_origins if o != "*"]
     if cors_origins:
         app.add_middleware(
             CORSMiddleware,
             allow_origins=cors_origins,
             allow_methods=["GET", "POST"],
             allow_headers=["Authorization", "Content-Type"],
+            allow_credentials=False,
             max_age=3600,
         )
 
@@ -222,17 +252,25 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
     @app.middleware("http")
     async def payload_size_limit(request: Request, call_next):
         if request.method in ("POST", "PUT", "PATCH"):
-            # Issue #63: ALWAYS read actual body to prevent Content-Length spoofing
-            body = await request.body()
-            if len(body) > _max_request_size:
-                return JSONResponse(
-                    status_code=413,
-                    content={
-                        "error": "payload_too_large",
-                        "message": f"Request body exceeds {_max_request_size} bytes",
-                        "max_bytes": _max_request_size,
-                    },
-                )
+            accumulated = 0
+            chunks: list[bytes] = []
+            async for chunk in request.stream():
+                accumulated += len(chunk)
+                if accumulated > _max_request_size:
+                    return JSONResponse(
+                        status_code=413,
+                        content={
+                            "error": "payload_too_large",
+                            "message": f"Request body exceeds {_max_request_size} bytes",
+                            "max_bytes": _max_request_size,
+                        },
+                    )
+                chunks.append(chunk)
+            # Re-inject the fully-read body so downstream handlers can read it
+            body = b"".join(chunks)
+            async def _receive():
+                return {"type": "http.request", "body": body, "more_body": False}
+            request._receive = _receive  # type: ignore[attr-defined]
         return await call_next(request)
 
     # ── Middleware: Backpressure (307) ──
@@ -296,15 +334,22 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
     from policyshield.server.rate_limiter import InMemoryRateLimiter as _AdminRL
 
     _admin_limiter = _AdminRL(max_requests=10, window_seconds=60)
+    _trusted_proxies: set[str] = {
+        h.strip()
+        for h in os.environ.get("POLICYSHIELD_TRUSTED_PROXIES", "").split(",")
+        if h.strip()
+    }
 
     @app.middleware("http")
     async def rate_limit_admin(request: Request, call_next):
         admin_paths = ("/api/v1/reload", "/api/v1/kill")
         if any(request.url.path.startswith(p) for p in admin_paths):
-            # Issue #189: Use X-Forwarded-For behind reverse proxy
-            client_ip = request.headers.get("x-forwarded-for", "").split(",")[0].strip() or (
-                request.client.host if request.client else "unknown"
-            )
+            direct_ip = request.client.host if request.client else "unknown"
+            if _trusted_proxies and direct_ip in _trusted_proxies:
+                xff = request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+                client_ip = xff if xff else direct_ip
+            else:
+                client_ip = direct_ip
             if not request.client:
                 _logger.warning("Admin rate-limit: request.client is None (proxy misconfiguration?)")
             if not _admin_limiter.is_allowed(client_ip):
@@ -331,8 +376,6 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
             # Use hash of API token as key if available (prevents prefix-rotation bypass)
             auth = request.headers.get("Authorization", "")
             if auth.startswith("Bearer ") and len(auth) > 7:
-                import hashlib
-
                 client_key = f"token:{hashlib.sha256(auth[7:].encode()).hexdigest()[:16]}"
             if not _api_limiter.is_allowed(client_key):
                 return JSONResponse(
@@ -569,7 +612,9 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
         try:
             body = await request.json()
             if isinstance(body, dict) and "reason" in body:
-                reason = body["reason"]
+                import re as _re
+                raw_reason = str(body["reason"])[:500]
+                reason = _re.sub(r"[^\x20-\x7e]", "", raw_reason)
         except Exception:
             pass  # No body or invalid JSON — use default reason
         engine.kill(reason)
@@ -721,7 +766,7 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
                 )
 
     # ── Dashboard static files ──
-    _dashboard_static = Path(__file__).parent.parent / "dashboard" / "static"
+    _dashboard_static = (Path(__file__).parent.parent / "dashboard" / "static").resolve()
 
     @app.get("/dashboard")
     @app.get("/dashboard/")
@@ -735,7 +780,9 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
     @app.get("/dashboard/{path:path}")
     async def dashboard_static(path: str):
         """Serve dashboard static assets."""
-        file_path = _dashboard_static / path
+        file_path = (_dashboard_static / path).resolve()
+        if not file_path.is_relative_to(_dashboard_static):
+            return JSONResponse({"error": "Not found"}, status_code=404)
         if file_path.exists() and file_path.is_file():
             return FileResponse(file_path)
         return JSONResponse({"error": "Not found"}, status_code=404)

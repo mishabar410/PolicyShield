@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import logging
+import time
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
+_METRICS_CACHE_TTL = 30.0  # seconds
 
 
 class PrometheusExporter:
@@ -14,9 +17,15 @@ class PrometheusExporter:
     def __init__(self, trace_dir: str | Path = "./traces", namespace: str = "policyshield") -> None:
         self._trace_dir = Path(trace_dir)
         self._namespace = namespace
+        self._cached_metrics: dict = {}
+        self._cache_ts: float = 0.0
 
     def collect_metrics(self) -> dict:
-        """Collect current metrics from traces."""
+        """Collect current metrics from traces (cached with TTL)."""
+        now = time.monotonic()
+        if now - self._cache_ts < _METRICS_CACHE_TTL:
+            return self._cached_metrics
+
         from policyshield.trace.aggregator import TraceAggregator
 
         if not self._trace_dir.exists():
@@ -51,6 +60,8 @@ class PrometheusExporter:
             key = f"{self._namespace}_pii_detections{{{self._label('type', entry.pii_type)},{self._label('tool', entry.tool)}}}"
             metrics[key] = entry.count
 
+        self._cached_metrics = metrics
+        self._cache_ts = now
         return metrics
 
     def format_prometheus(self) -> str:

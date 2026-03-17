@@ -14,7 +14,6 @@ MAX_SCAN_LENGTH = 50_000
 
 # Issue #52/#70: Limits to prevent unbounded match accumulation
 MAX_MATCHES_PER_PATTERN = 50
-MAX_TOTAL_MATCHES = 200
 
 
 @dataclass
@@ -126,6 +125,10 @@ def _date_check(date_str: str) -> bool:
         # caught above, but "5.6.7" should still be accepted cautiously.
         if all(n > 12 for n in nums):
             return False  # No part can be a month
+        # Require that at least one part looks like a plausible 2-digit year (00-99)
+        # and that none of the parts is zero (version strings like 1.0.2 have zeros)
+        if any(n == 0 for n in nums):
+            return False
         return True
 
     # At least one of the two non-year parts must be ≤ 12 (month)
@@ -259,7 +262,7 @@ class PIIDetector:
         matches: list[PIIMatch] = []
         for pii_pattern in self._patterns:
             # Issue #70: Stop scanning if we've accumulated too many matches
-            if len(matches) >= MAX_TOTAL_MATCHES:
+            if len(matches) >= PIIDetector.MAX_TOTAL_MATCHES:
                 break
             per_pattern_count = 0
             for m in pii_pattern.pattern.finditer(scan_text):

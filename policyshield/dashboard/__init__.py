@@ -12,34 +12,61 @@ logger = logging.getLogger(__name__)
 def create_dashboard_app(
     trace_dir: str | Path = "./traces",
     engine: Any = None,
+    allowed_origins: list[str] | None = None,
 ):
     """Create and return a FastAPI app for the dashboard.
 
     Args:
         trace_dir: Path to the JSONL trace directory.
         engine: Optional AsyncShieldEngine or ShieldEngine for rules/management APIs.
+        allowed_origins: Explicit list of allowed CORS origins. Empty/None disables CORS.
     """
+    import hmac
+    import os
+
     try:
         from fastapi import FastAPI, Query, WebSocket, WebSocketDisconnect
         from fastapi.responses import FileResponse, HTMLResponse
         from starlette.middleware.cors import CORSMiddleware
+        from fastapi import Depends, HTTPException, Request
     except ImportError:
         raise ImportError("Dashboard requires 'fastapi'. Install with: pip install policyshield[dashboard]")
 
     from policyshield import __version__
 
+    _dashboard_api_token = os.environ.get("POLICYSHIELD_API_TOKEN") or None
+    if _dashboard_api_token == "":
+        _dashboard_api_token = None
+        logger.warning("POLICYSHIELD_API_TOKEN is set to empty string — dashboard auth disabled")
+
+    async def _verify_dashboard_token(request: Request) -> None:
+        if _dashboard_api_token is None:
+            return
+        auth = request.headers.get("Authorization", "")
+        if not auth.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Missing Bearer token")
+        if not hmac.compare_digest(auth[7:], _dashboard_api_token):
+            raise HTTPException(status_code=403, detail="Invalid token")
+
+    _dash_auth = [Depends(_verify_dashboard_token)]
+
     trace_dir = Path(trace_dir)
     app = FastAPI(title="PolicyShield Dashboard", version=__version__)
 
-    # Allow all origins for dashboard (development-friendly)
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_methods=["GET", "POST"],
-        allow_headers=["*"],
-    )
+    # CORS: only add middleware when an explicit allow-list is provided
+    _cors_origins = allowed_origins or []
+    if not _cors_origins:
+        _env_origins = os.environ.get("POLICYSHIELD_DASHBOARD_CORS_ORIGINS", "")
+        _cors_origins = [o.strip() for o in _env_origins.split(",") if o.strip()]
+    if _cors_origins:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=_cors_origins,
+            allow_methods=["GET", "POST"],
+            allow_headers=["Authorization", "Content-Type"],
+        )
 
-    @app.get("/api/metrics")
+    @app.get("/api/metrics", dependencies=_dash_auth)
     def get_metrics():
         from policyshield.trace.aggregator import TraceAggregator
 
@@ -49,7 +76,7 @@ def create_dashboard_app(
         result = agg.aggregate()
         return result.to_dict()
 
-    @app.get("/api/metrics/verdicts")
+    @app.get("/api/metrics/verdicts", dependencies=_dash_auth)
     def get_verdicts():
         from policyshield.trace.aggregator import TraceAggregator
 
@@ -59,7 +86,7 @@ def create_dashboard_app(
         result = agg.aggregate()
         return result.verdict_breakdown.to_dict()
 
-    @app.get("/api/metrics/tools")
+    @app.get("/api/metrics/tools", dependencies=_dash_auth)
     def get_tools():
         from policyshield.trace.aggregator import TraceAggregator
 
@@ -69,7 +96,7 @@ def create_dashboard_app(
         result = agg.aggregate()
         return [t.to_dict() for t in result.top_tools]
 
-    @app.get("/api/metrics/pii")
+    @app.get("/api/metrics/pii", dependencies=_dash_auth)
     def get_pii():
         from policyshield.trace.aggregator import TraceAggregator
 
@@ -79,7 +106,7 @@ def create_dashboard_app(
         result = agg.aggregate()
         return [p.to_dict() for p in result.pii_heatmap]
 
-    @app.get("/api/metrics/cost")
+    @app.get("/api/metrics/cost", dependencies=_dash_auth)
     def get_cost(model: str = "gpt-4o"):
         from policyshield.trace.cost import CostEstimator
 
@@ -90,7 +117,7 @@ def create_dashboard_app(
         return est.to_dict()
 
     # ── Trace search endpoint ──
-    @app.get("/api/traces/search")
+    @app.get("/api/traces/search", dependencies=_dash_auth)
     def search_traces(
         tool: Optional[str] = Query(None),
         verdict: Optional[str] = Query(None),
@@ -120,7 +147,7 @@ def create_dashboard_app(
         return {"total": result.total, "records": result.records}
 
     # ── Rules endpoint ──
-    @app.get("/api/rules")
+    @app.get("/api/rules", dependencies=_dash_auth)
     def get_rules():
         if engine is None:
             return {"rules": [], "error": "No engine connected"}
@@ -152,6 +179,16 @@ def create_dashboard_app(
 
     @app.websocket("/ws/verdicts")
     async def ws_verdicts(websocket: WebSocket):
+        if _dashboard_api_token is not None:
+            auth_header = websocket.headers.get("authorization", "")
+            token = ""
+            if auth_header.startswith("Bearer "):
+                token = auth_header[7:]
+            if not token:
+                token = websocket.query_params.get("token", "")
+            if not hmac.compare_digest(token, _dashboard_api_token):
+                await websocket.close(code=4001)
+                return
         await websocket.accept()
         app.state.ws_clients.add(websocket)
         try:

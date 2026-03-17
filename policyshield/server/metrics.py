@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import threading
-from collections import Counter
+from collections import Counter, deque
 
 
 class MetricsCollector:
@@ -20,8 +20,8 @@ class MetricsCollector:
         self._approval_approved = 0
         self._approval_denied = 0
         self._approval_timeout = 0
-        self._approval_response_times: list[float] = []
         self._max_response_times = 1000  # Rolling window
+        self._approval_response_times: deque[float] = deque(maxlen=self._max_response_times)
 
     def record(self, verdict: str, latency_ms: float) -> None:
         with self._lock:
@@ -41,8 +41,6 @@ class MetricsCollector:
             else:
                 self._approval_denied += 1
             self._approval_response_times.append(response_time_ms)
-            if len(self._approval_response_times) > self._max_response_times:
-                self._approval_response_times = self._approval_response_times[-self._max_response_times :]
 
     def record_approval_timeout(self) -> None:
         with self._lock:

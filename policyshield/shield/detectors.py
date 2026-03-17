@@ -71,8 +71,8 @@ PATH_TRAVERSAL = Detector(
     name="path_traversal",
     description="Detects directory traversal sequences (../, ..\\, etc.)",
     patterns=_compile(
-        r"(?:\.\./){2,}",  # ../../  (2+ levels)
-        r"(?:\.\.\\){2,}",  # ..\..\  (Windows)
+        r"(?:\.\./){1,}",  # ../  (1+ levels)
+        r"(?:\.\.\\){1,}",  # ..\  (Windows)
         r"\.\./etc/(?:passwd|shadow)",  # direct /etc/passwd
         r"\.\./windows/",  # Windows system dir
         r"%2e%2e[/\\]",  # URL-encoded traversal

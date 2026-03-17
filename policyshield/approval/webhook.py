@@ -17,6 +17,7 @@ import logging
 import time
 from collections import OrderedDict
 from typing import Any, Literal
+from urllib.parse import urlparse
 
 import httpx
 
@@ -276,6 +277,23 @@ class WebhookApprovalBackend(ApprovalBackend):
                     request_id=request.request_id,
                     approved=False,
                     comment="webhook error: no poll_url in response",
+                )
+
+            # Validate poll_url shares scheme and host with the original webhook URL
+            _orig = urlparse(self._url)
+            _poll = urlparse(poll_url)
+            if _poll.scheme != _orig.scheme or _poll.netloc != _orig.netloc:
+                logger.error(
+                    "poll_url host/scheme mismatch: expected %s://%s, got %s://%s",
+                    _orig.scheme,
+                    _orig.netloc,
+                    _poll.scheme,
+                    _poll.netloc,
+                )
+                return ApprovalResponse(
+                    request_id=request.request_id,
+                    approved=False,
+                    comment="webhook error: poll_url host mismatch (SSRF protection)",
                 )
 
         except Exception as e:

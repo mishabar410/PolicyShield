@@ -2,13 +2,21 @@
 
 from __future__ import annotations
 
+import concurrent.futures
+import functools
 import json
 import logging
 import os
+import re as _re_module
 import threading
 from pathlib import Path
 from time import monotonic
 from typing import Any
+
+
+@functools.lru_cache(maxsize=512)
+def _compile_pattern(pattern: str) -> _re_module.Pattern:
+    return _re_module.compile(pattern)
 
 from policyshield.approval.base import ApprovalBackend, ApprovalRequest
 from policyshield.approval.cache import ApprovalCache, ApprovalStrategy
@@ -105,8 +113,10 @@ class BaseShieldEngine:
         self._lock = threading.Lock()
         self._watcher: Any = None
         # Approval metadata for cache population after resolution
-        self._approval_meta: dict[str, dict] = {}
-        self._approval_meta_ts: dict[str, float] = {}
+        # Use OrderedDict for O(1) insertion-order eviction via popitem(last=False)
+        from collections import OrderedDict as _OD
+        self._approval_meta: _OD[str, dict] = _OD()
+        self._approval_meta_ts: _OD[str, float] = _OD()
         self._approval_meta_ttl: float = 3600.0  # 1 hour
         self._max_approval_meta: int = 10_000
         # Resolved approval statuses for idempotent polling
@@ -115,6 +125,9 @@ class BaseShieldEngine:
         self._resolved_approvals_ttl: float = 3600.0  # 1 hour
         self._max_resolved_approvals = 10_000
         self._max_post_check_bytes = 256 * 1024  # 256KB — skip PII scan above this
+
+        # Shared thread-pool for fire-and-forget tasks (webhook, LLM Guard)
+        self._pool = concurrent.futures.ThreadPoolExecutor(max_workers=4)
 
         # Kill switch — atomic, lock-free via threading.Event
         self._killed = threading.Event()  # Not set = normal operation
@@ -277,9 +290,9 @@ class BaseShieldEngine:
                     message=rl_result.message,
                 )
 
-        # Budget check — cost-based per-session/per-hour limits
+        # Budget check — cost-based per-session/per-hour limits (atomic check+record)
         if self._budget_tracker is not None:
-            budget_ok, budget_msg = self._budget_tracker.check_budget(session_id, tool_name)
+            budget_ok, budget_msg = self._budget_tracker.check_and_record(session_id, tool_name)
             if not budget_ok:
                 return ShieldResult(
                     verdict=Verdict.BLOCK,
@@ -338,14 +351,10 @@ class BaseShieldEngine:
             if self._llm_guard is not None and getattr(self._llm_guard, "enabled", False):
                 try:
                     import asyncio
-                    import concurrent.futures
 
-                    # Issue #154: Run in a separate thread to avoid deadlock
-                    # when sync engine is called from an existing event loop
-                    # (e.g., FastAPI middleware, Jupyter, asyncio frameworks).
-                    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-                        future = pool.submit(asyncio.run, self._llm_guard.analyze(tool_name, args))
-                        guard_result = future.result(timeout=self._engine_timeout)
+                    # Issue #154: Run in the shared pool to avoid creating a new executor per call
+                    future = self._pool.submit(asyncio.run, self._llm_guard.analyze(tool_name, args))
+                    guard_result = future.result(timeout=self._engine_timeout)
                     if guard_result.is_threat and guard_result.risk_score >= self._llm_guard.risk_threshold:
                         return ShieldResult(
                             verdict=Verdict.BLOCK,
@@ -528,10 +537,9 @@ class BaseShieldEngine:
             self._approval_meta.pop(k, None)
             self._approval_meta_ts.pop(k, None)
 
-        # Hard limit (evict oldest)
+        # Hard limit (evict oldest by insertion order — O(1))
         while len(self._approval_meta) > self._max_approval_meta:
-            oldest = min(self._approval_meta_ts, key=self._approval_meta_ts.get)  # type: ignore[arg-type]
-            self._approval_meta.pop(oldest, None)
+            oldest, _ = self._approval_meta.popitem(last=False)
             self._approval_meta_ts.pop(oldest, None)
 
     def get_approval_status(self, approval_id: str) -> dict:
@@ -540,25 +548,29 @@ class BaseShieldEngine:
         Returns:
             dict with 'status' ('pending', 'approved', 'denied') and optional 'responder'.
         """
+        if self._approval_backend is None:
+            with self._lock:
+                if approval_id in self._resolved_approvals:
+                    return self._resolved_approvals[approval_id]
+            return {"status": "denied", "responder": None}
+
+        # Perform the backend poll outside the lock (may block briefly at timeout=0)
+        resp = self._approval_backend.wait_for_response(approval_id, timeout=0.0)
+
         with self._lock:
-            # Return cached result for idempotent polling
+            # Return cached result for idempotent polling (checked inside lock to prevent TOCTOU)
             if approval_id in self._resolved_approvals:
                 return self._resolved_approvals[approval_id]
 
-        if self._approval_backend is None:
-            return {"status": "denied", "responder": None}
+            if resp is None:
+                return {"status": "pending", "responder": None}
 
-        resp = self._approval_backend.wait_for_response(approval_id, timeout=0.0)
-        if resp is None:
-            return {"status": "pending", "responder": None}
+            # Build and cache the resolved status atomically
+            if resp.approved:
+                result = {"status": "approved", "responder": resp.responder}
+            else:
+                result = {"status": "denied", "responder": resp.responder}
 
-        # Build and cache the resolved status
-        if resp.approved:
-            result = {"status": "approved", "responder": resp.responder}
-        else:
-            result = {"status": "denied", "responder": resp.responder}
-
-        with self._lock:
             # Evict stale entries by TTL first
             now = monotonic()
             stale = [k for k, ts in self._resolved_approvals_ts.items() if now - ts > self._resolved_approvals_ttl]
@@ -600,12 +612,30 @@ class BaseShieldEngine:
         if self._approval_meta:
             with self._lock:
                 self._cleanup_approval_meta()
+        _AUDIT_PASSTHROUGH_PREFIXES = (
+            "__kill_switch__",
+            "__honeypot__",
+            "__sanitizer__",
+            "__rate_limit__",
+            "__budget__",
+            "__pii_taint__",
+        )
+
+        def _is_audit_exempt(rule_id: str | None) -> bool:
+            if rule_id is None:
+                return False
+            if rule_id in _AUDIT_PASSTHROUGH_PREFIXES:
+                return True
+            if rule_id.startswith("__plugin__"):
+                return True
+            return False
+
         # In AUDIT mode, always allow but record the would-be verdict
-        # Exception: kill switch and honeypots override even AUDIT mode
+        # Exception: kill switch, honeypots, and security controls override even AUDIT mode
         if (
             self._mode == ShieldMode.AUDIT
             and result.verdict != Verdict.ALLOW
-            and result.rule_id not in ("__kill_switch__", "__honeypot__")
+            and not _is_audit_exempt(result.rule_id)
         ):
             logger.info("AUDIT: would %s %s (rule=%s)", result.verdict.value, tool_name, result.rule_id)
             audit_result = ShieldResult(
@@ -619,12 +649,10 @@ class BaseShieldEngine:
             self._trace(audit_result, session_id, tool_name, latency_ms, args)
             return audit_result
 
-        # Update session & rate-limit only when the tool will actually execute
+        # Update session only when the tool will actually execute
+        # Budget spend was already recorded atomically in check_and_record (in _do_check_sync/_do_check)
         if result.verdict not in (Verdict.BLOCK, Verdict.APPROVE):
             self._session_mgr.increment(session_id, tool_name)
-            # Record budget spend for allowed calls
-            if self._budget_tracker is not None:
-                self._budget_tracker.record_spend(session_id, tool_name)
 
         # Record event in ring buffer for chain rule tracking
         # Only record events for actually executed calls (not blocked/pending-approval)
@@ -636,21 +664,19 @@ class BaseShieldEngine:
         if self._webhook_notifier is not None and result.verdict in (Verdict.BLOCK, Verdict.APPROVE):
             try:
                 import asyncio
-                import concurrent.futures
 
-                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-                    pool.submit(
-                        asyncio.run,
-                        self._webhook_notifier.notify(
-                            verdict=result.verdict.value,
-                            tool_name=tool_name,
-                            details={
-                                "session_id": session_id,
-                                "rule_id": result.rule_id or "",
-                                "message": result.message,
-                            },
-                        ),
-                    )
+                self._pool.submit(
+                    asyncio.run,
+                    self._webhook_notifier.notify(
+                        verdict=result.verdict.value,
+                        tool_name=tool_name,
+                        details={
+                            "session_id": session_id,
+                            "rule_id": result.rule_id or "",
+                            "message": result.message,
+                        },
+                    ),
+                )
             except Exception as e:
                 logger.warning("Webhook notification error: %s", e)
 
@@ -691,20 +717,19 @@ class BaseShieldEngine:
             return PostCheckResult()
 
         # Output rules check
-        import re as _re
-
         # Issue #12: Use JSON serialization for consistent output rule matching
         output_str = json.dumps(result, default=str) if not isinstance(result, str) else result
+        output_bytes_encoded = output_str.encode("utf-8", errors="replace")
         with self._lock:
             output_rules = getattr(self._rule_set, "output_rules", [])
 
         for orule in output_rules:
             # Tool pattern match
-            if orule.tool != ".*" and not _re.match(f"^{orule.tool}$", tool_name):
+            if orule.tool != ".*" and not _compile_pattern(f"^{orule.tool}$").match(tool_name):
                 continue
             # Max size check
             if orule.max_size:
-                encoded_size = len(output_str.encode())
+                encoded_size = len(output_bytes_encoded)
                 if encoded_size > orule.max_size:
                     logger.warning(
                         "Output too large for %s (%d bytes, max %d)",
@@ -718,7 +743,7 @@ class BaseShieldEngine:
                     )
             # Pattern blocking
             for pattern in orule.block_patterns:
-                if _re.search(pattern, output_str):
+                if _compile_pattern(pattern).search(output_str):
                     logger.warning("Output blocked by pattern '%s' for %s", pattern, tool_name)
                     return PostCheckResult(
                         blocked=True,
@@ -729,7 +754,7 @@ class BaseShieldEngine:
         redacted_output: str | None = None
 
         # Skip expensive PII scanning for oversized outputs
-        output_bytes = len(output_str.encode("utf-8", errors="replace"))
+        output_bytes = len(output_bytes_encoded)
         if output_bytes > self._max_post_check_bytes:
             logger.debug(
                 "Skipping PII scan for %s (output %d bytes > max %d)",
@@ -742,9 +767,8 @@ class BaseShieldEngine:
             if pii_matches:
                 redacted_output = self._pii.redact_text(result)
         elif isinstance(result, dict):
-            pii_matches = self._pii.scan_dict(result)
+            redacted_dict, pii_matches = self._pii.redact_dict(result)
             if pii_matches:
-                redacted_dict, _ = self._pii.redact_dict(result)
                 redacted_output = str(redacted_dict)
 
         tainted = False

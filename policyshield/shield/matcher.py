@@ -12,6 +12,9 @@ from policyshield.shield.context import ContextEvaluator
 # Maximum length for regex patterns to prevent ReDoS
 MAX_PATTERN_LENGTH = 500
 
+# Pre-compiled pattern for detecting catastrophic backtracking (Issue #107)
+_DANGEROUS_RE = re.compile(r"(\(.+[+*]\)[+*])")
+
 
 @dataclass
 class CompiledRule:
@@ -56,8 +59,7 @@ class CompiledRule:
                     compiled.tool_pattern = re.compile(f"^{re.escape(tool_str)}$")
                 else:
                     # Issue #107: Reject patterns with catastrophic backtracking
-                    _dangerous_re = re.compile(r"(\(.+[+*]\)[+*])")
-                    if _dangerous_re.search(tool_str):
+                    if _DANGEROUS_RE.search(tool_str):
                         raise ValueError(
                             f"Rule '{rule.id}' contains a potentially catastrophic regex pattern: {tool_str!r}"
                         )

@@ -1163,12 +1163,12 @@
 
         function verdictBadge(v) {
             const cls = { ALLOW: 'allow', BLOCK: 'block', REDACT: 'redact', APPROVE: 'approve' }[v] || 'allow';
-            return `<span class="badge badge-${cls}">${v || '?'}</span>`;
+            return `<span class="badge badge-${cls}">${escapeHtml(v || '?')}</span>`;
         }
 
         function severityBadge(s) {
             const cls = { critical: 'critical', high: 'high', medium: 'medium', low: 'low' }[String(s).toLowerCase()] || 'low';
-            return `<span class="badge badge-${cls}">${s || '—'}</span>`;
+            return `<span class="badge badge-${cls}">${escapeHtml(s || '—')}</span>`;
         }
 
         function escapeHtml(s) {

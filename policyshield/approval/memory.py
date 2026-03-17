@@ -174,8 +174,8 @@ class InMemoryBackend(ApprovalBackend):
             self._requests.pop(request_id, None)
 
             event = self._events.get(request_id)
-        if event is not None:
-            event.set()
+            if event is not None:
+                event.set()
 
     def pending(self) -> list[ApprovalRequest]:
         with self._lock:

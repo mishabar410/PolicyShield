@@ -19,16 +19,26 @@ class IdempotencyCache:
         self._lock = threading.Lock()
         self._inserts_since_eviction = 0
 
+    @staticmethod
+    def _validate_key(key: str) -> None:
+        if len(key.encode()) > 128:
+            raise ValueError("Idempotency key exceeds 128 bytes")
+        if any(c < " " for c in key):
+            raise ValueError("Idempotency key contains non-printable characters")
+
     def get(self, key: str) -> dict | None:
+        self._validate_key(key)
         with self._lock:
             if key in self._cache:
                 ts, result = self._cache[key]
-                if monotonic() - ts < self._ttl:
-                    return result
-                del self._cache[key]
+                if monotonic() - ts >= self._ttl:
+                    del self._cache[key]
+                    return None
+                return result
         return None
 
     def set(self, key: str, result: dict) -> None:
+        self._validate_key(key)
         with self._lock:
             self._cache[key] = (monotonic(), result)
             while len(self._cache) > self._max_size:

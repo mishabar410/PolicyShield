@@ -55,7 +55,7 @@ class CanaryRouter:
         # Deterministic hash bucketing
         bucket_key = f"{rule_id}:{session_id}"
         hash_value = int(hashlib.sha256(bucket_key.encode()).hexdigest()[:8], 16)
-        bucket = hash_value / 0xFFFFFFFF  # Normalize to 0.0-1.0
+        bucket = hash_value / 0x100000000  # Normalize to 0.0-1.0
         return bucket < canary_percent
 
     def reset(self, rule_id: str) -> None:

@@ -211,7 +211,7 @@ class SessionManager:
         """Check if a session has exceeded its TTL (by last access)."""
         # Issue #173: Use last_accessed if available, otherwise created_at
         last_active = session.last_accessed or session.created_at
-        return datetime.now(timezone.utc) - last_active > timedelta(seconds=self._ttl_seconds)
+        return (datetime.now(timezone.utc) - last_active).total_seconds() >= self._ttl_seconds
 
     def _maybe_evict(self) -> None:
         """Periodically evict expired sessions (amortized). Must be called with lock held."""
@@ -229,18 +229,14 @@ class SessionManager:
             self._backend.delete(sid)  # Issue #171: sync backend
 
     def _evict_oldest(self) -> None:
-        """Remove the least-recently-used session. Must be called with lock held.
-
-        Issue #91: Evicts by oldest creation time (LRU proxy), with fewest
-        total calls as tiebreaker.
-        """
+        """Remove the least-recently-used session. Must be called with lock held."""
         if not self._sessions:
             return
         lru_id = min(
             self._sessions,
             key=lambda sid: (
-                self._sessions[sid].created_at,
-                self._sessions[sid].total_calls,
+                self._sessions[sid].last_accessed or self._sessions[sid].created_at,
+                -self._sessions[sid].total_calls,
             ),
         )
         del self._sessions[lru_id]

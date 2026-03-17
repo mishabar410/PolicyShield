@@ -339,6 +339,10 @@ class PolicyBot:
         action = callback.get("data", "")
         callback_id = callback["id"]
 
+        if self._allowed_chats and chat_id not in self._allowed_chats:
+            await self._answer_callback(callback_id, "Unauthorized")
+            return
+
         if action == "deploy":
             await self._deploy(chat_id, user_id, message_id, callback_id)
         elif action == "cancel":

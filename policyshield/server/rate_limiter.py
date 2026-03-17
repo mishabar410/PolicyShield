@@ -29,7 +29,7 @@ class InMemoryRateLimiter:
             dq = self._requests[key]
             cutoff = now - self._window
             # O(1) amortized — pop expired from left
-            while dq and dq[0] <= cutoff:
+            while dq and dq[0] < cutoff:
                 dq.popleft()
             if len(dq) >= self._max:
                 return False

@@ -56,31 +56,40 @@ def find_cross_file_issues(rule_files: list[Path]) -> list[CrossFileIssue]:
                 )
             seen_ids[rule.id] = file_path
 
-    # Check for shadowing (same tool pattern, different verdict)
-    for i, (file_a, rules_a) in enumerate(file_rules):
-        for j, (file_b, rules_b) in enumerate(file_rules):
-            if i >= j:
-                continue
-            for ra in rules_a:
-                for rb in rules_b:
-                    if ra.id == rb.id:
-                        continue
-                    tool_a = ra.when.get("tool", ".*")
-                    tool_b = rb.when.get("tool", ".*")
-                    if _patterns_overlap(tool_a, tool_b) and ra.then != rb.then:
-                        issues.append(
-                            CrossFileIssue(
-                                severity="warning",
-                                message=(
-                                    f"Conflicting verdicts for overlapping tool patterns: "
-                                    f"{ra.then.value} vs {rb.then.value}"
-                                ),
-                                file_a=str(file_a),
-                                rule_a=ra.id,
-                                file_b=str(file_b),
-                                rule_b=rb.id,
-                            )
+    # Check for shadowing — build tool_pattern → [(file, rule)] map in one pass
+    from collections import defaultdict as _dd
+    pattern_map: dict[str, list[tuple[Path, object]]] = _dd(list)
+    for file_path, rules in file_rules:
+        for rule in rules:
+            pattern = str(rule.when.get("tool", ".*"))
+            pattern_map[pattern].append((file_path, rule))
+
+    seen_conflicts: set[frozenset] = set()
+    for pattern, entries in pattern_map.items():
+        for i in range(len(entries)):
+            for j in range(i + 1, len(entries)):
+                file_a, ra = entries[i]
+                file_b, rb = entries[j]
+                if ra.id == rb.id:
+                    continue
+                conflict_key = frozenset([ra.id, rb.id])
+                if conflict_key in seen_conflicts:
+                    continue
+                if ra.then != rb.then:
+                    seen_conflicts.add(conflict_key)
+                    issues.append(
+                        CrossFileIssue(
+                            severity="warning",
+                            message=(
+                                f"Conflicting verdicts for overlapping tool patterns: "
+                                f"{ra.then.value} vs {rb.then.value}"
+                            ),
+                            file_a=str(file_a),
+                            rule_a=ra.id,
+                            file_b=str(file_b),
+                            rule_b=rb.id,
                         )
+                    )
 
     return issues
 

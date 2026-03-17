@@ -11,6 +11,9 @@ _SECRET_PATTERNS = [
         re.compile(r"(?:password|passwd|pwd|secret|token)\s*[:=]\s*\S+", re.I),
         "[REDACTED]",
     ),
+    (re.compile(r"\bghp_[A-Za-z0-9]{36}\b"), "[REDACTED_GITHUB_PAT]"),
+    (re.compile(r"\bgithub_pat_[A-Za-z0-9_]{36,}\b"), "[REDACTED_GITHUB_PAT]"),
+    (re.compile(r"\b[A-Za-z0-9+/=_\-]{40,}\b"), "[REDACTED_TOKEN]"),
 ]
 MAX_VALUE_LENGTH = 200
 

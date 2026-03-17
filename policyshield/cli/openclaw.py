@@ -129,6 +129,8 @@ def _cmd_setup(parsed: argparse.Namespace) -> int:
         print(f"  ✓ Server running (PID {server_process.pid})")
         pid_file = Path(rules_dir) / ".policyshield.pid"
         pid_file.write_text(str(server_process.pid))
+        import stat as _stat
+        pid_file.chmod(0o600)
     else:
         print("→ [2/5] Skipping server start (--no-server)")
 
@@ -221,6 +223,22 @@ def _cmd_teardown(parsed: argparse.Namespace) -> int:
         return 0
     pid = int(pid_file.read_text().strip())
     try:
+        # Verify the process is actually a policyshield server before sending SIGTERM
+        _proc_name = ""
+        try:
+            _cmdline_path = Path(f"/proc/{pid}/cmdline")
+            if _cmdline_path.exists():
+                _proc_name = _cmdline_path.read_bytes().replace(b"\x00", b" ").decode(errors="replace")
+            else:
+                import subprocess as _sp
+                _r = _sp.run(["ps", "-p", str(pid), "-o", "command="], capture_output=True, text=True)
+                _proc_name = _r.stdout
+        except Exception:
+            pass
+        if _proc_name and "policyshield" not in _proc_name.lower():
+            print(f"  ✗ PID {pid} does not appear to be a policyshield process; refusing SIGTERM.", file=sys.stderr)
+            pid_file.unlink()
+            return 1
         os.kill(pid, signal.SIGTERM)
         print(f"✓ Server (PID {pid}) stopped.")
     except ProcessLookupError:

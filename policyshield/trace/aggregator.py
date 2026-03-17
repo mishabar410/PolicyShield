@@ -135,25 +135,16 @@ class TraceAggregator:
         if not records:
             return AggregationResult(verdict_breakdown=VerdictBreakdown())
 
-        vb = self._compute_verdict_breakdown(records)
+        vb, min_ts, max_ts = self._compute_verdict_breakdown(records)
         top = self._compute_top_tools(records)
-        top_blocked = self._compute_top_blocked_tools(records)
+        top_blocked = self._compute_top_blocked_tools(top)
         pii = self._compute_pii_heatmap(records)
         sessions = {r.get("session_id") for r in records if r.get("session_id")}
 
-        # Time range
+        # Time range — use min/max already computed in _compute_verdict_breakdown
         tw = time_window
-        if tw is None:
-            timestamps = []
-            for r in records:
-                ts = r.get("timestamp")
-                if ts:
-                    try:
-                        timestamps.append(datetime.fromisoformat(ts))
-                    except ValueError:
-                        pass
-            if timestamps:
-                tw = TimeWindow(start=min(timestamps), end=max(timestamps))
+        if tw is None and min_ts is not None and max_ts is not None:
+            tw = TimeWindow(start=min_ts, end=max_ts)
 
         tl = self._compute_timeline(records, tw) if tw else []
 
@@ -170,7 +161,8 @@ class TraceAggregator:
     def verdict_breakdown(self, **filters) -> VerdictBreakdown:
         """Verdict counts only."""
         records = self._get_records(**filters)
-        return self._compute_verdict_breakdown(records)
+        vb, _, _ = self._compute_verdict_breakdown(records)
+        return vb
 
     def top_tools(self, limit: int = 10, **filters) -> list[ToolStats]:
         """Top N tools by call count."""
@@ -204,18 +196,36 @@ class TraceAggregator:
         result = self._search_engine.search(query)
         return result.records
 
-    def _compute_verdict_breakdown(self, records: list[dict]) -> VerdictBreakdown:
+    def _compute_verdict_breakdown(
+        self, records: list[dict]
+    ) -> tuple[VerdictBreakdown, datetime | None, datetime | None]:
         counts = {"ALLOW": 0, "BLOCK": 0, "REDACT": 0, "APPROVE": 0}
+        min_ts: datetime | None = None
+        max_ts: datetime | None = None
         for r in records:
             v = r.get("verdict", "")
             if v in counts:
                 counts[v] += 1
-        return VerdictBreakdown(
-            allow=counts["ALLOW"],
-            block=counts["BLOCK"],
-            redact=counts["REDACT"],
-            approve=counts["APPROVE"],
-            total=len(records),
+            ts_str = r.get("timestamp")
+            if ts_str:
+                try:
+                    ts = datetime.fromisoformat(ts_str)
+                    if min_ts is None or ts < min_ts:
+                        min_ts = ts
+                    if max_ts is None or ts > max_ts:
+                        max_ts = ts
+                except ValueError:
+                    pass
+        return (
+            VerdictBreakdown(
+                allow=counts["ALLOW"],
+                block=counts["BLOCK"],
+                redact=counts["REDACT"],
+                approve=counts["APPROVE"],
+                total=len(records),
+            ),
+            min_ts,
+            max_ts,
         )
 
     def _compute_top_tools(self, records: list[dict], limit: int = 10) -> list[ToolStats]:
@@ -249,8 +259,7 @@ class TraceAggregator:
         stats.sort(key=lambda s: s.call_count, reverse=True)
         return stats[:limit]
 
-    def _compute_top_blocked_tools(self, records: list[dict], limit: int = 10) -> list[ToolStats]:
-        all_tools = self._compute_top_tools(records, limit=9999)
+    def _compute_top_blocked_tools(self, all_tools: list[ToolStats], limit: int = 10) -> list[ToolStats]:
         blocked = [t for t in all_tools if t.block_count > 0]
         blocked.sort(key=lambda s: s.block_count, reverse=True)
         return blocked[:limit]
@@ -297,7 +306,18 @@ class TraceAggregator:
         points = []
         for bk in sorted(buckets.keys()):
             recs = buckets[bk]
-            vb = self._compute_verdict_breakdown(recs)
+            counts = {"ALLOW": 0, "BLOCK": 0, "REDACT": 0, "APPROVE": 0}
+            for r in recs:
+                v = r.get("verdict", "")
+                if v in counts:
+                    counts[v] += 1
+            vb = VerdictBreakdown(
+                allow=counts["ALLOW"],
+                block=counts["BLOCK"],
+                redact=counts["REDACT"],
+                approve=counts["APPROVE"],
+                total=len(recs),
+            )
             points.append(
                 TimeSeriesPoint(
                     timestamp=datetime.fromtimestamp(bk, tz=timezone.utc),

@@ -20,6 +20,8 @@ import time
 from dataclasses import dataclass, field
 from typing import Any
 
+import httpx
+
 logger = logging.getLogger("policyshield")
 
 
@@ -113,8 +115,8 @@ class LLMGuard:
         self._max_cache_size = 1000
         # Issue #66: Thread-safe cache access
         self._cache_lock = threading.Lock()
-        # Issue #131: Persistent httpx client (created lazily)
-        self._http_client: Any | None = None
+        # Initialize HTTP client eagerly to avoid double-checked locking race
+        self._http_client: Any = httpx.AsyncClient(timeout=self._config.timeout)
 
     @property
     def enabled(self) -> bool:
@@ -165,17 +167,10 @@ class LLMGuard:
     # ------------------------------------------------------------------
 
     async def _call_llm(self, tool_name: str, args: dict) -> GuardResult:
-        import httpx
-
         prompt = self._build_prompt(tool_name, args)
 
-        # Issue #131: Reuse persistent httpx client
-        # Issue #203: Thread-safe lazy init to prevent TOCTOU race
-        if self._http_client is None or self._http_client.is_closed:
-            with self._cache_lock:
-                # Double-check after acquiring lock
-                if self._http_client is None or self._http_client.is_closed:
-                    self._http_client = httpx.AsyncClient(timeout=self._config.timeout)
+        if self._http_client.is_closed:
+            self._http_client = httpx.AsyncClient(timeout=self._config.timeout)
 
         resp = await self._http_client.post(
             f"{self._config.base_url}/chat/completions",

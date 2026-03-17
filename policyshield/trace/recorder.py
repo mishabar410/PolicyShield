@@ -62,7 +62,7 @@ class TraceRecorder:
     ):
         import atexit
 
-        self._output_dir = Path(output_dir)
+        self._output_dir = Path(output_dir).resolve()
         self._batch_size = batch_size
         self._privacy_mode = privacy_mode
         self._max_file_size = max_file_size
@@ -72,6 +72,7 @@ class TraceRecorder:
         self._current_date = datetime.now(timezone.utc).strftime("%Y%m%d")
         self._buffer: list[dict] = []
         self._file_path: Path | None = None
+        self._file_handle = None  # persistent file handle
         self._record_count = 0
         self._flush_count = 0  # Issue #98: Track flushes for periodic cleanup
         self._lock = threading.Lock()
@@ -90,6 +91,12 @@ class TraceRecorder:
 
         if not self._closed:
             self.flush()
+            if self._file_handle is not None:
+                try:
+                    self._file_handle.close()
+                except Exception:
+                    pass
+                self._file_handle = None
             atexit.unregister(self._atexit_flush)
             self._closed = True
 
@@ -189,20 +196,21 @@ class TraceRecorder:
         import sys
 
         if sys.platform != "win32":
+            fd = os.open(str(path), os.O_CREAT | os.O_WRONLY | os.O_APPEND, 0o600)
+            stat_result = os.fstat(fd)
+            current = stat_result.st_mode & 0o777
+            if current != 0o600:
+                os.fchmod(fd, 0o600)
+                logger.warning(
+                    "Fixed trace file permissions: %s (%o → 600)",
+                    path,
+                    current,
+                )
+            return os.fdopen(fd, "a", encoding="utf-8")
+        else:
             if not path.exists():
-                path.touch(mode=0o600)
-            else:
-                current = path.stat().st_mode & 0o777
-                if current != 0o600:
-                    os.chmod(path, 0o600)
-                    logger.warning(
-                        "Fixed trace file permissions: %s (%o → 600)",
-                        path,
-                        current,
-                    )
-        elif not path.exists():
-            path.touch()
-        return open(path, "a", encoding="utf-8")  # noqa: SIM115
+                path.touch()
+            return open(path, "a", encoding="utf-8")  # noqa: SIM115
 
     def _flush_unlocked(self) -> None:
         """Flush buffer without acquiring the lock (caller must hold it)."""
@@ -211,13 +219,30 @@ class TraceRecorder:
 
         if self._should_rotate():
             self._rotate()
+            # Close old handle so the new file is opened below
+            if self._file_handle is not None:
+                try:
+                    self._file_handle.close()
+                except Exception:
+                    pass
+                self._file_handle = None
 
         try:
             assert self._file_path is not None
-            with self._open_file(self._file_path) as f:
-                for entry in self._buffer:
-                    f.write(json.dumps(entry, default=str) + "\n")
+            if self._file_handle is None:
+                self._file_handle = self._open_file(self._file_path)
+            f = self._file_handle
+            for entry in self._buffer:
+                f.write(json.dumps(entry, default=str) + "\n")
+            f.flush()
         except OSError as exc:
+            # Close the handle so the next flush attempt re-opens
+            if self._file_handle is not None:
+                try:
+                    self._file_handle.close()
+                except Exception:
+                    pass
+                self._file_handle = None
             logger.error(
                 "Failed to write trace file %s: %s (retaining %d records for retry)",
                 self._file_path,

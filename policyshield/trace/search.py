@@ -46,8 +46,7 @@ class TraceSearchEngine:
 
     def search(self, query: SearchQuery) -> SearchResult:
         """Synchronous search across all JSONL trace files."""
-        all_records = self._load_all_records()
-        matched = [r for r in all_records if self._matches(r, query)]
+        matched = self._load_matching_records(query)
         total = len(matched)
         page = matched[query.offset : query.offset + query.limit]
         return SearchResult(total=total, records=page, query=query)
@@ -145,14 +144,42 @@ class TraceSearchEngine:
                 return True
         return False
 
-    def _load_all_records(self) -> list[dict]:
-        """Load records from all JSONL files in the trace directory."""
+    def _load_matching_records(self, query: SearchQuery) -> list[dict]:
+        """Load all records that match the query, applying filters inside the read loop.
+
+        The limit counts matched records only, not total records read.
+        """
+        matched: list[dict] = []
+        if not self._trace_dir.exists():
+            return matched
+        for jsonl_file in sorted(self._trace_dir.glob("*.jsonl")):
+            with jsonl_file.open() as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        record = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    if self._matches(record, query):
+                        matched.append(record)
+        return matched
+
+    def _load_all_records(self, limit: int = 0) -> list[dict]:
+        """Load records from all JSONL files in the trace directory.
+
+        Args:
+            limit: Stop loading once this many records have been collected (0 = no limit).
+        """
         records: list[dict] = []
         if not self._trace_dir.exists():
             return records
         for jsonl_file in sorted(self._trace_dir.glob("*.jsonl")):
             with jsonl_file.open() as f:
                 for line in f:
+                    if limit > 0 and len(records) >= limit:
+                        return records
                     line = line.strip()
                     if line:
                         try:

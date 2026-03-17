@@ -7,6 +7,7 @@ post-checking, kill switch, reload, and constraints queries.
 from __future__ import annotations
 
 import asyncio
+import hmac
 import json
 from typing import Any
 
@@ -163,21 +164,23 @@ def create_mcp_server(engine: Any, admin_token: str | None = None) -> Any:
                 return [TextContent(type="text", text=json.dumps(info))]
 
             elif name == "kill_switch":
-                # Issue #132: Admin auth check
-                if admin_token and arguments.get("admin_token") != admin_token:
+                provided = arguments.get("admin_token")
+                if admin_token is None or not hmac.compare_digest(str(provided or ""), admin_token):
                     return [TextContent(type="text", text=json.dumps({"error": "Unauthorized: invalid admin_token"}))]
                 reason = arguments.get("reason", "MCP kill switch")
                 await asyncio.to_thread(engine.kill, reason)
                 return [TextContent(type="text", text=json.dumps({"status": "killed", "reason": reason}))]
 
             elif name == "resume":
-                if admin_token and arguments.get("admin_token") != admin_token:
+                provided = arguments.get("admin_token")
+                if admin_token is None or not hmac.compare_digest(str(provided or ""), admin_token):
                     return [TextContent(type="text", text=json.dumps({"error": "Unauthorized: invalid admin_token"}))]
                 await asyncio.to_thread(engine.resume)
                 return [TextContent(type="text", text=json.dumps({"status": "resumed"}))]
 
             elif name == "reload":
-                if admin_token and arguments.get("admin_token") != admin_token:
+                provided = arguments.get("admin_token")
+                if admin_token is None or not hmac.compare_digest(str(provided or ""), admin_token):
                     return [TextContent(type="text", text=json.dumps({"error": "Unauthorized: invalid admin_token"}))]
                 await asyncio.to_thread(engine.reload_rules)
                 return [

@@ -18,6 +18,13 @@ logger = logging.getLogger(__name__)
 _TELEGRAM_API = "https://api.telegram.org"
 
 
+def _escape_md(text: str) -> str:
+    """Escape Telegram Markdown v1 special characters."""
+    for ch in ("_", "*", "`", "[", "]", "(", ")"):
+        text = text.replace(ch, "\\" + ch)
+    return text
+
+
 class TelegramApprovalBackend(ApprovalBackend):
     """Approval backend using Telegram Bot API.
 
@@ -76,11 +83,11 @@ class TelegramApprovalBackend(ApprovalBackend):
 
         text = (
             f"🛡️ *APPROVE REQUIRED*\n\n"
-            f"**Tool:** `{request.tool_name}`\n"
-            f"**Rule:** `{request.rule_id}`\n"
-            f"**Message:** {request.message}\n"
-            f"**Session:** `{request.session_id}`\n"
-            f"**Request ID:** `{request.request_id[:8]}…`"
+            f"**Tool:** `{_escape_md(request.tool_name)}`\n"
+            f"**Rule:** `{_escape_md(request.rule_id)}`\n"
+            f"**Message:** {_escape_md(request.message)}\n"
+            f"**Session:** `{_escape_md(request.session_id)}`\n"
+            f"**Request ID:** `{_escape_md(request.request_id[:8])}…`"
         )
 
         try:

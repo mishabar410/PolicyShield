@@ -95,7 +95,14 @@ class AsyncShieldEngine(BaseShieldEngine):
                 timeout=self._engine_timeout,
             )
         except asyncio.TimeoutError:
-            logger.error("_apply_post_check timed out (%.1fs)", self._engine_timeout)
+            logger.error(
+                "_apply_post_check timed out (%.1fs) for tool=%s — running side-effects in background",
+                self._engine_timeout,
+                tool_name,
+            )
+            asyncio.get_running_loop().run_in_executor(
+                None, self._apply_post_check, result, session_id, tool_name, latency_ms, args
+            )
             return result
 
     async def _do_check(
@@ -177,9 +184,9 @@ class AsyncShieldEngine(BaseShieldEngine):
                     message=rl_result.message,
                 )
 
-        # Budget check — cost-based per-session/per-hour limits
+        # Budget check — cost-based per-session/per-hour limits (atomic check+record)
         if self._budget_tracker is not None:
-            budget_ok, budget_msg = self._budget_tracker.check_budget(session_id, tool_name)
+            budget_ok, budget_msg = self._budget_tracker.check_and_record(session_id, tool_name)
             if not budget_ok:
                 return ShieldResult(
                     verdict=Verdict.BLOCK,

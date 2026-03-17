@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import logging
 import threading
+import time
 from abc import ABC, abstractmethod
 from collections import OrderedDict
 from datetime import datetime, timezone
@@ -214,5 +215,5 @@ class RedisSessionBackend(SessionBackend):
 
 
 def _now_ts() -> float:
-    """Monotonic-safe timestamp for TTL calculations."""
-    return datetime.now(timezone.utc).timestamp()
+    """Return current Unix timestamp for TTL calculations."""
+    return time.time()

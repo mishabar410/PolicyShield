@@ -43,7 +43,7 @@ class _SlidingWindow:
         """
         cutoff = now - window
         # Remove expired timestamps from left (oldest first) — O(1) amortized
-        while self.timestamps and self.timestamps[0] <= cutoff:
+        while self.timestamps and self.timestamps[0] < cutoff:
             self.timestamps.popleft()
         return len(self.timestamps)
 
@@ -162,6 +162,7 @@ class RateLimiter:
 
         with self._lock:
             self._cleanup_stale_windows(now)
+            keys_to_record: list[tuple[str, str]] = []
             for config in self._configs:
                 if config.tool != "*" and config.tool != tool_name:
                     continue
@@ -182,15 +183,10 @@ class RateLimiter:
                         current_count=count,
                         message=config.message,
                     )
+                keys_to_record.append(key)
 
-            # Record under same lock — atomic with check
-            for config in self._configs:
-                if config.tool != "*" and config.tool != tool_name:
-                    continue
-                key = (
-                    config.tool,
-                    session_id if config.per_session else "__global__",
-                )
+            # Record under same lock — atomic with check (single pass)
+            for key in keys_to_record:
                 self._windows[key].add(now)
 
         return RateLimitResult(allowed=True, tool=tool_name)
