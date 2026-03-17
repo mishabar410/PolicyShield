@@ -146,7 +146,11 @@ class AlertEngine:
                         rule_name=rule.name,
                         severity=rule.severity,
                         message=f"PII type '{entry.pii_type}' detected in tool '{entry.tool}' ({entry.count} occurrences)",
-                        context={"pii_type": entry.pii_type, "tool": entry.tool, "count": entry.count},
+                        context={
+                            "pii_type": entry.pii_type,
+                            "tool": entry.tool,
+                            "count": entry.count,
+                        },
                     )
 
         elif rule.condition_type == AlertConditionType.TOOL_BLOCKED:

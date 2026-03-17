@@ -54,7 +54,9 @@ class InputSanitizer:
         self._config = config or SanitizerConfig()
         self._compiled_patterns: list[re.Pattern] | None = None
         if self._config.blocked_patterns:
-            self._compiled_patterns = [_compile_pattern(p) for p in self._config.blocked_patterns]
+            self._compiled_patterns = [
+                _compile_pattern(p) for p in self._config.blocked_patterns
+            ]
 
         # Load built-in detectors (if configured)
         self._detectors: list | None = None
@@ -69,7 +71,9 @@ class InputSanitizer:
         was_modified = False
 
         # Issue #53: Early size guard — reject extremely large payloads
-        _max_total = max(self._config.max_string_length * self._config.max_total_keys, 1_000_000)
+        _max_total = max(
+            self._config.max_string_length * self._config.max_total_keys, 1_000_000
+        )
         raw_str = _flatten_to_string(args, max_size=_max_total)
         if len(raw_str) > _max_total:
             return SanitizeResult(
@@ -92,7 +96,9 @@ class InputSanitizer:
                     warnings=[],
                     was_modified=False,
                     rejected=True,
-                    rejection_reason=(f"Built-in detector [{first.detector_name}] matched: {first.matched_text!r}"),
+                    rejection_reason=(
+                        f"Built-in detector [{first.detector_name}] matched: {first.matched_text!r}"
+                    ),
                 )
 
         # 2) User-defined blocked patterns
@@ -132,13 +138,17 @@ class InputSanitizer:
 
         if isinstance(value, dict):
             if depth >= cfg.max_args_depth:
-                warnings.append(f"Max depth ({cfg.max_args_depth}) exceeded — truncated")
+                warnings.append(
+                    f"Max depth ({cfg.max_args_depth}) exceeded — truncated"
+                )
                 return {}, True, warnings
 
             result = {}
             for k, v in value.items():
                 if key_counter.count >= cfg.max_total_keys:
-                    warnings.append(f"Max keys ({cfg.max_total_keys}) exceeded — truncated")
+                    warnings.append(
+                        f"Max keys ({cfg.max_total_keys}) exceeded — truncated"
+                    )
                     modified = True
                     break
                 key_counter.count += 1
@@ -151,7 +161,9 @@ class InputSanitizer:
 
         if isinstance(value, list):
             if depth >= cfg.max_args_depth:
-                warnings.append(f"Max depth ({cfg.max_args_depth}) exceeded — truncated")
+                warnings.append(
+                    f"Max depth ({cfg.max_args_depth}) exceeded — truncated"
+                )
                 return [], True, warnings
 
             result_list = []
@@ -218,7 +230,12 @@ def _flatten_to_string(value: Any, max_size: int = 1_000_000) -> str:
 
 
 def _flatten_recurse(
-    value: Any, parts: list[str], _depth: int = 0, *, _max_size: int = 1_000_000, _total: list[int] | None = None
+    value: Any,
+    parts: list[str],
+    _depth: int = 0,
+    *,
+    _max_size: int = 1_000_000,
+    _total: list[int] | None = None,
 ) -> None:
     if _total is None:
         _total = [0]
@@ -239,7 +256,9 @@ def _flatten_recurse(
         for item in value:
             if _total[0] > _max_size:
                 return
-            _flatten_recurse(item, parts, _depth + 1, _max_size=_max_size, _total=_total)
+            _flatten_recurse(
+                item, parts, _depth + 1, _max_size=_max_size, _total=_total
+            )
     elif isinstance(value, str):
         parts.append(value)
         _total[0] += len(value)

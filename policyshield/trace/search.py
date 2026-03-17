@@ -75,7 +75,10 @@ class TraceSearchEngine:
         if query.verdict is not None and record.get("verdict") != query.verdict:
             return False
 
-        if query.session_id is not None and record.get("session_id") != query.session_id:
+        if (
+            query.session_id is not None
+            and record.get("session_id") != query.session_id
+        ):
             return False
 
         if query.rule_id is not None:

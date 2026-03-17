@@ -112,7 +112,9 @@ class BudgetTracker:
                     )
 
             # Record spend atomically
-            self._session_spend[session_id] = self._session_spend.get(session_id, 0) + cost
+            self._session_spend[session_id] = (
+                self._session_spend.get(session_id, 0) + cost
+            )
             self._session_spend.move_to_end(session_id)
             while len(self._session_spend) > self._max_spend_sessions:
                 self._session_spend.popitem(last=False)
@@ -124,7 +126,9 @@ class BudgetTracker:
         """Record a tool call spend. Returns the cost."""
         cost = self.get_tool_cost(tool_name)
         with self._lock:
-            self._session_spend[session_id] = self._session_spend.get(session_id, 0) + cost
+            self._session_spend[session_id] = (
+                self._session_spend.get(session_id, 0) + cost
+            )
             self._session_spend.move_to_end(session_id)
             # Issue #155: LRU eviction
             while len(self._session_spend) > self._max_spend_sessions:

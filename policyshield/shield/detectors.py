@@ -11,7 +11,6 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-
 # ────────────────────────────────────────────────────────────────────
 # Data classes
 # ────────────────────────────────────────────────────────────────────
@@ -158,7 +157,15 @@ SECRET_DETECTION = Detector(
 # ────────────────────────────────────────────────────────────────────
 
 ALL_DETECTORS: dict[str, Detector] = {
-    d.name: d for d in (PATH_TRAVERSAL, SHELL_INJECTION, SQL_INJECTION, SSRF, URL_SCHEMES, SECRET_DETECTION)
+    d.name: d
+    for d in (
+        PATH_TRAVERSAL,
+        SHELL_INJECTION,
+        SQL_INJECTION,
+        SSRF,
+        URL_SCHEMES,
+        SECRET_DETECTION,
+    )
 }
 
 

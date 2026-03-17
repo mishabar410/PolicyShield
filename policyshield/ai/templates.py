@@ -38,7 +38,9 @@ _TOOL_PATTERNS: list[tuple[str, DangerLevel]] = [
     (r"(help|info|status|version|health)$", DangerLevel.SAFE),
 ]
 
-_COMPILED_PATTERNS = [(re.compile(p, re.IGNORECASE), level) for p, level in _TOOL_PATTERNS]
+_COMPILED_PATTERNS = [
+    (re.compile(p, re.IGNORECASE), level) for p, level in _TOOL_PATTERNS
+]
 
 
 def classify_tool(tool_name: str) -> DangerLevel:

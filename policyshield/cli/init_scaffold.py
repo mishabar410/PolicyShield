@@ -5,14 +5,16 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-
 # ---------- preset rule templates ----------
 
 _MINIMAL_RULES: list[dict[str, Any]] = [
     {
         "id": "block-dangerous-commands",
         "description": "Block destructive shell commands",
-        "when": {"tool": "exec", "args_match": {"command": {"regex": r"rm\s+-rf|mkfs|dd\s+if="}}},
+        "when": {
+            "tool": "exec",
+            "args_match": {"command": {"regex": r"rm\s+-rf|mkfs|dd\s+if="}},
+        },
         "then": "block",
         "severity": "critical",
         "message": "Destructive shell commands are not allowed.",
@@ -37,7 +39,12 @@ _SECURITY_RULES: list[dict[str, Any]] = [
     {
         "id": "block-shell-injection",
         "description": "Block destructive shell commands",
-        "when": {"tool": "exec", "args_match": {"command": {"regex": r"rm\s+-rf|mkfs|dd\s+if=|format\s+c:|fdisk"}}},
+        "when": {
+            "tool": "exec",
+            "args_match": {
+                "command": {"regex": r"rm\s+-rf|mkfs|dd\s+if=|format\s+c:|fdisk"}
+            },
+        },
         "then": "block",
         "severity": "critical",
         "message": "Destructive shell commands are not allowed.",
@@ -53,7 +60,10 @@ _SECURITY_RULES: list[dict[str, Any]] = [
     {
         "id": "block-write-system",
         "description": "Block writes to system directories",
-        "when": {"tool": "write_file", "args_match": {"path": {"regex": r"^/(etc|usr|var|bin|sbin)/"}}},
+        "when": {
+            "tool": "write_file",
+            "args_match": {"path": {"regex": r"^/(etc|usr|var|bin|sbin)/"}},
+        },
         "then": "block",
         "severity": "critical",
         "message": "Writing outside the workspace is not allowed.",
@@ -126,7 +136,10 @@ _COMPLIANCE_RULES: list[dict[str, Any]] = [
     {
         "id": "block-shell-injection",
         "description": "Block destructive shell commands",
-        "when": {"tool": "exec", "args_match": {"command": {"regex": r"rm\s+-rf|mkfs|dd\s+if="}}},
+        "when": {
+            "tool": "exec",
+            "args_match": {"command": {"regex": r"rm\s+-rf|mkfs|dd\s+if="}},
+        },
         "then": "block",
         "severity": "critical",
         "message": "Destructive shell commands are not allowed.",
@@ -134,7 +147,10 @@ _COMPLIANCE_RULES: list[dict[str, Any]] = [
     {
         "id": "block-write-system",
         "description": "Block writes to system directories",
-        "when": {"tool": "write_file", "args_match": {"path": {"regex": r"^/(etc|usr|var|bin|sbin)/"}}},
+        "when": {
+            "tool": "write_file",
+            "args_match": {"path": {"regex": r"^/(etc|usr|var|bin|sbin)/"}},
+        },
         "then": "block",
         "severity": "critical",
         "message": "Writing outside the workspace is not allowed.",
@@ -186,7 +202,9 @@ _OPENCLAW_RULES: list[dict[str, Any]] = [
         "when": {
             "tool": "exec",
             "args_match": {
-                "command": {"regex": r"\b(rm\s+-rf|rm\s+-r\s+/|mkfs|dd\s+if=|chmod\s+777|chmod\s+-R\s+777)\b"}
+                "command": {
+                    "regex": r"\b(rm\s+-rf|rm\s+-r\s+/|mkfs|dd\s+if=|chmod\s+777|chmod\s+-R\s+777)\b"
+                }
             },
         },
         "then": "block",
@@ -198,7 +216,9 @@ _OPENCLAW_RULES: list[dict[str, Any]] = [
         "description": "Block remote code execution via curl|sh",
         "when": {
             "tool": "exec",
-            "args_match": {"command": {"regex": r"curl.*\|.*sh|wget.*\|.*sh|curl.*\|.*bash"}},
+            "args_match": {
+                "command": {"regex": r"curl.*\|.*sh|wget.*\|.*sh|curl.*\|.*bash"}
+            },
         },
         "then": "block",
         "severity": "critical",
@@ -224,7 +244,9 @@ _OPENCLAW_RULES: list[dict[str, Any]] = [
         "description": "Block environment variable dumps",
         "when": {
             "tool": "exec",
-            "args_match": {"command": {"regex": r"\benv\b|\bprintenv\b|\bset\b.*export"}},
+            "args_match": {
+                "command": {"regex": r"\benv\b|\bprintenv\b|\bset\b.*export"}
+            },
         },
         "then": "block",
         "severity": "high",
@@ -384,7 +406,16 @@ _SECURE_RULES: list[dict[str, Any]] = [
     {
         "id": "block-network",
         "description": "Block all network operations",
-        "when": {"tool": ["web_fetch", "http_request", "curl", "wget", "http_post", "api_call"]},
+        "when": {
+            "tool": [
+                "web_fetch",
+                "http_request",
+                "curl",
+                "wget",
+                "http_post",
+                "api_call",
+            ]
+        },
         "then": "block",
         "severity": "high",
         "message": "Network access is blocked in secure mode",
@@ -476,7 +507,9 @@ def _to_yaml_str(data: dict[str, Any], indent: int = 0) -> str:
     """Convert a dict to YAML string using pyyaml."""
     import yaml
 
-    return yaml.dump(data, default_flow_style=False, allow_unicode=True, sort_keys=False)
+    return yaml.dump(
+        data, default_flow_style=False, allow_unicode=True, sort_keys=False
+    )
 
 
 def scaffold(
@@ -567,7 +600,12 @@ def scaffold(
     else:
         rules_file.write_text(
             f"# PolicyShield rules — preset: {preset}\n"
-            + yaml.dump(rules_data, default_flow_style=False, allow_unicode=True, sort_keys=False),
+            + yaml.dump(
+                rules_data,
+                default_flow_style=False,
+                allow_unicode=True,
+                sort_keys=False,
+            ),
             encoding="utf-8",
         )
         created.append("policies/rules.yaml")
@@ -591,7 +629,12 @@ def scaffold(
                 "# Usage: policyshield server --rules policies/demo-verify.yaml --port 8100\n"
                 "# After verifying, switch to production rules:\n"
                 "#   policyshield server --rules policies/rules.yaml --port 8100\n"
-                + yaml.dump(demo_data, default_flow_style=False, allow_unicode=True, sort_keys=False),
+                + yaml.dump(
+                    demo_data,
+                    default_flow_style=False,
+                    allow_unicode=True,
+                    sort_keys=False,
+                ),
                 encoding="utf-8",
             )
             created.append("policies/demo-verify.yaml")
@@ -603,7 +646,9 @@ def scaffold(
     else:
         test_file.write_text(
             "# Auto-generated test cases for rules\n"
-            + yaml.dump(test_data, default_flow_style=False, allow_unicode=True, sort_keys=False),
+            + yaml.dump(
+                test_data, default_flow_style=False, allow_unicode=True, sort_keys=False
+            ),
             encoding="utf-8",
         )
         created.append("tests/test_rules.yaml")
@@ -615,7 +660,12 @@ def scaffold(
     else:
         config_file.write_text(
             "# PolicyShield configuration\n"
-            + yaml.dump(config_data, default_flow_style=False, allow_unicode=True, sort_keys=False),
+            + yaml.dump(
+                config_data,
+                default_flow_style=False,
+                allow_unicode=True,
+                sort_keys=False,
+            ),
             encoding="utf-8",
         )
         created.append("policyshield.yaml")
@@ -654,7 +704,13 @@ def _ask_preset(default: str) -> str:
         print("  4) openclaw   — 11 rules (exec, PII, secrets, rate limits)")
         print("  5) secure     — 10 rules (default BLOCK + whitelist + all detectors)")
         choice = input(f"Preset [{default}]: ").strip()
-        mapping = {"1": "minimal", "2": "security", "3": "compliance", "4": "openclaw", "5": "secure"}
+        mapping = {
+            "1": "minimal",
+            "2": "security",
+            "3": "compliance",
+            "4": "openclaw",
+            "5": "secure",
+        }
         if choice in mapping:
             return mapping[choice]
         if choice in mapping.values():

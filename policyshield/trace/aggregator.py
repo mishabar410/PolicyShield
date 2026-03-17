@@ -54,7 +54,11 @@ class ToolStats:
             "call_count": self.call_count,
             "block_count": self.block_count,
             "block_rate": round(self.block_rate, 4),
-            "avg_latency_ms": round(self.avg_latency_ms, 2) if self.avg_latency_ms is not None else None,
+            "avg_latency_ms": (
+                round(self.avg_latency_ms, 2)
+                if self.avg_latency_ms is not None
+                else None
+            ),
         }
 
 
@@ -106,13 +110,15 @@ class AggregationResult:
             "pii_heatmap": [p.to_dict() for p in self.pii_heatmap],
             "timeline": [t.to_dict() for t in self.timeline],
             "unique_sessions": self.unique_sessions,
-            "time_range": {
-                "start": self.time_range.start.isoformat(),
-                "end": self.time_range.end.isoformat(),
-                "bucket_seconds": self.time_range.bucket_seconds,
-            }
-            if self.time_range
-            else None,
+            "time_range": (
+                {
+                    "start": self.time_range.start.isoformat(),
+                    "end": self.time_range.end.isoformat(),
+                    "bucket_seconds": self.time_range.bucket_seconds,
+                }
+                if self.time_range
+                else None
+            ),
         }
 
 
@@ -228,7 +234,9 @@ class TraceAggregator:
             max_ts,
         )
 
-    def _compute_top_tools(self, records: list[dict], limit: int = 10) -> list[ToolStats]:
+    def _compute_top_tools(
+        self, records: list[dict], limit: int = 10
+    ) -> list[ToolStats]:
         tool_data: dict[str, dict] = {}
         for r in records:
             t = r.get("tool", "unknown")
@@ -259,7 +267,9 @@ class TraceAggregator:
         stats.sort(key=lambda s: s.call_count, reverse=True)
         return stats[:limit]
 
-    def _compute_top_blocked_tools(self, all_tools: list[ToolStats], limit: int = 10) -> list[ToolStats]:
+    def _compute_top_blocked_tools(
+        self, all_tools: list[ToolStats], limit: int = 10
+    ) -> list[ToolStats]:
         blocked = [t for t in all_tools if t.block_count > 0]
         blocked.sort(key=lambda s: s.block_count, reverse=True)
         return blocked[:limit]
@@ -273,11 +283,16 @@ class TraceAggregator:
                 key = (pt, tool)
                 counts[key] = counts.get(key, 0) + 1
 
-        entries = [PIIHeatmapEntry(pii_type=k[0], tool=k[1], count=v) for k, v in counts.items()]
+        entries = [
+            PIIHeatmapEntry(pii_type=k[0], tool=k[1], count=v)
+            for k, v in counts.items()
+        ]
         entries.sort(key=lambda e: e.count, reverse=True)
         return entries
 
-    def _compute_timeline(self, records: list[dict], window: TimeWindow) -> list[TimeSeriesPoint]:
+    def _compute_timeline(
+        self, records: list[dict], window: TimeWindow
+    ) -> list[TimeSeriesPoint]:
         bucket_s = window.bucket_seconds
         start_ts = window.start.timestamp()
         end_ts = window.end.timestamp()
@@ -336,7 +351,12 @@ def format_aggregation(result: AggregationResult, top_n: int = 10) -> str:
     vb = result.verdict_breakdown
     lines.append("Verdict Breakdown:")
     parts = []
-    for name, count in [("ALLOW", vb.allow), ("BLOCK", vb.block), ("REDACT", vb.redact), ("APPROVE", vb.approve)]:
+    for name, count in [
+        ("ALLOW", vb.allow),
+        ("BLOCK", vb.block),
+        ("REDACT", vb.redact),
+        ("APPROVE", vb.approve),
+    ]:
         pct = count / vb.total * 100 if vb.total else 0
         parts.append(f"  {name}: {count} ({pct:.0f}%)")
     lines.extend(parts)

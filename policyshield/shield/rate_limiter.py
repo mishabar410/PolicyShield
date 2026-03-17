@@ -57,7 +57,9 @@ class RateLimiter:
     def __init__(self, configs: list[RateLimitConfig] | None = None):
         self._configs: list[RateLimitConfig] = list(configs or [])
         # key = (tool, session_id) for per-session, (tool, "__global__") for global
-        self._windows: dict[tuple[str, str], _SlidingWindow] = defaultdict(_SlidingWindow)
+        self._windows: dict[tuple[str, str], _SlidingWindow] = defaultdict(
+            _SlidingWindow
+        )
         self._lock = threading.Lock()
         self._last_cleanup = 0.0
         self._cleanup_interval = 60.0  # seconds between stale window evictions
@@ -72,7 +74,9 @@ class RateLimiter:
         self._last_cleanup = now
         max_window = max((c.window_seconds for c in self._configs), default=60)
         stale_keys = [
-            k for k, w in self._windows.items() if not w.timestamps or (now - w.timestamps[-1]) > max_window * 2
+            k
+            for k, w in self._windows.items()
+            if not w.timestamps or (now - w.timestamps[-1]) > max_window * 2
         ]
         for k in stale_keys:
             del self._windows[k]
@@ -95,13 +99,19 @@ class RateLimiter:
         for i, item in enumerate(data):
             # Issue #150: Validate required keys and values
             if "max_calls" not in item:
-                raise ValueError(f"Rate limit entry #{i}: missing required key 'max_calls'")
+                raise ValueError(
+                    f"Rate limit entry #{i}: missing required key 'max_calls'"
+                )
             max_calls = int(item["max_calls"])
             if max_calls <= 0:
-                raise ValueError(f"Rate limit entry #{i}: max_calls must be > 0, got {max_calls}")
+                raise ValueError(
+                    f"Rate limit entry #{i}: max_calls must be > 0, got {max_calls}"
+                )
             window_seconds = float(item.get("window_seconds", 60))
             if window_seconds <= 0:
-                raise ValueError(f"Rate limit entry #{i}: window_seconds must be > 0, got {window_seconds}")
+                raise ValueError(
+                    f"Rate limit entry #{i}: window_seconds must be > 0, got {window_seconds}"
+                )
             configs.append(
                 RateLimitConfig(
                     tool=item.get("tool", "*"),
@@ -152,7 +162,9 @@ class RateLimiter:
 
         return RateLimitResult(allowed=True, tool=tool_name)
 
-    def check_and_record(self, tool_name: str, session_id: str = "default") -> RateLimitResult:
+    def check_and_record(
+        self, tool_name: str, session_id: str = "default"
+    ) -> RateLimitResult:
         """Atomically check and record a tool call.
 
         Prevents TOCTOU races where concurrent threads could both pass

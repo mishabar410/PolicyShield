@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from policyshield.core.models import PIIMatch, RuleConfig, ShieldResult, Verdict
 
-
 # Default suggestions per verdict type
 _DEFAULT_SUGGESTIONS: dict[Verdict, str] = {
     Verdict.BLOCK: "Consider using a safer alternative or requesting elevated permissions.",

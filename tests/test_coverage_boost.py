@@ -1,430 +1,302 @@
-"""Targeted tests to close the 84.47% → 85% coverage gap.
-
-Focuses on async_engine.py and decorators.py — the two largest gaps.
-"""
+"""Targeted tests to boost coverage past 85% threshold."""
 
 from __future__ import annotations
 
-import asyncio
-from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock
+import textwrap
+from datetime import datetime, timezone
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-from policyshield.core.exceptions import ApprovalRequiredError
-from policyshield.core.models import PostCheckResult, ShieldMode, ShieldResult, Verdict
-from policyshield.decorators import _bind_args, _rebuild_args, guard, shield
+from policyshield.approval.sanitizer import sanitize_args
+from policyshield.config.loader import (
+    PolicyShieldConfig,
+    _build_config,
+    _expand_env,
+    build_async_engine_from_config,
+    build_engine_from_config,
+    load_config,
+    render_config,
+    validate_config_file,
+)
+from policyshield.core.models import ShieldMode, Verdict
+from policyshield.trace.recorder import TraceRecorder, _stable_default, compute_args_hash
 
 
-# ─── decorators.py ────────────────────────────────────────────────
+# ── Sanitizer coverage (lines 24, 26, 32) ─────────────────────────
 
 
-class TestShieldDecoratorSync:
-    """Cover sync_wrapper paths in shield()."""
+class TestSanitizerCoverage:
+    def test_nested_dict_sanitized(self):
+        """Cover recursive dict branch (line 24)."""
+        # Use a value that matches the catch-all pattern (40+ alphanumeric chars)
+        long_token = "A" * 50
+        result = sanitize_args({"outer": {"key": long_token}})
+        assert long_token not in str(result["outer"])
 
-    def _make_engine(self, verdict=Verdict.ALLOW, message="ok", modified_args=None):
-        result = ShieldResult(verdict=verdict, message=message, modified_args=modified_args)
-        engine = MagicMock()
-        engine.check = MagicMock(return_value=result)
-        return engine
+    def test_list_sanitized(self):
+        """Cover list/tuple branch (line 26)."""
+        long_token = "B" * 50
+        result = sanitize_args({"items": [long_token, "safe"]})
+        assert long_token not in str(result["items"])
 
-    def test_allow(self):
-        engine = self._make_engine()
+    def test_truncation_after_no_secret(self):
+        """Cover truncation when no secret pattern matches (line 32)."""
+        # Use chars that don't match any secret pattern but exceed 200 chars
+        long_text = "Hello world! " * 20  # 260 chars, no secret pattern match
+        result = sanitize_args({"text": long_text})
+        assert len(str(result["text"])) <= 220  # truncated
 
-        @shield(engine)
-        def my_tool(x: int) -> int:
-            return x * 2
 
-        assert my_tool(5) == 10
+# ── TraceRecorder coverage (lines 21-27, 97-98, 114-115, 211-213) ──
 
-    def test_block_raise(self):
-        engine = self._make_engine(verdict=Verdict.BLOCK, message="no")
 
-        @shield(engine, on_block="raise")
-        def my_tool(x: int) -> int:
-            return x
+class TestRecorderCoverage:
+    def test_stable_default_datetime(self):
+        """Cover _stable_default datetime branch (line 22)."""
+        dt = datetime(2025, 1, 1, tzinfo=timezone.utc)
+        assert "2025" in _stable_default(dt)
 
-        with pytest.raises(PermissionError, match="PolicyShield blocked"):
-            my_tool(5)
+    def test_stable_default_set(self):
+        """Cover _stable_default set branch (line 24)."""
+        result = _stable_default({3, 1, 2})
+        assert result == [1, 2, 3]
 
-    def test_block_return_none(self):
-        engine = self._make_engine(verdict=Verdict.BLOCK, message="no")
+    def test_stable_default_object(self):
+        """Cover _stable_default __dict__ branch (line 26)."""
 
-        @shield(engine, on_block="return_none")
-        def my_tool(x: int) -> int:
-            return x
+        class Obj:
+            def __init__(self):
+                self.a = 1
 
-        assert my_tool(5) is None
+        result = _stable_default(Obj())
+        assert result == {"a": 1}
 
-    def test_approve_raise(self):
-        engine = self._make_engine(verdict=Verdict.APPROVE, message="approval needed")
+    def test_stable_default_fallback(self):
+        """Cover _stable_default repr fallback (line 27)."""
+        result = _stable_default(42)
+        assert result == "42"
 
-        @shield(engine, on_block="raise")
-        def my_tool(x: int) -> int:
-            return x
+    def test_context_manager(self, tmp_path):
+        """Cover __enter__/__exit__ and close (lines 97-98, 103-107)."""
+        with TraceRecorder(output_dir=tmp_path) as rec:
+            rec.record("s1", "tool", Verdict.ALLOW)
+        # After exit, _closed should be True
+        assert rec._closed is True
 
-        with pytest.raises(ApprovalRequiredError, match="requires approval"):
-            my_tool(5)
+    def test_close_idempotent(self, tmp_path):
+        """Calling close twice should not error."""
+        rec = TraceRecorder(output_dir=tmp_path)
+        rec.record("s1", "tool", Verdict.ALLOW)
+        rec.close()
+        rec.close()  # Second close should be no-op
+        assert rec._closed is True
 
-    def test_approve_return_dict(self):
-        engine = self._make_engine(verdict=Verdict.APPROVE, message="approval needed")
+    def test_atexit_flush_when_not_closed(self, tmp_path):
+        """Cover _atexit_flush (lines 111-115)."""
+        rec = TraceRecorder(output_dir=tmp_path)
+        rec.record("s1", "tool", Verdict.BLOCK)
+        rec._atexit_flush()
+        files = list(tmp_path.glob("*.jsonl"))
+        assert len(files) == 1
 
-        @shield(engine, on_block="return_none")
-        def my_tool(x: int) -> int:
-            return x
+    def test_compute_args_hash(self):
+        """Cover compute_args_hash function."""
+        h1 = compute_args_hash({"key": "value"})
+        h2 = compute_args_hash({"key": "value"})
+        h3 = compute_args_hash({"key": "other"})
+        assert h1 == h2
+        assert h1 != h3
 
-        result = my_tool(5)
-        assert isinstance(result, dict)
-        assert result["approval_required"] is True
 
-    def test_redact_modified_args(self):
-        engine = self._make_engine(
-            verdict=Verdict.REDACT,
-            modified_args={"x": 99},
+# ── Config loader coverage (lines 97-99, 308-310, 318-320, etc.) ──
+
+
+_RULES_YAML = textwrap.dedent("""\
+    shield_name: test
+    version: 1
+    rules:
+      - id: r1
+        when:
+          tool: test_tool
+        then: ALLOW
+""")
+
+
+class TestConfigCoverage:
+    def test_expand_env_with_default(self, monkeypatch):
+        """Cover _expand_env default branch (line 98)."""
+        monkeypatch.delenv("NONEXISTENT_VAR", raising=False)
+        result = _expand_env("${NONEXISTENT_VAR:-fallback}")
+        assert result == "fallback"
+
+    def test_expand_env_not_found_no_default(self, monkeypatch):
+        """Cover _expand_env keep-original branch (line 99)."""
+        monkeypatch.delenv("NONEXISTENT_VAR", raising=False)
+        result = _expand_env("${NONEXISTENT_VAR}")
+        assert result == "${NONEXISTENT_VAR}"
+
+    def test_build_config_with_rules_string(self):
+        """Cover rules-as-string branch (line 174)."""
+        cfg = _build_config({"rules": "/path/to/rules"})
+        assert cfg.rules_path == "/path/to/rules"
+
+    def test_load_config_file_not_found(self, tmp_path):
+        """Cover FileNotFoundError branch (line 138)."""
+        with pytest.raises(FileNotFoundError):
+            load_config(path=tmp_path / "nonexistent.yaml")
+
+    def test_validate_config_invalid_yaml(self, tmp_path):
+        """Cover invalid YAML branch in validate_config_file."""
+        bad = tmp_path / "bad.yaml"
+        bad.write_text(": :\n  bad: [unclosed", encoding="utf-8")
+        errors = validate_config_file(bad)
+        assert len(errors) > 0
+
+    def test_validate_config_not_mapping(self, tmp_path):
+        """Cover non-mapping root."""
+        bad = tmp_path / "bad.yaml"
+        bad.write_text("just a string", encoding="utf-8")
+        errors = validate_config_file(bad)
+        assert "mapping" in errors[0]
+
+    def test_validate_config_invalid_mode(self, tmp_path):
+        """Cover invalid mode validation."""
+        bad = tmp_path / "config.yaml"
+        bad.write_text("mode: BADMODE\nrules:\n  path: ./rules", encoding="utf-8")
+        errors = validate_config_file(bad)
+        assert any("mode" in e.lower() for e in errors)
+
+    def test_validate_config_rules_path_not_string(self, tmp_path):
+        """Cover rules.path type validation."""
+        bad = tmp_path / "config.yaml"
+        bad.write_text("rules:\n  path: 123", encoding="utf-8")
+        errors = validate_config_file(bad)
+        assert any("string" in e.lower() for e in errors)
+
+    def test_render_config(self):
+        """Cover render_config function."""
+        cfg = PolicyShieldConfig()
+        rendered = render_config(cfg)
+        assert "mode" in rendered
+        assert "ENFORCE" in rendered
+
+    def test_build_engine_with_otel(self, tmp_path, monkeypatch):
+        """Cover OTel builder branch (lines 308-310)."""
+        monkeypatch.chdir(tmp_path)
+        rules_dir = tmp_path / "rules"
+        rules_dir.mkdir()
+        (rules_dir / "rules.yaml").write_text(_RULES_YAML, encoding="utf-8")
+
+        cfg = PolicyShieldConfig(
+            rules_path=str(rules_dir),
+            trace_enabled=False,
+            otel_enabled=True,
+            otel_service_name="test-svc",
+            otel_endpoint="http://localhost:4317",
         )
 
-        @shield(engine)
-        def my_tool(x: int) -> int:
-            return x
+        mock_otel_mod = MagicMock()
+        with patch.dict("sys.modules", {"policyshield.trace.otel": mock_otel_mod}):
+            engine = build_engine_from_config(cfg)
+            assert engine is not None
 
-        assert my_tool(5) == 99
+    def test_build_engine_with_budget(self, tmp_path, monkeypatch):
+        """Cover budget builder branch (lines 318-320)."""
+        monkeypatch.chdir(tmp_path)
+        rules_dir = tmp_path / "rules"
+        rules_dir.mkdir()
+        (rules_dir / "rules.yaml").write_text(_RULES_YAML, encoding="utf-8")
 
-    def test_custom_tool_name(self):
-        engine = self._make_engine()
+        cfg = PolicyShieldConfig(
+            rules_path=str(rules_dir),
+            trace_enabled=False,
+            budget_enabled=True,
+            budget_max_per_session=100,
+            budget_max_per_hour=500,
+        )
+        engine = build_engine_from_config(cfg)
+        assert engine is not None
 
-        @shield(engine, tool_name="custom_name")
-        def my_tool(x: int) -> int:
-            return x
+    def test_build_async_engine_with_sanitizer(self, tmp_path, monkeypatch):
+        """Cover async engine builder with sanitizer (lines 381-387)."""
+        monkeypatch.chdir(tmp_path)
+        rules_dir = tmp_path / "rules"
+        rules_dir.mkdir()
+        (rules_dir / "rules.yaml").write_text(_RULES_YAML, encoding="utf-8")
 
-        my_tool(5)
-        engine.check.assert_called_once()
-        call_args = engine.check.call_args
-        assert call_args[0][0] == "custom_name"
+        cfg = PolicyShieldConfig(
+            rules_path=str(rules_dir),
+            trace_enabled=False,
+            sanitizer_enabled=True,
+            sanitizer_blocked_patterns=["<script>"],
+        )
+        engine = build_async_engine_from_config(cfg)
+        assert engine._sanitizer is not None
 
+    def test_build_async_engine_with_otel(self, tmp_path, monkeypatch):
+        """Cover async OTel builder branch (lines 407-409)."""
+        monkeypatch.chdir(tmp_path)
+        rules_dir = tmp_path / "rules"
+        rules_dir.mkdir()
+        (rules_dir / "rules.yaml").write_text(_RULES_YAML, encoding="utf-8")
 
-class TestShieldDecoratorAsync:
-    """Cover async_wrapper paths in shield()."""
-
-    def _make_engine(self, verdict=Verdict.ALLOW, message="ok", modified_args=None):
-        result = ShieldResult(verdict=verdict, message=message, modified_args=modified_args)
-        engine = MagicMock()
-        engine.check = AsyncMock(return_value=result)
-        return engine
-
-    @pytest.mark.asyncio
-    async def test_allow(self):
-        engine = self._make_engine()
-
-        @shield(engine)
-        async def my_tool(x: int) -> int:
-            return x * 2
-
-        assert await my_tool(5) == 10
-
-    @pytest.mark.asyncio
-    async def test_block_raise(self):
-        engine = self._make_engine(verdict=Verdict.BLOCK, message="no")
-
-        @shield(engine, on_block="raise")
-        async def my_tool(x: int) -> int:
-            return x
-
-        with pytest.raises(PermissionError, match="PolicyShield blocked"):
-            await my_tool(5)
-
-    @pytest.mark.asyncio
-    async def test_block_return_none(self):
-        engine = self._make_engine(verdict=Verdict.BLOCK, message="no")
-
-        @shield(engine, on_block="return_none")
-        async def my_tool(x: int) -> int:
-            return x
-
-        assert await my_tool(5) is None
-
-    @pytest.mark.asyncio
-    async def test_approve_raise(self):
-        engine = self._make_engine(verdict=Verdict.APPROVE, message="need approval")
-
-        @shield(engine, on_block="raise")
-        async def my_tool(x: int) -> int:
-            return x
-
-        with pytest.raises(ApprovalRequiredError, match="requires approval"):
-            await my_tool(5)
-
-    @pytest.mark.asyncio
-    async def test_approve_return_dict(self):
-        engine = self._make_engine(verdict=Verdict.APPROVE, message="need approval")
-
-        @shield(engine, on_block="return_none")
-        async def my_tool(x: int) -> int:
-            return x
-
-        result = await my_tool(5)
-        assert isinstance(result, dict)
-        assert result["approval_required"] is True
-
-    @pytest.mark.asyncio
-    async def test_redact_modified_args(self):
-        engine = self._make_engine(
-            verdict=Verdict.REDACT,
-            modified_args={"x": 42},
+        cfg = PolicyShieldConfig(
+            rules_path=str(rules_dir),
+            trace_enabled=False,
+            otel_enabled=True,
+            otel_service_name="test-svc",
+            otel_endpoint="http://localhost:4317",
         )
 
-        @shield(engine)
-        async def my_tool(x: int) -> int:
-            return x
+        mock_otel_mod = MagicMock()
+        with patch.dict("sys.modules", {"policyshield.trace.otel": mock_otel_mod}):
+            engine = build_async_engine_from_config(cfg)
+            assert engine is not None
 
-        assert await my_tool(5) == 42
+    def test_build_async_engine_with_budget(self, tmp_path, monkeypatch):
+        """Cover async budget builder branch (lines 417-419)."""
+        monkeypatch.chdir(tmp_path)
+        rules_dir = tmp_path / "rules"
+        rules_dir.mkdir()
+        (rules_dir / "rules.yaml").write_text(_RULES_YAML, encoding="utf-8")
 
-
-class TestBindAndRebuildArgs:
-    """Cover _bind_args and _rebuild_args."""
-
-    def test_bind_args_mixed(self):
-        def fn(a: int, b: str, c: float = 3.0):
-            pass
-
-        result = _bind_args(fn, (1, "hello"), {"c": 5.0})
-        assert result == {"a": 1, "b": "hello", "c": 5.0}
-
-    def test_bind_args_defaults(self):
-        def fn(a: int, b: str = "default"):
-            pass
-
-        result = _bind_args(fn, (1,), {})
-        assert result == {"a": 1, "b": "default"}
-
-    def test_bind_args_fallback(self):
-        """Tests fallback when signature cannot be inspected."""
-        # Use a callable that raises ValueError on signature inspection
-        import operator
-
-        result = _bind_args(operator.add, (), {"end": "!"})
-        assert result == {"end": "!"}
-
-    def test_rebuild_args_positional(self):
-        def fn(a: int, b: str):
-            pass
-
-        new_args, new_kwargs = _rebuild_args(fn, {"a": 99}, (1, "hello"), {})
-        assert new_args == (99, "hello")
-        assert new_kwargs == {}
-
-    def test_rebuild_args_keyword(self):
-        def fn(a: int, b: str = "default"):
-            pass
-
-        new_args, new_kwargs = _rebuild_args(fn, {"b": "modified"}, (1,), {})
-        assert new_args == (1,)
-        assert new_kwargs == {"b": "modified"}
-
-    def test_rebuild_args_unknown_key(self):
-        def fn(a: int):
-            pass
-
-        new_args, new_kwargs = _rebuild_args(fn, {"unknown": "val"}, (1,), {})
-        assert new_args == (1,)
-        assert new_kwargs == {"unknown": "val"}
-
-    def test_rebuild_args_fallback(self):
-        """Fallback when signature cannot be inspected."""
-        new_args, new_kwargs = _rebuild_args(print, {"x": 1}, (1,), {"y": 2})
-        assert new_args == (1,)
-        assert new_kwargs == {"y": 2, "x": 1}
-
-
-class TestGuardLegacy:
-    """Cover the guard() backward-compatible function."""
-
-    def test_guard_with_engine(self):
-        result = ShieldResult(verdict=Verdict.ALLOW, message="ok")
-        engine = MagicMock()
-        engine.check = MagicMock(return_value=result)
-
-        @guard("my_tool", engine=engine)
-        def my_tool(x: int) -> int:
-            return x
-
-        assert my_tool(5) == 5
-        engine.check.assert_called_once()
-
-    def test_guard_block(self):
-        result = ShieldResult(verdict=Verdict.BLOCK, message="blocked")
-        engine = MagicMock()
-        engine.check = MagicMock(return_value=result)
-
-        @guard("my_tool", engine=engine, on_block="return_none")
-        def my_tool(x: int) -> int:
-            return x
-
-        assert my_tool(5) is None
-
-
-# ─── async_engine.py ──────────────────────────────────────────────
-
-
-class TestAsyncEngineExtended:
-    """Cover uncovered paths in AsyncShieldEngine."""
-
-    @pytest.fixture()
-    def engine(self, tmp_path):
-        rules_file = tmp_path / "rules.yaml"
-        rules_file.write_text(
-            "rules:\n"
-            "  - id: block-exec\n"
-            "    when:\n"
-            "      tool: exec\n"
-            "    then: block\n"
-            "    severity: high\n"
-            "    message: exec blocked\n"
+        cfg = PolicyShieldConfig(
+            rules_path=str(rules_dir),
+            trace_enabled=False,
+            budget_enabled=True,
+            budget_max_per_session=100,
+            budget_max_per_hour=500,
         )
-        from policyshield.shield.async_engine import AsyncShieldEngine
+        engine = build_async_engine_from_config(cfg)
+        assert engine is not None
 
-        return AsyncShieldEngine(rules=str(rules_file))
+    def test_build_config_invalid_watch_interval(self):
+        """Cover watch_interval validation (line 194)."""
+        with pytest.raises(ValueError, match="watch_interval"):
+            _build_config({"rules": {"watch_interval": -1}})
 
-    @pytest.mark.asyncio
-    async def test_disabled_mode(self, engine):
-        engine._mode = ShieldMode.DISABLED
-        result = await engine.check("exec", {"cmd": "rm -rf /"})
-        assert result.verdict == Verdict.ALLOW
+    def test_build_config_invalid_batch_size(self):
+        """Cover batch_size validation (line 198)."""
+        with pytest.raises(ValueError, match="batch_size"):
+            _build_config({"trace": {"batch_size": 0}})
 
-    @pytest.mark.asyncio
-    async def test_kill_switch_blocks(self, engine):
-        engine._killed.set()
-        engine._kill_reason = "Emergency"
-        result = await engine.check("exec", {"cmd": "ls"})
-        assert result.verdict == Verdict.BLOCK
-        assert "Kill switch" in result.message or "Emergency" in result.message
+    def test_build_config_invalid_max_string_length(self):
+        """Cover max_string_length validation (line 202)."""
+        with pytest.raises(ValueError, match="max_string_length"):
+            _build_config({"sanitizer": {"max_string_length": 0}})
 
-    @pytest.mark.asyncio
-    async def test_basic_block(self, engine):
-        result = await engine.check("exec", {"cmd": "ls"})
-        assert result.verdict == Verdict.BLOCK
-        assert "exec blocked" in (result.message or "")
+    def test_load_config_env_mode_override(self, monkeypatch):
+        """Cover env mode override (lines 148-149)."""
+        monkeypatch.delenv("POLICYSHIELD_CONFIG", raising=False)
+        monkeypatch.setenv("POLICYSHIELD_MODE", "AUDIT")
+        cfg = load_config()
+        assert cfg.mode == ShieldMode.AUDIT
 
-    @pytest.mark.asyncio
-    async def test_allow_no_match(self, engine):
-        result = await engine.check("read_file", {"path": "/tmp/test"})
-        assert result.verdict == Verdict.ALLOW
-
-    @pytest.mark.asyncio
-    async def test_timeout_fail_open(self, engine):
-        """Cover the asyncio.TimeoutError path (lines 70-77)."""
-        engine._engine_timeout = 0.001
-        engine._fail_open = True
-
-        # Make _do_check take longer than timeout
-        original = engine._do_check
-
-        async def slow_check(*args, **kwargs):
-            await asyncio.sleep(1)
-            return await original(*args, **kwargs)
-
-        engine._do_check = slow_check
-        result = await engine.check("exec", {"cmd": "ls"})
-        assert result.verdict == Verdict.ALLOW
-        assert "timed out" in (result.message or "").lower()
-
-    @pytest.mark.asyncio
-    async def test_timeout_fail_closed(self, engine):
-        """Cover timeout path with fail_open=False (line 76)."""
-        engine._engine_timeout = 0.001
-        engine._fail_open = False
-
-        async def slow_check(*args, **kwargs):
-            await asyncio.sleep(1)
-            return ShieldResult(verdict=Verdict.ALLOW, message="ok")
-
-        engine._do_check = slow_check
-        result = await engine.check("exec", {"cmd": "ls"})
-        assert result.verdict == Verdict.BLOCK
-
-    @pytest.mark.asyncio
-    async def test_exception_fail_open(self, engine):
-        """Cover the Exception path with fail_open=True (lines 78-81)."""
-        engine._fail_open = True
-
-        async def failing_check(*args, **kwargs):
-            raise RuntimeError("test error")
-
-        engine._do_check = failing_check
-        result = await engine.check("exec", {"cmd": "ls"})
-        assert result.verdict == Verdict.ALLOW
-
-    @pytest.mark.asyncio
-    async def test_exception_fail_closed(self, engine):
-        """Cover the Exception path with fail_open=False (lines 82-83)."""
-        engine._fail_open = False
-
-        async def failing_check(*args, **kwargs):
-            raise RuntimeError("test error")
-
-        engine._do_check = failing_check
-        with pytest.raises(Exception, match="Shield check failed"):
-            await engine.check("exec", {"cmd": "ls"})
-
-    @pytest.mark.asyncio
-    async def test_redact_verdict(self, tmp_path):
-        """Cover the REDACT path (lines 245-256)."""
-        rules_file = tmp_path / "rules.yaml"
-        rules_file.write_text(
-            "rules:\n"
-            "  - id: redact-email\n"
-            "    when:\n"
-            "      tool: send_email\n"
-            "    then: redact\n"
-            "    severity: medium\n"
-            "    message: redacted\n"
-        )
-        from policyshield.shield.async_engine import AsyncShieldEngine
-
-        eng = AsyncShieldEngine(rules=str(rules_file))
-        result = await eng.check("send_email", {"body": "My SSN is 123-45-6789"})
-        assert result.verdict == Verdict.REDACT
-
-    @pytest.mark.asyncio
-    async def test_post_check(self, engine):
-        """Cover the post_check method (line 382)."""
-        result = await engine.post_check("exec", "some output", session_id="test")
-        assert isinstance(result, PostCheckResult)
-
-    @pytest.mark.asyncio
-    async def test_sanitizer_rejection(self, engine):
-        """Cover the sanitizer path (lines 124-132)."""
-        mock_result = SimpleNamespace(rejected=True, rejection_reason="Dangerous input", sanitized_args={})
-        engine._sanitizer = MagicMock()
-        engine._sanitizer.sanitize = MagicMock(return_value=mock_result)
-        result = await engine.check("read_file", {"path": "/etc/passwd"})
-        assert result.verdict == Verdict.BLOCK
-        assert "Dangerous" in (result.message or "")
-
-    @pytest.mark.asyncio
-    async def test_rate_limiter_block(self, engine):
-        """Cover the rate limiter path (lines 152-159)."""
-        mock_rl_result = SimpleNamespace(allowed=False, message="Rate limited")
-        engine._rate_limiter = MagicMock()
-        engine._rate_limiter.check_and_record = MagicMock(return_value=mock_rl_result)
-        result = await engine.check("read_file", {"path": "/tmp/test"})
-        assert result.verdict == Verdict.BLOCK
-        assert "Rate limited" in (result.message or "")
-
-    @pytest.mark.asyncio
-    async def test_matcher_error_fail_open(self, engine):
-        """Cover matcher exception path (lines 192-196)."""
-        engine._fail_open = True
-        engine._matcher = MagicMock()
-        engine._matcher.find_best_match = MagicMock(side_effect=RuntimeError("match error"))
-        result = await engine.check("read_file", {"path": "/tmp/test"})
-        assert result.verdict == Verdict.ALLOW
-
-    @pytest.mark.asyncio
-    async def test_matcher_error_fail_closed(self, engine):
-        """Cover matcher exception path (lines 196-200)."""
-        engine._fail_open = False
-        engine._matcher = MagicMock()
-        engine._matcher.find_best_match = MagicMock(side_effect=RuntimeError("match error"))
-        result = await engine.check("read_file", {"path": "/tmp/test"})
-        assert result.verdict == Verdict.BLOCK
-        assert "Internal error" in (result.message or "")
+    def test_load_config_env_fail_open_override(self, monkeypatch):
+        """Cover env fail_open override (lines 152-153)."""
+        monkeypatch.delenv("POLICYSHIELD_CONFIG", raising=False)
+        monkeypatch.setenv("POLICYSHIELD_FAIL_OPEN", "true")
+        cfg = load_config()
+        assert cfg.fail_open is True

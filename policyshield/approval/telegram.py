@@ -75,7 +75,10 @@ class TelegramApprovalBackend(ApprovalBackend):
         keyboard = {
             "inline_keyboard": [
                 [
-                    {"text": "✅ Approve", "callback_data": f"approve:{request.request_id}"},
+                    {
+                        "text": "✅ Approve",
+                        "callback_data": f"approve:{request.request_id}",
+                    },
                     {"text": "❌ Deny", "callback_data": f"deny:{request.request_id}"},
                 ]
             ]
@@ -112,7 +115,9 @@ class TelegramApprovalBackend(ApprovalBackend):
             # so the request can be resolved via respond() API
             self._ensure_polling()
 
-    def wait_for_response(self, request_id: str, timeout: float = 300.0) -> ApprovalResponse | None:
+    def wait_for_response(
+        self, request_id: str, timeout: float = 300.0
+    ) -> ApprovalResponse | None:
         event = self._events.get(request_id)
         if event is None:
             return None
@@ -160,7 +165,11 @@ class TelegramApprovalBackend(ApprovalBackend):
             data = resp.json()
             if data.get("ok"):
                 return {"healthy": True, "latency_ms": round(latency, 1), "error": None}
-            return {"healthy": False, "latency_ms": round(latency, 1), "error": "getMe returned ok=false"}
+            return {
+                "healthy": False,
+                "latency_ms": round(latency, 1),
+                "error": "getMe returned ok=false",
+            }
         except Exception as e:
             latency = (monotonic() - start) * 1000
             return {"healthy": False, "latency_ms": round(latency, 1), "error": str(e)}

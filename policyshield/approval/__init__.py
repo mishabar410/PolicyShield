@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from policyshield.approval.base import ApprovalBackend, ApprovalRequest, ApprovalResponse
+from policyshield.approval.base import (
+    ApprovalBackend,
+    ApprovalRequest,
+    ApprovalResponse,
+)
 from policyshield.approval.cli_backend import CLIBackend
 from policyshield.approval.memory import InMemoryBackend
 

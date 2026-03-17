@@ -52,9 +52,15 @@ def create_mcp_server(engine: Any, admin_token: str | None = None) -> Any:
                 inputSchema={
                     "type": "object",
                     "properties": {
-                        "tool_name": {"type": "string", "description": "Name of the tool to check"},
+                        "tool_name": {
+                            "type": "string",
+                            "description": "Name of the tool to check",
+                        },
                         "args": {"type": "object", "description": "Tool arguments"},
-                        "session_id": {"type": "string", "description": "Session identifier"},
+                        "session_id": {
+                            "type": "string",
+                            "description": "Session identifier",
+                        },
                         "sender": {"type": "string", "description": "Caller identity"},
                     },
                     "required": ["tool_name"],
@@ -66,9 +72,18 @@ def create_mcp_server(engine: Any, admin_token: str | None = None) -> Any:
                 inputSchema={
                     "type": "object",
                     "properties": {
-                        "tool_name": {"type": "string", "description": "Name of the tool"},
-                        "result": {"type": "string", "description": "Tool output to scan"},
-                        "session_id": {"type": "string", "description": "Session identifier"},
+                        "tool_name": {
+                            "type": "string",
+                            "description": "Name of the tool",
+                        },
+                        "result": {
+                            "type": "string",
+                            "description": "Tool output to scan",
+                        },
+                        "session_id": {
+                            "type": "string",
+                            "description": "Session identifier",
+                        },
                     },
                     "required": ["tool_name", "result"],
                 },
@@ -84,8 +99,14 @@ def create_mcp_server(engine: Any, admin_token: str | None = None) -> Any:
                 inputSchema={
                     "type": "object",
                     "properties": {
-                        "reason": {"type": "string", "description": "Reason for kill switch activation"},
-                        "admin_token": {"type": "string", "description": "Admin authentication token"},
+                        "reason": {
+                            "type": "string",
+                            "description": "Reason for kill switch activation",
+                        },
+                        "admin_token": {
+                            "type": "string",
+                            "description": "Admin authentication token",
+                        },
                     },
                     "required": ["admin_token"],
                 },
@@ -96,7 +117,10 @@ def create_mcp_server(engine: Any, admin_token: str | None = None) -> Any:
                 inputSchema={
                     "type": "object",
                     "properties": {
-                        "admin_token": {"type": "string", "description": "Admin authentication token"},
+                        "admin_token": {
+                            "type": "string",
+                            "description": "Admin authentication token",
+                        },
                     },
                     "required": ["admin_token"],
                 },
@@ -107,7 +131,10 @@ def create_mcp_server(engine: Any, admin_token: str | None = None) -> Any:
                 inputSchema={
                     "type": "object",
                     "properties": {
-                        "admin_token": {"type": "string", "description": "Admin authentication token"},
+                        "admin_token": {
+                            "type": "string",
+                            "description": "Admin authentication token",
+                        },
                     },
                     "required": ["admin_token"],
                 },
@@ -165,28 +192,64 @@ def create_mcp_server(engine: Any, admin_token: str | None = None) -> Any:
 
             elif name == "kill_switch":
                 provided = arguments.get("admin_token")
-                if admin_token is None or not hmac.compare_digest(str(provided or ""), admin_token):
-                    return [TextContent(type="text", text=json.dumps({"error": "Unauthorized: invalid admin_token"}))]
+                if admin_token is None or not hmac.compare_digest(
+                    str(provided or ""), admin_token
+                ):
+                    return [
+                        TextContent(
+                            type="text",
+                            text=json.dumps(
+                                {"error": "Unauthorized: invalid admin_token"}
+                            ),
+                        )
+                    ]
                 reason = arguments.get("reason", "MCP kill switch")
                 await asyncio.to_thread(engine.kill, reason)
-                return [TextContent(type="text", text=json.dumps({"status": "killed", "reason": reason}))]
+                return [
+                    TextContent(
+                        type="text",
+                        text=json.dumps({"status": "killed", "reason": reason}),
+                    )
+                ]
 
             elif name == "resume":
                 provided = arguments.get("admin_token")
-                if admin_token is None or not hmac.compare_digest(str(provided or ""), admin_token):
-                    return [TextContent(type="text", text=json.dumps({"error": "Unauthorized: invalid admin_token"}))]
+                if admin_token is None or not hmac.compare_digest(
+                    str(provided or ""), admin_token
+                ):
+                    return [
+                        TextContent(
+                            type="text",
+                            text=json.dumps(
+                                {"error": "Unauthorized: invalid admin_token"}
+                            ),
+                        )
+                    ]
                 await asyncio.to_thread(engine.resume)
-                return [TextContent(type="text", text=json.dumps({"status": "resumed"}))]
+                return [
+                    TextContent(type="text", text=json.dumps({"status": "resumed"}))
+                ]
 
             elif name == "reload":
                 provided = arguments.get("admin_token")
-                if admin_token is None or not hmac.compare_digest(str(provided or ""), admin_token):
-                    return [TextContent(type="text", text=json.dumps({"error": "Unauthorized: invalid admin_token"}))]
+                if admin_token is None or not hmac.compare_digest(
+                    str(provided or ""), admin_token
+                ):
+                    return [
+                        TextContent(
+                            type="text",
+                            text=json.dumps(
+                                {"error": "Unauthorized: invalid admin_token"}
+                            ),
+                        )
+                    ]
                 await asyncio.to_thread(engine.reload_rules)
                 return [
                     TextContent(
                         type="text",
-                        text=json.dumps({"status": "ok", "rules_count": engine.rule_count}),
+                        text=json.dumps(
+                            {"status": "ok", "rules_count": engine.rule_count}
+                        ),
                     )
                 ]
 
@@ -195,7 +258,11 @@ def create_mcp_server(engine: Any, admin_token: str | None = None) -> Any:
                 summary = await asyncio.to_thread(engine.get_policy_summary)
                 return [TextContent(type="text", text=summary)]
 
-            return [TextContent(type="text", text=json.dumps({"error": f"Unknown tool: {name}"}))]
+            return [
+                TextContent(
+                    type="text", text=json.dumps({"error": f"Unknown tool: {name}"})
+                )
+            ]
 
         except (KeyError, ValueError, TypeError) as e:
             # Client errors: safe to return details
@@ -204,7 +271,13 @@ def create_mcp_server(engine: Any, admin_token: str | None = None) -> Any:
             # Internal errors: log but don't expose details
             import logging
 
-            logging.getLogger(__name__).exception("Unexpected error in MCP tool call: %s", name)
-            return [TextContent(type="text", text=json.dumps({"error": "Internal server error"}))]
+            logging.getLogger(__name__).exception(
+                "Unexpected error in MCP tool call: %s", name
+            )
+            return [
+                TextContent(
+                    type="text", text=json.dumps({"error": "Internal server error"})
+                )
+            ]
 
     return server

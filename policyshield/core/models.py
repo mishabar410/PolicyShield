@@ -9,7 +9,6 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, field_validator
 
-
 # --- Enums ---
 
 
@@ -89,7 +88,9 @@ class RuleConfig(BaseModel):
     Matcher sorts rules ascending by priority (0 before 1 before 2).
     """
     enabled: bool = True
-    approval_strategy: str | None = None  # "once", "per_session", "per_rule", "per_tool"
+    approval_strategy: str | None = (
+        None  # "once", "per_session", "per_rule", "per_tool"
+    )
     chain: list[dict] | None = None  # Chain conditions for multi-step rules
 
 
@@ -207,7 +208,9 @@ class SessionState(BaseModel):
     taints: set[PIIType] = Field(default_factory=set)
     pii_tainted: bool = False
     taint_details: str | None = None
-    event_buffer: object = Field(default=None, exclude=True)  # EventRingBuffer, lazy-init
+    event_buffer: object = Field(
+        default=None, exclude=True
+    )  # EventRingBuffer, lazy-init
     # Issue #32: Per-session lock for thread-safe mutation
     _session_lock: threading.Lock = PrivateAttr(default_factory=threading.Lock)
 

@@ -66,9 +66,7 @@ class LLMGuardConfig:
 
     def __repr__(self) -> str:
         """Hide api_key from repr/logs (Issue #138)."""
-        return (
-            f"LLMGuardConfig(enabled={self.enabled}, model={self.model!r}, api_key='***', base_url={self.base_url!r})"
-        )
+        return f"LLMGuardConfig(enabled={self.enabled}, model={self.model!r}, api_key='***', base_url={self.base_url!r})"
 
 
 # ---------------------------------------------------------------------------

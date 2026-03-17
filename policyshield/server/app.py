@@ -55,7 +55,9 @@ def _rules_hash(engine: AsyncShieldEngine) -> str:
     ruleset = engine.rules
     parts = [f"{ruleset.shield_name}:{ruleset.version}:{len(ruleset.rules)}"]
     for r in ruleset.rules:
-        parts.append(f"|{r.id}:{r.then.value}:{r.severity}:{r.enabled}:{r.priority}:{r.when}")
+        parts.append(
+            f"|{r.id}:{r.then.value}:{r.severity}:{r.enabled}:{r.priority}:{r.when}"
+        )
     parts.append(f"|dv:{ruleset.default_verdict.value}")
     for orule in getattr(ruleset, "output_rules", None) or []:
         parts.append(f"|o:{getattr(orule, 'id', '')}")
@@ -139,9 +141,13 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
             result = await engine.check("__self_test__", {})
             # Issue #218: Log verdict level — BLOCK from wildcard rules is still a valid engine
             if result.verdict.value == "BLOCK":
-                _logger.warning("Self-test returned BLOCK (likely wildcard rule) — engine is operational")
+                _logger.warning(
+                    "Self-test returned BLOCK (likely wildcard rule) — engine is operational"
+                )
             else:
-                _logger.info("Startup self-test passed: verdict=%s", result.verdict.value)
+                _logger.info(
+                    "Startup self-test passed: verdict=%s", result.verdict.value
+                )
         except Exception as e:
             _logger.critical("Startup self-test FAILED: %s", e)
             raise RuntimeError(f"Engine self-test failed: {e}") from e
@@ -184,8 +190,14 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
         lifespan=lifespan,
         openapi_tags=[
             {"name": "check", "description": "Tool call validation endpoints"},
-            {"name": "admin", "description": "Kill switch, reload, approval management"},
-            {"name": "observability", "description": "Health, metrics, readiness probes"},
+            {
+                "name": "admin",
+                "description": "Kill switch, reload, approval management",
+            },
+            {
+                "name": "observability",
+                "description": "Health, metrics, readiness probes",
+            },
         ],
     )
 
@@ -236,7 +248,9 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
         if request.method in ("POST", "PUT", "PATCH"):
             if request.url.path in _json_only_paths:
                 ct = request.headers.get("content-type", "")
-                if not ct or "application/json" not in ct:  # Issue #165: reject missing CT too
+                if (
+                    not ct or "application/json" not in ct
+                ):  # Issue #165: reject missing CT too
                     return JSONResponse(
                         status_code=415,
                         content={
@@ -269,8 +283,10 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
             # Re-inject the fully-read body so downstream handlers can read it
             body = b"".join(chunks)
             request._body = body  # type: ignore[attr-defined]
+
             async def _receive():
                 return {"type": "http.request", "body": body, "more_body": False}
+
             request._receive = _receive  # type: ignore[attr-defined]
         return await call_next(request)
 
@@ -314,7 +330,9 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
         # phase. Use per-endpoint timeouts for streaming endpoints.
         if request.url.path.startswith("/api/"):
             try:
-                return await asyncio.wait_for(call_next(request), timeout=_request_timeout)
+                return await asyncio.wait_for(
+                    call_next(request), timeout=_request_timeout
+                )
             except asyncio.TimeoutError:
                 _logger.error(
                     "Request timeout (%.1fs) for %s",
@@ -352,7 +370,9 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
             else:
                 client_ip = direct_ip
             if not request.client:
-                _logger.warning("Admin rate-limit: request.client is None (proxy misconfiguration?)")
+                _logger.warning(
+                    "Admin rate-limit: request.client is None (proxy misconfiguration?)"
+                )
             if not _admin_limiter.is_allowed(client_ip):
                 return JSONResponse(
                     status_code=429,
@@ -373,11 +393,15 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
         if request.url.path in check_paths:
             client_key = request.client.host if request.client else "unknown"
             if not request.client:
-                _logger.warning("API rate-limit: request.client is None (proxy misconfiguration?)")
+                _logger.warning(
+                    "API rate-limit: request.client is None (proxy misconfiguration?)"
+                )
             # Use hash of API token as key if available (prevents prefix-rotation bypass)
             auth = request.headers.get("Authorization", "")
             if auth.startswith("Bearer ") and len(auth) > 7:
-                client_key = f"token:{hashlib.sha256(auth[7:].encode()).hexdigest()[:16]}"
+                client_key = (
+                    f"token:{hashlib.sha256(auth[7:].encode()).hexdigest()[:16]}"
+                )
             if not _api_limiter.is_allowed(client_key):
                 return JSONResponse(
                     status_code=429,
@@ -396,7 +420,9 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
     @app.exception_handler(Exception)
     async def shield_error_handler(request: Request, exc: Exception):
         """Return machine-readable verdict even on internal errors."""
-        _logger.error("Unhandled exception in %s: %s", request.url.path, exc, exc_info=True)
+        _logger.error(
+            "Unhandled exception in %s: %s", request.url.path, exc, exc_info=True
+        )
         verdict = "ALLOW" if getattr(engine, "_fail_open", False) else "BLOCK"
         detail: dict = {
             "verdict": verdict,
@@ -470,7 +496,9 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
             redacted_output=result.redacted_output,
         )
 
-    @app.get("/api/v1/constraints", response_model=ConstraintsResponse, dependencies=auth)
+    @app.get(
+        "/api/v1/constraints", response_model=ConstraintsResponse, dependencies=auth
+    )
     async def constraints() -> ConstraintsResponse:
         return ConstraintsResponse(summary=engine.get_policy_summary())
 
@@ -542,9 +570,15 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
         )
 
     # ── Approval poll timeout (316) ──
-    _approval_poll_timeout = float(os.environ.get("POLICYSHIELD_APPROVAL_POLL_TIMEOUT", 30))
+    _approval_poll_timeout = float(
+        os.environ.get("POLICYSHIELD_APPROVAL_POLL_TIMEOUT", 30)
+    )
 
-    @app.post("/api/v1/check-approval", response_model=ApprovalStatusResponse, dependencies=auth)
+    @app.post(
+        "/api/v1/check-approval",
+        response_model=ApprovalStatusResponse,
+        dependencies=auth,
+    )
     async def check_approval(req: ApprovalStatusRequest) -> ApprovalStatusResponse:
         """Check the status of a pending approval request."""
         try:
@@ -560,19 +594,27 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
             responder=result.get("responder"),
         )
 
-    @app.post("/api/v1/clear-taint", response_model=ClearTaintResponse, dependencies=auth)
+    @app.post(
+        "/api/v1/clear-taint", response_model=ClearTaintResponse, dependencies=auth
+    )
     async def clear_taint(req: ClearTaintRequest) -> ClearTaintResponse:
         """Clear PII taint from a session, re-enabling outgoing calls."""
         # Issue #199: Use SessionManager.clear_taint() for atomic get+clear
         engine.session_manager.clear_taint(req.session_id)
         return ClearTaintResponse(session_id=req.session_id)
 
-    @app.post("/api/v1/respond-approval", response_model=RespondApprovalResponse, dependencies=auth)
+    @app.post(
+        "/api/v1/respond-approval",
+        response_model=RespondApprovalResponse,
+        dependencies=auth,
+    )
     async def respond_approval(req: RespondApprovalRequest) -> RespondApprovalResponse:
         """Respond to a pending approval request (approve or deny)."""
         backend = engine.approval_backend
         if backend is None:
-            raise HTTPException(status_code=500, detail="No approval backend configured")
+            raise HTTPException(
+                status_code=500, detail="No approval backend configured"
+            )
         # Issue #217: Run sync backend.respond() in thread to avoid blocking event loop
         await asyncio.to_thread(
             backend.respond,
@@ -583,7 +625,11 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
         )
         return RespondApprovalResponse(approval_id=req.approval_id)
 
-    @app.get("/api/v1/pending-approvals", response_model=PendingApprovalsResponse, dependencies=auth)
+    @app.get(
+        "/api/v1/pending-approvals",
+        response_model=PendingApprovalsResponse,
+        dependencies=auth,
+    )
     async def pending_approvals() -> PendingApprovalsResponse:
         """List all pending approval requests."""
         from policyshield.approval.sanitizer import sanitize_args
@@ -614,6 +660,7 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
             body = await request.json()
             if isinstance(body, dict) and "reason" in body:
                 import re as _re
+
                 raw_reason = str(body["reason"])[:500]
                 reason = _re.sub(r"[^\x20-\x7e]", "", raw_reason)
         except Exception:
@@ -634,7 +681,11 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
         ruleset = engine.rules
         rules_list = []
         for r in ruleset.rules:
-            rd: dict[str, Any] = {"id": r.id, "then": r.then.value, "severity": r.severity}
+            rd: dict[str, Any] = {
+                "id": r.id,
+                "then": r.then.value,
+                "severity": r.severity,
+            }
             if hasattr(r, "enabled"):
                 rd["enabled"] = r.enabled
             if hasattr(r, "priority"):
@@ -678,7 +729,11 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
     # Issue #6: Prevent data race on concurrent compile-and-apply
     _compile_lock = asyncio.Lock()
 
-    @app.post("/api/v1/compile-and-apply", response_model=CompileAndApplyResponse, dependencies=auth)
+    @app.post(
+        "/api/v1/compile-and-apply",
+        response_model=CompileAndApplyResponse,
+        dependencies=auth,
+    )
     async def compile_and_apply(req: CompileRequest) -> CompileAndApplyResponse:
         """Compile natural language description, merge into rules file, and reload."""
         from policyshield.ai.compiler import PolicyCompiler
@@ -735,7 +790,12 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
                 )
                 try:
                     tmp_fd.write(
-                        yaml.dump(existing_data, default_flow_style=False, allow_unicode=True, sort_keys=False)
+                        yaml.dump(
+                            existing_data,
+                            default_flow_style=False,
+                            allow_unicode=True,
+                            sort_keys=False,
+                        )
                     )
                     tmp_fd.flush()
                     os.fsync(tmp_fd.fileno())
@@ -767,7 +827,9 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
                 )
 
     # ── Dashboard static files ──
-    _dashboard_static = (Path(__file__).parent.parent / "dashboard" / "static").resolve()
+    _dashboard_static = (
+        Path(__file__).parent.parent / "dashboard" / "static"
+    ).resolve()
 
     @app.get("/dashboard")
     @app.get("/dashboard/")

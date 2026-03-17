@@ -26,7 +26,9 @@ def app(args: list[str] | None = None) -> int:
         prog="policyshield",
         description="PolicyShield — Declarative firewall for AI agent tool calls",
     )
-    parser.add_argument("--version", action="version", version=f"policyshield {__version__}")
+    parser.add_argument(
+        "--version", action="version", version=f"policyshield {__version__}"
+    )
 
     subparsers = parser.add_subparsers(dest="command")
 
@@ -40,21 +42,31 @@ def app(args: list[str] | None = None) -> int:
     validate_parser.add_argument("path", help="Path to YAML rule file or directory")
 
     # lint command
-    lint_parser = subparsers.add_parser("lint", help="Lint rule files for potential issues")
+    lint_parser = subparsers.add_parser(
+        "lint", help="Lint rule files for potential issues"
+    )
     lint_parser.add_argument("path", help="Path to YAML rule file or directory")
 
     # test command
     test_parser = subparsers.add_parser("test", help="Run YAML-based rule tests")
     test_parser.add_argument("path", help="Path to test file or directory")
-    test_parser.add_argument("-v", "--verbose", action="store_true", help="Show details for each test")
-    test_parser.add_argument("--json", dest="json_output", action="store_true", help="JSON output")
+    test_parser.add_argument(
+        "-v", "--verbose", action="store_true", help="Show details for each test"
+    )
+    test_parser.add_argument(
+        "--json", dest="json_output", action="store_true", help="JSON output"
+    )
 
     # diff command
     diff_parser = subparsers.add_parser("diff", help="Compare two rule sets")
     diff_parser.add_argument("old_path", help="Path to old rule file")
     diff_parser.add_argument("new_path", help="Path to new rule file")
-    diff_parser.add_argument("--json", dest="json_output", action="store_true", help="JSON output")
-    diff_parser.add_argument("--exit-code", action="store_true", help="Exit 1 if differences found")
+    diff_parser.add_argument(
+        "--json", dest="json_output", action="store_true", help="JSON output"
+    )
+    diff_parser.add_argument(
+        "--exit-code", action="store_true", help="Exit 1 if differences found"
+    )
 
     # trace command
     trace_parser = subparsers.add_parser("trace", help="Inspect trace logs")
@@ -63,117 +75,212 @@ def app(args: list[str] | None = None) -> int:
     # trace show
     show_parser = trace_subparsers.add_parser("show", help="Show trace entries")
     show_parser.add_argument("file", help="Path to JSONL trace file")
-    show_parser.add_argument("-n", "--limit", type=int, default=50, help="Max entries to show")
+    show_parser.add_argument(
+        "-n", "--limit", type=int, default=50, help="Max entries to show"
+    )
     show_parser.add_argument("--verdict", help="Filter by verdict")
     show_parser.add_argument("--tool", help="Filter by tool name")
     show_parser.add_argument("--session", help="Filter by session ID")
 
-    violations_parser = trace_subparsers.add_parser("violations", help="Show only violations (non-ALLOW)")
+    violations_parser = trace_subparsers.add_parser(
+        "violations", help="Show only violations (non-ALLOW)"
+    )
     violations_parser.add_argument("file", help="Path to JSONL trace file")
-    violations_parser.add_argument("-n", "--limit", type=int, default=50, help="Max entries to show")
+    violations_parser.add_argument(
+        "-n", "--limit", type=int, default=50, help="Max entries to show"
+    )
 
     # trace stats
-    stats_parser = trace_subparsers.add_parser("stats", help="Show aggregated trace statistics")
-    stats_parser.add_argument("file", nargs="?", default=None, help="Path to JSONL trace file (legacy mode)")
-    stats_parser.add_argument("--dir", default=None, help="Trace directory for aggregation")
-    stats_parser.add_argument("--from", dest="time_from", help="Start time (ISO datetime)")
+    stats_parser = trace_subparsers.add_parser(
+        "stats", help="Show aggregated trace statistics"
+    )
+    stats_parser.add_argument(
+        "file", nargs="?", default=None, help="Path to JSONL trace file (legacy mode)"
+    )
+    stats_parser.add_argument(
+        "--dir", default=None, help="Trace directory for aggregation"
+    )
+    stats_parser.add_argument(
+        "--from", dest="time_from", help="Start time (ISO datetime)"
+    )
     stats_parser.add_argument("--to", dest="time_to", help="End time (ISO datetime)")
     stats_parser.add_argument("--tool", help="Filter by tool name")
     stats_parser.add_argument("--session", help="Filter by session ID")
-    stats_parser.add_argument("--top", type=int, default=10, help="Top N tools (default: 10)")
-    stats_parser.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    stats_parser.add_argument(
+        "--top", type=int, default=10, help="Top N tools (default: 10)"
+    )
+    stats_parser.add_argument(
+        "--format", choices=["text", "json"], default="text", help="Output format"
+    )
 
     # trace search
-    search_parser = trace_subparsers.add_parser("search", help="Search traces with filters")
-    search_parser.add_argument("--dir", default="./traces", help="Trace directory (default: ./traces)")
+    search_parser = trace_subparsers.add_parser(
+        "search", help="Search traces with filters"
+    )
+    search_parser.add_argument(
+        "--dir", default="./traces", help="Trace directory (default: ./traces)"
+    )
     search_parser.add_argument("--tool", help="Filter by tool name")
-    search_parser.add_argument("--verdict", help="Filter by verdict (ALLOW, BLOCK, REDACT, APPROVE)")
+    search_parser.add_argument(
+        "--verdict", help="Filter by verdict (ALLOW, BLOCK, REDACT, APPROVE)"
+    )
     search_parser.add_argument("--session", help="Filter by session ID")
     search_parser.add_argument("--text", help="Full-text search in args, message, tool")
     search_parser.add_argument("--rule", help="Filter by rule ID")
     search_parser.add_argument("--pii", help="Filter by PII type")
-    search_parser.add_argument("--from", dest="time_from", help="Start time (ISO datetime)")
+    search_parser.add_argument(
+        "--from", dest="time_from", help="Start time (ISO datetime)"
+    )
     search_parser.add_argument("--to", dest="time_to", help="End time (ISO datetime)")
-    search_parser.add_argument("--limit", type=int, default=50, help="Max results (default: 50)")
-    search_parser.add_argument("--format", choices=["table", "json"], default="table", help="Output format")
+    search_parser.add_argument(
+        "--limit", type=int, default=50, help="Max results (default: 50)"
+    )
+    search_parser.add_argument(
+        "--format", choices=["table", "json"], default="table", help="Output format"
+    )
 
     # trace cost
-    cost_parser = trace_subparsers.add_parser("cost", help="Estimate token/dollar cost of tool calls")
-    cost_parser.add_argument("--dir", default="./traces", help="Trace directory (default: ./traces)")
-    cost_parser.add_argument("--model", default="gpt-4o", help="Model for pricing (default: gpt-4o)")
-    cost_parser.add_argument("--from", dest="time_from", help="Start time (ISO datetime)")
+    cost_parser = trace_subparsers.add_parser(
+        "cost", help="Estimate token/dollar cost of tool calls"
+    )
+    cost_parser.add_argument(
+        "--dir", default="./traces", help="Trace directory (default: ./traces)"
+    )
+    cost_parser.add_argument(
+        "--model", default="gpt-4o", help="Model for pricing (default: gpt-4o)"
+    )
+    cost_parser.add_argument(
+        "--from", dest="time_from", help="Start time (ISO datetime)"
+    )
     cost_parser.add_argument("--to", dest="time_to", help="End time (ISO datetime)")
-    cost_parser.add_argument("--format", choices=["table", "json"], default="table", help="Output format")
+    cost_parser.add_argument(
+        "--format", choices=["table", "json"], default="table", help="Output format"
+    )
 
     # trace export
-    export_parser = trace_subparsers.add_parser("export", help="Export trace to CSV or HTML")
+    export_parser = trace_subparsers.add_parser(
+        "export", help="Export trace to CSV or HTML"
+    )
     export_parser.add_argument("file", help="Path to JSONL trace file")
-    export_parser.add_argument("--format", choices=["csv", "html"], default="csv", help="Export format")
+    export_parser.add_argument(
+        "--format", choices=["csv", "html"], default="csv", help="Export format"
+    )
     export_parser.add_argument("--output", help="Output file path")
-    export_parser.add_argument("--title", default="PolicyShield Trace Report", help="HTML report title")
+    export_parser.add_argument(
+        "--title", default="PolicyShield Trace Report", help="HTML report title"
+    )
 
     # trace dashboard
-    dash_parser = trace_subparsers.add_parser("dashboard", help="Launch live web dashboard")
-    dash_parser.add_argument("--dir", default="./traces", help="Trace directory (default: ./traces)")
-    dash_parser.add_argument("--host", default="127.0.0.1", help="Host to bind (default: 127.0.0.1)")
-    dash_parser.add_argument("--port", type=int, default=8000, help="Port to bind (default: 8000)")
-    dash_parser.add_argument("--prometheus", action="store_true", help="Enable /metrics endpoint")
+    dash_parser = trace_subparsers.add_parser(
+        "dashboard", help="Launch live web dashboard"
+    )
+    dash_parser.add_argument(
+        "--dir", default="./traces", help="Trace directory (default: ./traces)"
+    )
+    dash_parser.add_argument(
+        "--host", default="127.0.0.1", help="Host to bind (default: 127.0.0.1)"
+    )
+    dash_parser.add_argument(
+        "--port", type=int, default=8000, help="Port to bind (default: 8000)"
+    )
+    dash_parser.add_argument(
+        "--prometheus", action="store_true", help="Enable /metrics endpoint"
+    )
 
     # init command
-    init_parser = subparsers.add_parser("init", help="Scaffold a new PolicyShield project")
-    init_parser.add_argument("directory", nargs="?", default=".", help="Target directory (default: current directory)")
+    init_parser = subparsers.add_parser(
+        "init", help="Scaffold a new PolicyShield project"
+    )
+    init_parser.add_argument(
+        "directory",
+        nargs="?",
+        default=".",
+        help="Target directory (default: current directory)",
+    )
     init_parser.add_argument(
         "--preset",
         default="minimal",
         choices=["minimal", "security", "compliance", "openclaw"],
         help="Rule preset (default: minimal)",
     )
-    init_parser.add_argument("--no-interactive", action="store_true", help="Skip interactive prompts")
+    init_parser.add_argument(
+        "--no-interactive", action="store_true", help="Skip interactive prompts"
+    )
 
     # config command
     config_parser = subparsers.add_parser("config", help="Manage policyshield config")
     config_subparsers = config_parser.add_subparsers(dest="config_command")
     val_parser = config_subparsers.add_parser("validate", help="Validate config file")
-    val_parser.add_argument("path", nargs="?", default="policyshield.yaml", help="Config file path")
+    val_parser.add_argument(
+        "path", nargs="?", default="policyshield.yaml", help="Config file path"
+    )
     show_parser2 = config_subparsers.add_parser("show", help="Show resolved config")
     show_parser2.add_argument("path", nargs="?", default=None, help="Config file path")
     config_subparsers.add_parser("init", help="Create default policyshield.yaml")
 
     # playground command
-    play_parser = subparsers.add_parser("playground", help="Interactive rule testing REPL")
+    play_parser = subparsers.add_parser(
+        "playground", help="Interactive rule testing REPL"
+    )
     play_parser.add_argument("--rules", required=True, help="Path to YAML rules file")
-    play_parser.add_argument("--tool", default=None, help="Single check: tool name (non-interactive)")
-    play_parser.add_argument("--args", default=None, help="Single check: JSON args string")
+    play_parser.add_argument(
+        "--tool", default=None, help="Single check: tool name (non-interactive)"
+    )
+    play_parser.add_argument(
+        "--args", default=None, help="Single check: JSON args string"
+    )
 
     # server command
-    server_parser = subparsers.add_parser("server", help="Start PolicyShield HTTP server")
-    server_parser.add_argument("--rules", required=True, help="Path to YAML rules file or directory")
-    server_parser.add_argument("--port", type=int, default=8100, help="Server port (default: 8100)")
-    server_parser.add_argument("--host", default="0.0.0.0", help="Server host (default: 0.0.0.0)")
+    server_parser = subparsers.add_parser(
+        "server", help="Start PolicyShield HTTP server"
+    )
+    server_parser.add_argument(
+        "--rules", required=True, help="Path to YAML rules file or directory"
+    )
+    server_parser.add_argument(
+        "--port", type=int, default=8100, help="Server port (default: 8100)"
+    )
+    server_parser.add_argument(
+        "--host", default="0.0.0.0", help="Server host (default: 0.0.0.0)"
+    )
     server_parser.add_argument(
         "--mode",
         choices=["enforce", "audit", "disabled"],
         default="enforce",
     )
-    server_parser.add_argument("--reload", action="store_true", help="Enable hot reload of rules")
-    server_parser.add_argument("--workers", type=int, default=1, help="Number of uvicorn workers")
+    server_parser.add_argument(
+        "--reload", action="store_true", help="Enable hot reload of rules"
+    )
+    server_parser.add_argument(
+        "--workers", type=int, default=1, help="Number of uvicorn workers"
+    )
     server_parser.add_argument("--tls-cert", help="Path to TLS certificate (PEM)")
     server_parser.add_argument("--tls-key", help="Path to TLS private key (PEM)")
 
     # replay command
-    sp_replay = subparsers.add_parser("replay", help="Replay traces against different rules")
+    sp_replay = subparsers.add_parser(
+        "replay", help="Replay traces against different rules"
+    )
     sp_replay.add_argument("traces", help="Path to JSONL trace file or directory")
     sp_replay.add_argument("--rules", required=True, help="Path to new rules YAML")
     sp_replay.add_argument("--session", default=None, help="Filter by session ID")
     sp_replay.add_argument("--tool", default=None, help="Filter by tool name")
-    sp_replay.add_argument("--only-changed", action="store_true", help="Show only changed verdicts")
-    sp_replay.add_argument("--format", choices=["table", "json"], default="table", help="Output format")
+    sp_replay.add_argument(
+        "--only-changed", action="store_true", help="Show only changed verdicts"
+    )
+    sp_replay.add_argument(
+        "--format", choices=["table", "json"], default="table", help="Output format"
+    )
 
     # generate command
     sp_gen = subparsers.add_parser("generate", help="Generate rules from description")
-    sp_gen.add_argument("description", nargs="?", help="Natural language description of rules")
+    sp_gen.add_argument(
+        "description", nargs="?", help="Natural language description of rules"
+    )
     sp_gen.add_argument("--tools", nargs="+", help="List of tool names for context")
-    sp_gen.add_argument("--output", "-o", default=None, help="Output YAML file (default: stdout)")
+    sp_gen.add_argument(
+        "--output", "-o", default=None, help="Output YAML file (default: stdout)"
+    )
     sp_gen.add_argument(
         "--provider",
         choices=["openai", "anthropic"],
@@ -194,18 +301,34 @@ def app(args: list[str] | None = None) -> int:
     )
 
     # kill command
-    kill_parser = subparsers.add_parser("kill", help="Activate kill switch on running server")
-    kill_parser.add_argument("--port", type=int, default=8100, help="Server port (default: 8100)")
-    kill_parser.add_argument("--reason", type=str, default="Kill switch activated via CLI")
+    kill_parser = subparsers.add_parser(
+        "kill", help="Activate kill switch on running server"
+    )
+    kill_parser.add_argument(
+        "--port", type=int, default=8100, help="Server port (default: 8100)"
+    )
+    kill_parser.add_argument(
+        "--reason", type=str, default="Kill switch activated via CLI"
+    )
 
     # resume command
-    resume_parser = subparsers.add_parser("resume", help="Deactivate kill switch on running server")
-    resume_parser.add_argument("--port", type=int, default=8100, help="Server port (default: 8100)")
+    resume_parser = subparsers.add_parser(
+        "resume", help="Deactivate kill switch on running server"
+    )
+    resume_parser.add_argument(
+        "--port", type=int, default=8100, help="Server port (default: 8100)"
+    )
 
     # doctor command
-    doctor_parser = subparsers.add_parser("doctor", help="Check configuration health and security score")
-    doctor_parser.add_argument("--config", type=str, default=None, help="Path to policyshield.yaml")
-    doctor_parser.add_argument("--rules", type=str, default=None, help="Path to rules.yaml")
+    doctor_parser = subparsers.add_parser(
+        "doctor", help="Check configuration health and security score"
+    )
+    doctor_parser.add_argument(
+        "--config", type=str, default=None, help="Path to policyshield.yaml"
+    )
+    doctor_parser.add_argument(
+        "--rules", type=str, default=None, help="Path to rules.yaml"
+    )
     doctor_parser.add_argument("--json", action="store_true", help="Output as JSON")
 
     # generate-rules command
@@ -263,48 +386,100 @@ def app(args: list[str] | None = None) -> int:
     sim_parser.add_argument("--session-id", default="simulate", help="Session ID")
 
     # openapi command
-    openapi_parser = subparsers.add_parser("openapi", help="Export OpenAPI schema as JSON")
-    openapi_parser.add_argument("--rules", required=True, help="Path to YAML rules file")
-    openapi_parser.add_argument("--output", "-o", default=None, help="Output file (default: stdout)")
-    openapi_parser.add_argument("--indent", type=int, default=2, help="JSON indent (default: 2)")
+    openapi_parser = subparsers.add_parser(
+        "openapi", help="Export OpenAPI schema as JSON"
+    )
+    openapi_parser.add_argument(
+        "--rules", required=True, help="Path to YAML rules file"
+    )
+    openapi_parser.add_argument(
+        "--output", "-o", default=None, help="Output file (default: stdout)"
+    )
+    openapi_parser.add_argument(
+        "--indent", type=int, default=2, help="JSON indent (default: 2)"
+    )
 
     # compile command (NL → YAML)
-    compile_parser = subparsers.add_parser("compile", help="Compile natural language to PolicyShield YAML")
-    compile_parser.add_argument("description", help="Natural language policy description")
-    compile_parser.add_argument("--output", "-o", default=None, help="Output YAML file (default: stdout)")
-    compile_parser.add_argument("--model", default="gpt-4o-mini", help="LLM model (default: gpt-4o-mini)")
+    compile_parser = subparsers.add_parser(
+        "compile", help="Compile natural language to PolicyShield YAML"
+    )
+    compile_parser.add_argument(
+        "description", help="Natural language policy description"
+    )
+    compile_parser.add_argument(
+        "--output", "-o", default=None, help="Output YAML file (default: stdout)"
+    )
+    compile_parser.add_argument(
+        "--model", default="gpt-4o-mini", help="LLM model (default: gpt-4o-mini)"
+    )
 
     # bot command (Telegram bot)
-    bot_parser = subparsers.add_parser("bot", help="Start Telegram bot for NL policy management")
-    bot_parser.add_argument("--token", default=None, help="Telegram Bot API token (or POLICYSHIELD_BOT_TOKEN)")
-    bot_parser.add_argument("--rules", default=None, help="Path to YAML rules file (or POLICYSHIELD_BOT_RULES_PATH)")
-    bot_parser.add_argument("--server", default=None, help="PolicyShield server URL (or POLICYSHIELD_SERVER_URL)")
+    bot_parser = subparsers.add_parser(
+        "bot", help="Start Telegram bot for NL policy management"
+    )
     bot_parser.add_argument(
-        "--admin-token", default=None, help="Admin token for server API (or POLICYSHIELD_ADMIN_TOKEN)"
+        "--token",
+        default=None,
+        help="Telegram Bot API token (or POLICYSHIELD_BOT_TOKEN)",
+    )
+    bot_parser.add_argument(
+        "--rules",
+        default=None,
+        help="Path to YAML rules file (or POLICYSHIELD_BOT_RULES_PATH)",
+    )
+    bot_parser.add_argument(
+        "--server",
+        default=None,
+        help="PolicyShield server URL (or POLICYSHIELD_SERVER_URL)",
+    )
+    bot_parser.add_argument(
+        "--admin-token",
+        default=None,
+        help="Admin token for server API (or POLICYSHIELD_ADMIN_TOKEN)",
     )
 
     # check (dry-run) command
-    check_parser = subparsers.add_parser("check", help="One-shot tool call check (dry-run)")
+    check_parser = subparsers.add_parser(
+        "check", help="One-shot tool call check (dry-run)"
+    )
     check_parser.add_argument("--tool", required=True, help="Tool name to check")
     check_parser.add_argument("--args", default="{}", help="JSON args string")
     check_parser.add_argument("--rules", required=True, help="Path to YAML rules file")
     check_parser.add_argument("--session-id", default="cli", help="Session ID")
-    check_parser.add_argument("--json", dest="json_output", action="store_true", help="JSON output")
+    check_parser.add_argument(
+        "--json", dest="json_output", action="store_true", help="JSON output"
+    )
 
     # quickstart command
     subparsers.add_parser("quickstart", help="Interactive setup wizard")
 
     # report command (compliance)
-    report_parser = subparsers.add_parser("report", help="Generate compliance report from traces")
-    report_parser.add_argument("--dir", default="./traces", help="Trace directory (default: ./traces)")
-    report_parser.add_argument("--format", choices=["text", "html"], default="text", help="Output format")
-    report_parser.add_argument("--output", "-o", default=None, help="Output file (default: stdout)")
+    report_parser = subparsers.add_parser(
+        "report", help="Generate compliance report from traces"
+    )
+    report_parser.add_argument(
+        "--dir", default="./traces", help="Trace directory (default: ./traces)"
+    )
+    report_parser.add_argument(
+        "--format", choices=["text", "html"], default="text", help="Output format"
+    )
+    report_parser.add_argument(
+        "--output", "-o", default=None, help="Output file (default: stdout)"
+    )
 
     # timeline command (incident)
-    timeline_parser = subparsers.add_parser("timeline", help="Show incident timeline for a session")
-    timeline_parser.add_argument("--dir", default="./traces", help="Trace directory (default: ./traces)")
-    timeline_parser.add_argument("--session", required=True, help="Session ID to inspect")
-    timeline_parser.add_argument("--format", choices=["text", "json"], default="text", help="Output format")
+    timeline_parser = subparsers.add_parser(
+        "timeline", help="Show incident timeline for a session"
+    )
+    timeline_parser.add_argument(
+        "--dir", default="./traces", help="Trace directory (default: ./traces)"
+    )
+    timeline_parser.add_argument(
+        "--session", required=True, help="Session ID to inspect"
+    )
+    timeline_parser.add_argument(
+        "--format", choices=["text", "json"], default="text", help="Output format"
+    )
 
     parsed = parser.parse_args(args)
 
@@ -496,7 +671,9 @@ def _cmd_server(parsed: argparse.Namespace) -> int:
         print("  Hot reload: enabled")
 
     # TLS support — env var fallback
-    tls_cert = getattr(parsed, "tls_cert", None) or os.environ.get("POLICYSHIELD_TLS_CERT")
+    tls_cert = getattr(parsed, "tls_cert", None) or os.environ.get(
+        "POLICYSHIELD_TLS_CERT"
+    )
     tls_key = getattr(parsed, "tls_key", None) or os.environ.get("POLICYSHIELD_TLS_KEY")
 
     uvicorn_kwargs: dict = {
@@ -885,7 +1062,10 @@ def _cmd_trace_dashboard(parsed: argparse.Namespace) -> int:
 
         uvicorn.run(app, host=host, port=port, log_level="info")
     except ImportError:
-        print("⚠  uvicorn not found. Install with: pip install policyshield[dashboard]", file=sys.stderr)
+        print(
+            "⚠  uvicorn not found. Install with: pip install policyshield[dashboard]",
+            file=sys.stderr,
+        )
         print("   Starting with built-in server...", file=sys.stderr)
         # Fallback: just print a message, can't serve without uvicorn
         return 1
@@ -1012,7 +1192,9 @@ def _cmd_replay(parsed: argparse.Namespace) -> int:
     )
 
     if summary["tightened"] > 0:
-        print(f"\n⚠️  {summary['tightened']} tool call(s) would be MORE restricted with new rules.")
+        print(
+            f"\n⚠️  {summary['tightened']} tool call(s) would be MORE restricted with new rules."
+        )
 
     return 0
 
@@ -1038,7 +1220,9 @@ def _cmd_simulate(parsed: argparse.Namespace) -> int:
         return 1
 
     engine_current = ShieldEngine(rules=current_rules)
-    result_current = engine_current.check(tool_name=parsed.tool, args=args, session_id=parsed.session_id)
+    result_current = engine_current.check(
+        tool_name=parsed.tool, args=args, session_id=parsed.session_id
+    )
 
     # Check with NEW rule added
     try:
@@ -1057,24 +1241,32 @@ def _cmd_simulate(parsed: argparse.Namespace) -> int:
         taint_chain=current_rules.taint_chain,
     )
     engine_merged = ShieldEngine(rules=merged)
-    result_merged = engine_merged.check(tool_name=parsed.tool, args=args, session_id=parsed.session_id)
+    result_merged = engine_merged.check(
+        tool_name=parsed.tool, args=args, session_id=parsed.session_id
+    )
 
     # Display
     print(f"Tool:    {parsed.tool}")
     print(f"Args:    {args}")
     print()
     print(f"📋 Current rules ({len(current_rules.rules)} rules):")
-    print(f"   Verdict: {result_current.verdict.value} (rule: {result_current.rule_id or 'none'})")
+    print(
+        f"   Verdict: {result_current.verdict.value} (rule: {result_current.rule_id or 'none'})"
+    )
     print()
     print(f"📋 With new rule  ({len(merged.rules)} rules):")
-    print(f"   Verdict: {result_merged.verdict.value} (rule: {result_merged.rule_id or 'none'})")
+    print(
+        f"   Verdict: {result_merged.verdict.value} (rule: {result_merged.rule_id or 'none'})"
+    )
     if result_merged.message:
         print(f"   Message: {result_merged.message}")
 
     # Diff highlight
     if result_current.verdict != result_merged.verdict:
         print()
-        print(f"⚠️  CHANGE: {result_current.verdict.value} → {result_merged.verdict.value}")
+        print(
+            f"⚠️  CHANGE: {result_current.verdict.value} → {result_merged.verdict.value}"
+        )
     else:
         print()
         print("✅ No change in verdict")
@@ -1106,7 +1298,10 @@ def _display_trace(
                 entry = json.loads(line)
 
                 # Apply filters
-                if verdict_filter and entry.get("verdict", "").upper() != verdict_filter.upper():
+                if (
+                    verdict_filter
+                    and entry.get("verdict", "").upper() != verdict_filter.upper()
+                ):
                     continue
                 if tool_filter and entry.get("tool") != tool_filter:
                     continue
@@ -1133,7 +1328,9 @@ def _display_trace(
             latency = entry.get("latency_ms", 0)
 
             icon = "✓" if verdict == "ALLOW" else "✗"
-            print(f"{icon} [{verdict}] {tool} | session={session} | rule={rule_id} | {latency:.1f}ms | {timestamp}")
+            print(
+                f"{icon} [{verdict}] {tool} | session={session} | rule={rule_id} | {latency:.1f}ms | {timestamp}"
+            )
 
             if "pii_types" in entry and entry["pii_types"]:
                 print(f"  PII: {', '.join(entry['pii_types'])}")
@@ -1159,7 +1356,9 @@ def _cmd_generate(args: argparse.Namespace) -> int:
     # AI mode (requires LLM)
     if not args.description:
         print("Error: description is required for AI generation.")
-        print("Usage: policyshield generate 'Block all file deletions' --tools delete_file read_file")
+        print(
+            "Usage: policyshield generate 'Block all file deletions' --tools delete_file read_file"
+        )
         return 1
 
     return asyncio.run(_generate_ai(args))
@@ -1171,7 +1370,9 @@ def _generate_template(args: argparse.Namespace) -> int:
 
     if not args.tools:
         print("Error: --tools is required for template mode.")
-        print("Usage: policyshield generate --template --tools delete_file send_email -o rules.yaml")
+        print(
+            "Usage: policyshield generate --template --tools delete_file send_email -o rules.yaml"
+        )
         return 1
 
     recs = recommend_rules(args.tools)
@@ -1216,7 +1417,9 @@ async def _generate_ai(args: argparse.Namespace) -> int:
         print("─" * 60)
         print(result.yaml_text)
         print("─" * 60)
-        print("\nYou can save this YAML and fix it manually with: policyshield lint <file>")
+        print(
+            "\nYou can save this YAML and fix it manually with: policyshield lint <file>"
+        )
 
         if args.output:
             _write_file(args.output, result.yaml_text)
@@ -1322,7 +1525,10 @@ def _cmd_doctor(parsed: argparse.Namespace) -> int:
             "score": report.score,
             "max_score": report.max_score,
             "grade": report.grade,
-            "checks": [{"name": c.name, "passed": c.passed, "message": c.message} for c in report.checks],
+            "checks": [
+                {"name": c.name, "passed": c.passed, "message": c.message}
+                for c in report.checks
+            ],
         }
         print(json_mod.dumps(out, indent=2))
     else:
@@ -1357,7 +1563,10 @@ def _cmd_generate_rules(parsed: argparse.Namespace) -> int:
         print(f"Using {len(tool_names)} provided tool names")
     else:
         print("✗ Specify --from-openclaw or --tools", file=sys.stderr)
-        print("  Example: policyshield generate-rules --tools exec,read_file,write_file", file=sys.stderr)
+        print(
+            "  Example: policyshield generate-rules --tools exec,read_file,write_file",
+            file=sys.stderr,
+        )
         return 1
 
     if not tool_names:
@@ -1388,7 +1597,11 @@ def _cmd_generate_rules(parsed: argparse.Namespace) -> int:
     output_path = Path(parsed.output)
     if output_path.exists() and not parsed.force:
         try:
-            confirm = input(f"\n{output_path} already exists. Overwrite? [y/N]: ").strip().lower()
+            confirm = (
+                input(f"\n{output_path} already exists. Overwrite? [y/N]: ")
+                .strip()
+                .lower()
+            )
             if confirm not in ("y", "yes"):
                 print("Aborted.")
                 return 0
@@ -1419,7 +1632,10 @@ def _cmd_openapi(parsed: argparse.Namespace) -> int:
         from policyshield.server.app import create_app
         from policyshield.shield.async_engine import AsyncShieldEngine
     except ImportError:
-        print("ERROR: server extras required. Run: pip install policyshield[server]", file=sys.stderr)
+        print(
+            "ERROR: server extras required. Run: pip install policyshield[server]",
+            file=sys.stderr,
+        )
         return 1
 
     engine = AsyncShieldEngine(rules=rules_path)
@@ -1498,7 +1714,9 @@ def _cmd_compile(parsed: argparse.Namespace) -> int:
     result = asyncio.run(compiler.compile(parsed.description))
 
     if not result.is_valid:
-        print(f"✗ Compilation failed after {result.attempts} attempts:", file=sys.stderr)
+        print(
+            f"✗ Compilation failed after {result.attempts} attempts:", file=sys.stderr
+        )
         for err in result.errors:
             print(f"  - {err}", file=sys.stderr)
         if result.yaml_text:
@@ -1509,7 +1727,10 @@ def _cmd_compile(parsed: argparse.Namespace) -> int:
     if parsed.output:
         Path(parsed.output).parent.mkdir(parents=True, exist_ok=True)
         Path(parsed.output).write_text(result.yaml_text + "\n", encoding="utf-8")
-        print(f"✓ Written to {parsed.output} ({result.attempts} attempt(s))", file=sys.stderr)
+        print(
+            f"✓ Written to {parsed.output} ({result.attempts} attempt(s))",
+            file=sys.stderr,
+        )
     else:
         print(result.yaml_text)
 

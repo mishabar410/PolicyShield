@@ -14,7 +14,9 @@ _METRICS_CACHE_TTL = 30.0  # seconds
 class PrometheusExporter:
     """Exports PolicyShield metrics in Prometheus format."""
 
-    def __init__(self, trace_dir: str | Path = "./traces", namespace: str = "policyshield") -> None:
+    def __init__(
+        self, trace_dir: str | Path = "./traces", namespace: str = "policyshield"
+    ) -> None:
         self._trace_dir = Path(trace_dir)
         self._namespace = namespace
         self._cached_metrics: dict = {}
@@ -52,8 +54,12 @@ class PrometheusExporter:
 
         # Per-tool stats
         for ts in result.top_tools:
-            metrics[f"{self._namespace}_tool_calls{{{self._label('tool', ts.tool)}}}"] = ts.call_count
-            metrics[f"{self._namespace}_tool_blocks{{{self._label('tool', ts.tool)}}}"] = ts.block_count
+            metrics[
+                f"{self._namespace}_tool_calls{{{self._label('tool', ts.tool)}}}"
+            ] = ts.call_count
+            metrics[
+                f"{self._namespace}_tool_blocks{{{self._label('tool', ts.tool)}}}"
+            ] = ts.block_count
 
         # PII counts
         for entry in result.pii_heatmap:
@@ -88,7 +94,9 @@ def add_prometheus_endpoint(app, trace_dir: str | Path = "./traces") -> None:
     try:
         from fastapi.responses import PlainTextResponse
     except ImportError:
-        raise ImportError("Prometheus endpoint requires FastAPI. Install with: pip install policyshield[dashboard]")
+        raise ImportError(
+            "Prometheus endpoint requires FastAPI. Install with: pip install policyshield[dashboard]"
+        )
 
     exporter = PrometheusExporter(trace_dir)
 

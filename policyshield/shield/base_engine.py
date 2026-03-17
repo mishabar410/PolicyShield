@@ -116,6 +116,7 @@ class BaseShieldEngine:
         # Approval metadata for cache population after resolution
         # Use OrderedDict for O(1) insertion-order eviction via popitem(last=False)
         from collections import OrderedDict as _OD
+
         self._approval_meta: _OD[str, dict] = _OD()
         self._approval_meta_ts: _OD[str, float] = _OD()
         self._approval_meta_ttl: float = 3600.0  # 1 hour
@@ -227,7 +228,9 @@ class BaseShieldEngine:
 
         for hook_fn in _get_pre_hooks():
             try:
-                hook_fn(tool_name=tool_name, args=args, session_id=session_id, sender=sender)
+                hook_fn(
+                    tool_name=tool_name, args=args, session_id=session_id, sender=sender
+                )
             except Exception as e:
                 logger.warning("Pre-check hook error: %s", e)
 
@@ -272,7 +275,9 @@ class BaseShieldEngine:
             try:
                 det_result = detector_fn(tool_name=tool_name, args=raw_args)
                 if isinstance(det_result, _DR) and det_result.detected:
-                    logger.warning("Plugin detector '%s' triggered: %s", pname, det_result.message)
+                    logger.warning(
+                        "Plugin detector '%s' triggered: %s", pname, det_result.message
+                    )
                     return ShieldResult(
                         verdict=Verdict.BLOCK,
                         rule_id=f"__plugin__{pname}",
@@ -293,7 +298,9 @@ class BaseShieldEngine:
 
         # Budget check — cost-based per-session/per-hour limits (atomic check+record)
         if self._budget_tracker is not None:
-            budget_ok, budget_msg = self._budget_tracker.check_and_record(session_id, tool_name)
+            budget_ok, budget_msg = self._budget_tracker.check_and_record(
+                session_id, tool_name
+            )
             if not budget_ok:
                 return ShieldResult(
                     verdict=Verdict.BLOCK,
@@ -308,7 +315,9 @@ class BaseShieldEngine:
                 return ShieldResult(
                     verdict=Verdict.BLOCK,
                     rule_id="__pii_taint__",
-                    message=(f"Session tainted: {session.taint_details}. Outgoing calls blocked until reviewed."),
+                    message=(
+                        f"Session tainted: {session.taint_details}. Outgoing calls blocked until reviewed."
+                    ),
                 )
 
         # Session state for condition matching
@@ -319,7 +328,9 @@ class BaseShieldEngine:
             matcher = self._matcher
             rule_set = self._rule_set
             pii_detector = self._pii  # Issue #170: snapshot like async path
-            event_buffer = self._session_mgr.get_event_buffer(session_id)  # Issue #207: inside lock
+            event_buffer = self._session_mgr.get_event_buffer(
+                session_id
+            )  # Issue #207: inside lock
 
         # NOTE: Issue #162 — LLM Guard uses asyncio.run() inside ThreadPool,
         # creating nested event loops. This pattern works but has suboptimal
@@ -349,14 +360,21 @@ class BaseShieldEngine:
 
         if match is None:
             # LLM Guard — check for threats even when no rule matches (Issue #1)
-            if self._llm_guard is not None and getattr(self._llm_guard, "enabled", False):
+            if self._llm_guard is not None and getattr(
+                self._llm_guard, "enabled", False
+            ):
                 try:
                     import asyncio
 
                     # Issue #154: Run in the shared pool to avoid creating a new executor per call
-                    future = self._pool.submit(asyncio.run, self._llm_guard.analyze(tool_name, args))
+                    future = self._pool.submit(
+                        asyncio.run, self._llm_guard.analyze(tool_name, args)
+                    )
                     guard_result = future.result(timeout=self._engine_timeout)
-                    if guard_result.is_threat and guard_result.risk_score >= self._llm_guard.risk_threshold:
+                    if (
+                        guard_result.is_threat
+                        and guard_result.risk_score >= self._llm_guard.risk_threshold
+                    ):
                         return ShieldResult(
                             verdict=Verdict.BLOCK,
                             rule_id="__llm_guard__",
@@ -425,7 +443,9 @@ class BaseShieldEngine:
                     event_buffer=event_buffer,
                     context=context,
                 )
-                shadow_verdict = shadow_match.rule.then if shadow_match else Verdict.ALLOW
+                shadow_verdict = (
+                    shadow_match.rule.then if shadow_match else Verdict.ALLOW
+                )
                 if shadow_match and shadow_match.rule.then != result.verdict:
                     logger.info(
                         "SHADOW: tool=%s verdict_diff: current=%s shadow=%s (rule=%s)",
@@ -439,7 +459,11 @@ class BaseShieldEngine:
                         session_id=session_id,
                         tool=tool_name,
                         verdict=shadow_verdict if shadow_match else Verdict.ALLOW,
-                        rule_id=f"__shadow__{shadow_match.rule.id}" if shadow_match else "__shadow__",
+                        rule_id=(
+                            f"__shadow__{shadow_match.rule.id}"
+                            if shadow_match
+                            else "__shadow__"
+                        ),
                     )
             except Exception as e:
                 logger.warning("Shadow evaluation error: %s", e)
@@ -449,7 +473,9 @@ class BaseShieldEngine:
 
         for hook_fn in _get_post_hooks():
             try:
-                hook_fn(tool_name=tool_name, args=args, session_id=session_id, result=result)
+                hook_fn(
+                    tool_name=tool_name, args=args, session_id=session_id, result=result
+                )
             except Exception as e:
                 logger.warning("Post-check hook error: %s", e)
 
@@ -474,7 +500,9 @@ class BaseShieldEngine:
         if hasattr(self._approval_backend, "_circuit_breaker"):
             cb = self._approval_backend._circuit_breaker
             if not cb.is_available():
-                verdict = Verdict.BLOCK if cb.fallback_verdict == "BLOCK" else Verdict.ALLOW
+                verdict = (
+                    Verdict.BLOCK if cb.fallback_verdict == "BLOCK" else Verdict.ALLOW
+                )
                 return ShieldResult(
                     verdict=verdict,
                     rule_id=rule.id,
@@ -491,7 +519,9 @@ class BaseShieldEngine:
 
         # Check cache first
         if self._approval_cache is not None:
-            cached = self._approval_cache.get(tool_name, rule.id, session_id, strategy=strategy)
+            cached = self._approval_cache.get(
+                tool_name, rule.id, session_id, strategy=strategy
+            )
             if cached is not None:
                 if cached.approved:
                     return self._verdict_builder.allow(rule=rule, args=args)
@@ -533,7 +563,11 @@ class BaseShieldEngine:
         """Remove stale and excess entries from _approval_meta (caller holds lock)."""
         now = monotonic()
         # TTL cleanup
-        expired = [k for k, ts in self._approval_meta_ts.items() if now - ts > self._approval_meta_ttl]
+        expired = [
+            k
+            for k, ts in self._approval_meta_ts.items()
+            if now - ts > self._approval_meta_ttl
+        ]
         for k in expired:
             self._approval_meta.pop(k, None)
             self._approval_meta_ts.pop(k, None)
@@ -574,14 +608,20 @@ class BaseShieldEngine:
 
             # Evict stale entries by TTL first
             now = monotonic()
-            stale = [k for k, ts in self._resolved_approvals_ts.items() if now - ts > self._resolved_approvals_ttl]
+            stale = [
+                k
+                for k, ts in self._resolved_approvals_ts.items()
+                if now - ts > self._resolved_approvals_ttl
+            ]
             for k in stale:
                 self._resolved_approvals.pop(k, None)
                 self._resolved_approvals_ts.pop(k, None)
 
             # Then evict oldest quarter if still over limit
             if len(self._resolved_approvals) >= self._max_resolved_approvals:
-                to_remove = list(self._resolved_approvals.keys())[: len(self._resolved_approvals) // 4]
+                to_remove = list(self._resolved_approvals.keys())[
+                    : len(self._resolved_approvals) // 4
+                ]
                 for k in to_remove:
                     del self._resolved_approvals[k]
                     self._resolved_approvals_ts.pop(k, None)
@@ -606,7 +646,12 @@ class BaseShieldEngine:
     # ------------------------------------------------------------------ #
 
     def _apply_post_check(
-        self, result: ShieldResult, session_id: str, tool_name: str, latency_ms: float, args: dict
+        self,
+        result: ShieldResult,
+        session_id: str,
+        tool_name: str,
+        latency_ms: float,
+        args: dict,
     ) -> ShieldResult:
         """Apply audit-mode override, session update, and trace after a check."""
         # Issue #201: Proactive GC — clean stale approval meta on every check
@@ -638,7 +683,12 @@ class BaseShieldEngine:
             and result.verdict != Verdict.ALLOW
             and not _is_audit_exempt(result.rule_id)
         ):
-            logger.info("AUDIT: would %s %s (rule=%s)", result.verdict.value, tool_name, result.rule_id)
+            logger.info(
+                "AUDIT: would %s %s (rule=%s)",
+                result.verdict.value,
+                tool_name,
+                result.rule_id,
+            )
             audit_result = ShieldResult(
                 verdict=Verdict.ALLOW,
                 rule_id=result.rule_id,
@@ -662,7 +712,10 @@ class BaseShieldEngine:
             buf.add(tool_name, result.verdict.value)
 
         # Webhook notification — fire-and-forget on BLOCK/APPROVE
-        if self._webhook_notifier is not None and result.verdict in (Verdict.BLOCK, Verdict.APPROVE):
+        if self._webhook_notifier is not None and result.verdict in (
+            Verdict.BLOCK,
+            Verdict.APPROVE,
+        ):
             try:
                 import asyncio
 
@@ -719,14 +772,18 @@ class BaseShieldEngine:
 
         # Output rules check
         # Issue #12: Use JSON serialization for consistent output rule matching
-        output_str = json.dumps(result, default=str) if not isinstance(result, str) else result
+        output_str = (
+            json.dumps(result, default=str) if not isinstance(result, str) else result
+        )
         output_bytes_encoded = output_str.encode("utf-8", errors="replace")
         with self._lock:
             output_rules = getattr(self._rule_set, "output_rules", [])
 
         for orule in output_rules:
             # Tool pattern match
-            if orule.tool != ".*" and not _compile_pattern(f"^{orule.tool}$").match(tool_name):
+            if orule.tool != ".*" and not _compile_pattern(f"^{orule.tool}$").match(
+                tool_name
+            ):
                 continue
             # Max size check
             if orule.max_size:
@@ -740,15 +797,19 @@ class BaseShieldEngine:
                     )
                     return PostCheckResult(
                         blocked=True,
-                        block_reason=orule.message or f"Output exceeds max_size ({orule.max_size} bytes)",
+                        block_reason=orule.message
+                        or f"Output exceeds max_size ({orule.max_size} bytes)",
                     )
             # Pattern blocking
             for pattern in orule.block_patterns:
                 if _compile_pattern(pattern).search(output_str):
-                    logger.warning("Output blocked by pattern '%s' for %s", pattern, tool_name)
+                    logger.warning(
+                        "Output blocked by pattern '%s' for %s", pattern, tool_name
+                    )
                     return PostCheckResult(
                         blocked=True,
-                        block_reason=orule.message or f"Output matches blocked pattern: {pattern}",
+                        block_reason=orule.message
+                        or f"Output matches blocked pattern: {pattern}",
                     )
 
         pii_matches: list = []
@@ -811,7 +872,9 @@ class BaseShieldEngine:
             return
         new_ruleset = load_rules(reload_path)
         self._swap_rules(new_ruleset)
-        logger.info("Rules reloaded from %s (%d rules)", reload_path, len(new_ruleset.rules))
+        logger.info(
+            "Rules reloaded from %s (%d rules)", reload_path, len(new_ruleset.rules)
+        )
 
     def start_watching(self, poll_interval: float = 2.0) -> None:
         """Start watching YAML files for hot reload.
@@ -820,7 +883,9 @@ class BaseShieldEngine:
             poll_interval: Seconds between checks.
         """
         if self._rules_path is None:
-            logger.warning("Cannot watch: engine was created with a RuleSet, not a path")
+            logger.warning(
+                "Cannot watch: engine was created with a RuleSet, not a path"
+            )
             return
         from policyshield.shield.watcher import RuleWatcher
 
@@ -908,5 +973,7 @@ class BaseShieldEngine:
             lines.append(f"Default: {rule_set.default_verdict.value}")
             lines.append(f"Rules: {len(rule_set.rules)}")
             for rule in rule_set.rules:
-                lines.append(f"  - [{rule.then.value}] {rule.id}: {rule.message or rule.description or rule.id}")
+                lines.append(
+                    f"  - [{rule.then.value}] {rule.id}: {rule.message or rule.description or rule.id}"
+                )
         return "\n".join(lines)

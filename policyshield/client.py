@@ -72,9 +72,17 @@ class PolicyShieldClient:
         payload = {"tool_name": tool_name, "args": args or {}, **kwargs}
         resp = self._request("POST", "/check", json=payload)
         resp.raise_for_status()
-        return CheckResult(**{k: v for k, v in resp.json().items() if k in CheckResult.__dataclass_fields__})
+        return CheckResult(
+            **{
+                k: v
+                for k, v in resp.json().items()
+                if k in CheckResult.__dataclass_fields__
+            }
+        )
 
-    def post_check(self, tool_name: str, result: str, session_id: str = "default") -> dict:
+    def post_check(
+        self, tool_name: str, result: str, session_id: str = "default"
+    ) -> dict:
         """Post-call check on tool output for PII."""
         resp = self._request(
             "POST",

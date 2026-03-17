@@ -165,9 +165,15 @@ def _build_config(data: dict) -> PolicyShieldConfig:
     """Map raw dict to :class:`PolicyShieldConfig`."""
     mode_str = data.get("mode", "ENFORCE")
     try:
-        mode = ShieldMode(mode_str.upper()) if isinstance(mode_str, str) else ShieldMode(mode_str)
+        mode = (
+            ShieldMode(mode_str.upper())
+            if isinstance(mode_str, str)
+            else ShieldMode(mode_str)
+        )
     except ValueError:
-        raise ValueError(f"Invalid mode: {mode_str!r}. Must be ENFORCE, AUDIT or DISABLED.")
+        raise ValueError(
+            f"Invalid mode: {mode_str!r}. Must be ENFORCE, AUDIT or DISABLED."
+        )
 
     rules = data.get("rules", {})
     if isinstance(rules, str):
@@ -199,7 +205,9 @@ def _build_config(data: dict) -> PolicyShieldConfig:
 
     max_string_length = san.get("max_string_length", 10_000)
     if max_string_length < 1:
-        raise ValueError(f"sanitizer.max_string_length must be >= 1, got {max_string_length}")
+        raise ValueError(
+            f"sanitizer.max_string_length must be >= 1, got {max_string_length}"
+        )
 
     return PolicyShieldConfig(
         mode=mode,
@@ -249,23 +257,33 @@ def _build_approval_backend(backend_name: str, **kwargs):  # noqa: ANN202
     if backend_name == "slack":
         from policyshield.approval.slack import SlackApprovalBackend
 
-        webhook_url = kwargs.get("webhook_url") or os.environ.get("POLICYSHIELD_SLACK_WEBHOOK_URL", "")
+        webhook_url = kwargs.get("webhook_url") or os.environ.get(
+            "POLICYSHIELD_SLACK_WEBHOOK_URL", ""
+        )
         return SlackApprovalBackend(webhook_url=webhook_url)
     if backend_name == "telegram":
         from policyshield.approval.telegram import TelegramApprovalBackend
 
-        bot_token = kwargs.get("bot_token") or os.environ.get("POLICYSHIELD_APPROVAL_BOT_TOKEN", "")
-        chat_id = kwargs.get("chat_id") or os.environ.get("POLICYSHIELD_APPROVAL_CHAT_ID", "")
+        bot_token = kwargs.get("bot_token") or os.environ.get(
+            "POLICYSHIELD_APPROVAL_BOT_TOKEN", ""
+        )
+        chat_id = kwargs.get("chat_id") or os.environ.get(
+            "POLICYSHIELD_APPROVAL_CHAT_ID", ""
+        )
         return TelegramApprovalBackend(bot_token=bot_token, chat_id=chat_id)
     if backend_name == "webhook":
         from policyshield.approval.webhook import WebhookApprovalBackend
 
-        webhook_url = kwargs.get("webhook_url") or os.environ.get("POLICYSHIELD_APPROVAL_WEBHOOK_URL", "")
+        webhook_url = kwargs.get("webhook_url") or os.environ.get(
+            "POLICYSHIELD_APPROVAL_WEBHOOK_URL", ""
+        )
         return WebhookApprovalBackend(webhook_url=webhook_url)
     # Unknown backends → warn and return None
     import logging
 
-    logging.getLogger("policyshield").warning("Unknown approval backend '%s', using none", backend_name)
+    logging.getLogger("policyshield").warning(
+        "Unknown approval backend '%s', using none", backend_name
+    )
     return None
 
 
@@ -297,7 +315,9 @@ def build_engine_from_config(config: PolicyShieldConfig):  # noqa: ANN201
 
     pii = PIIDetector() if config.pii_enabled else None
 
-    rate_limiter = RateLimiter.from_yaml_dict(config.rate_limits) if config.rate_limits else None
+    rate_limiter = (
+        RateLimiter.from_yaml_dict(config.rate_limits) if config.rate_limits else None
+    )
 
     # Issue #50: Build approval backend from config
     approval = _build_approval_backend(config.approval_backend)
@@ -356,7 +376,11 @@ def build_engine_from_config(config: PolicyShieldConfig):  # noqa: ANN201
             url=config.remote_rules_url,
             refresh_interval=config.remote_rules_interval,
             signature_key=config.remote_rules_signature_key,
-            callback=lambda rs: engine._swap_rules(rs) if hasattr(engine, "_swap_rules") else engine.reload_rules(),
+            callback=lambda rs: (
+                engine._swap_rules(rs)
+                if hasattr(engine, "_swap_rules")
+                else engine.reload_rules()
+            ),
         )
         loader.start()
         engine._remote_loader = loader  # type: ignore[attr-defined]
@@ -396,7 +420,9 @@ def build_async_engine_from_config(config: PolicyShieldConfig):  # noqa: ANN201
 
     pii = PIIDetector() if config.pii_enabled else None
 
-    rate_limiter = RateLimiter.from_yaml_dict(config.rate_limits) if config.rate_limits else None
+    rate_limiter = (
+        RateLimiter.from_yaml_dict(config.rate_limits) if config.rate_limits else None
+    )
 
     # Issue #83: Build approval backend from config
     approval = _build_approval_backend(config.approval_backend)
@@ -455,7 +481,11 @@ def build_async_engine_from_config(config: PolicyShieldConfig):  # noqa: ANN201
             url=config.remote_rules_url,
             refresh_interval=config.remote_rules_interval,
             signature_key=config.remote_rules_signature_key,
-            callback=lambda rs: engine._swap_rules(rs) if hasattr(engine, "_swap_rules") else engine.reload_rules(),
+            callback=lambda rs: (
+                engine._swap_rules(rs)
+                if hasattr(engine, "_swap_rules")
+                else engine.reload_rules()
+            ),
         )
         loader.start()
         engine._remote_loader = loader  # type: ignore[attr-defined]

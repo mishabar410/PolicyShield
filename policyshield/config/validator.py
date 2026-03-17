@@ -42,6 +42,8 @@ def validate_env_config() -> dict[str, str]:
         errors.append(f"POLICYSHIELD_LOG_FORMAT={log_format} must be 'text' or 'json'")
 
     if errors:
-        raise ConfigError("Configuration errors:\n" + "\n".join(f"  - {e}" for e in errors))
+        raise ConfigError(
+            "Configuration errors:\n" + "\n".join(f"  - {e}" for e in errors)
+        )
 
     return {"fail_mode": fail_mode, "log_format": log_format}

@@ -84,7 +84,15 @@ def run_doctor(
                 )
             )
     else:
-        report.add(Check("Config file", False, 10, f"✗ {config_path} not found", "Run: policyshield init"))
+        report.add(
+            Check(
+                "Config file",
+                False,
+                10,
+                f"✗ {config_path} not found",
+                "Run: policyshield init",
+            )
+        )
 
     # --- Check 2: Rules file exists and parses ---
     rules: list[dict] = []
@@ -94,7 +102,9 @@ def run_doctor(
             data = yaml.safe_load(rules_path.read_text()) or {}
             rules = data.get("rules", [])
             if rules:
-                report.add(Check("Rules file", True, 10, f"✓ {rules_path}: {len(rules)} rules"))
+                report.add(
+                    Check("Rules file", True, 10, f"✓ {rules_path}: {len(rules)} rules")
+                )
             else:
                 report.add(
                     Check(
@@ -116,14 +126,24 @@ def run_doctor(
                 )
             )
     else:
-        report.add(Check("Rules file", False, 10, f"✗ {rules_path} not found", "Run: policyshield init"))
+        report.add(
+            Check(
+                "Rules file",
+                False,
+                10,
+                f"✗ {rules_path} not found",
+                "Run: policyshield init",
+            )
+        )
 
     # --- Check 3: default_verdict ---
     # Issue #71: Reuse rules_data from check 2 instead of parsing again
     rules_data = data if rules_path.exists() else {}
     default_v = rules_data.get("default_verdict", "allow")
     if default_v == "block":
-        report.add(Check("Default verdict", True, 15, "✓ default_verdict: block (secure)"))
+        report.add(
+            Check("Default verdict", True, 15, "✓ default_verdict: block (secure)")
+        )
     else:
         report.add(
             Check(
@@ -152,10 +172,23 @@ def run_doctor(
 
     # --- Check 5: Builtin detectors ---
     detectors = config.get("sanitizer", {}).get("builtin_detectors", [])
-    all_detectors = {"path_traversal", "shell_injection", "sql_injection", "ssrf", "url_schemes"}
+    all_detectors = {
+        "path_traversal",
+        "shell_injection",
+        "sql_injection",
+        "ssrf",
+        "url_schemes",
+    }
     enabled = set(detectors) & all_detectors
     if len(enabled) == len(all_detectors):
-        report.add(Check("Builtin detectors", True, 15, f"✓ All {len(all_detectors)} detectors enabled"))
+        report.add(
+            Check(
+                "Builtin detectors",
+                True,
+                15,
+                f"✓ All {len(all_detectors)} detectors enabled",
+            )
+        )
     elif enabled:
         report.add(
             Check(
@@ -194,15 +227,22 @@ def run_doctor(
 
     # --- Check 7: Exec/shell protection ---
     has_exec_block = any(
-        r.get("then") == "block" and _tool_matches(r.get("when", {}), {"exec", "shell", "run_command", "system"})
+        r.get("then") == "block"
+        and _tool_matches(r.get("when", {}), {"exec", "shell", "run_command", "system"})
         for r in rules
     )
     if has_exec_block:
-        report.add(Check("Exec protection", True, 10, "✓ Shell/exec blocking rules present"))
+        report.add(
+            Check("Exec protection", True, 10, "✓ Shell/exec blocking rules present")
+        )
     else:
         report.add(
             Check(
-                "Exec protection", False, 10, "⚠ No exec/shell blocking rules", "Add a block rule for exec/shell tools"
+                "Exec protection",
+                False,
+                10,
+                "⚠ No exec/shell blocking rules",
+                "Add a block rule for exec/shell tools",
             )
         )
 
@@ -224,10 +264,20 @@ def run_doctor(
     # --- Check 9: Approval flows ---
     has_approve = any(r.get("then") == "approve" for r in rules)
     if has_approve:
-        report.add(Check("Approval flows", True, 10, "✓ Human-in-the-loop approval rules present"))
+        report.add(
+            Check(
+                "Approval flows", True, 10, "✓ Human-in-the-loop approval rules present"
+            )
+        )
     else:
         report.add(
-            Check("Approval flows", False, 10, "⚠ No approval rules", "Add 'then: approve' for sensitive operations")
+            Check(
+                "Approval flows",
+                False,
+                10,
+                "⚠ No approval rules",
+                "Add 'then: approve' for sensitive operations",
+            )
         )
 
     # --- Check 10: Tracing ---
@@ -235,7 +285,15 @@ def run_doctor(
     if trace.get("enabled", False):
         report.add(Check("Tracing", True, 5, "✓ Tracing enabled"))
     else:
-        report.add(Check("Tracing", False, 5, "⚠ Tracing disabled", "Enable trace.enabled in policyshield.yaml"))
+        report.add(
+            Check(
+                "Tracing",
+                False,
+                5,
+                "⚠ Tracing disabled",
+                "Enable trace.enabled in policyshield.yaml",
+            )
+        )
 
     report.finalize()
     return report

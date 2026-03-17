@@ -55,7 +55,9 @@ def _validate_remote_url(url: str) -> None:
     if not host:
         raise ValueError("Remote rules URL has no host")
     if _is_private_address(host):
-        raise ValueError(f"Remote rules URL resolves to a private/internal address: {host!r}")
+        raise ValueError(
+            f"Remote rules URL resolves to a private/internal address: {host!r}"
+        )
 
 
 class RemoteRuleLoader:
@@ -144,7 +146,12 @@ class RemoteRuleLoader:
             # Verify signature if key is configured
             if self._signature_key:
                 server_sig = resp.headers.get("X-PolicyShield-Signature", "")
-                expected = "sha256=" + hmac.HMAC(self._signature_key.encode(), body, hashlib.sha256).hexdigest()
+                expected = (
+                    "sha256="
+                    + hmac.HMAC(
+                        self._signature_key.encode(), body, hashlib.sha256
+                    ).hexdigest()
+                )
                 if not hmac.compare_digest(expected, server_sig):
                     logger.error("Remote rules signature verification FAILED")
                     return None

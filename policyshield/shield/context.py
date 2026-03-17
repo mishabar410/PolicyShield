@@ -30,7 +30,9 @@ class ContextEvaluator:
         try:
             self._tz = ZoneInfo(tz)
         except (KeyError, Exception) as e:
-            raise ValueError(f"Invalid timezone: {tz!r}. Must be a valid IANA timezone.") from e
+            raise ValueError(
+                f"Invalid timezone: {tz!r}. Must be a valid IANA timezone."
+            ) from e
 
     # ------------------------------------------------------------------
     # Public API

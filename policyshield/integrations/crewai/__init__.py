@@ -12,5 +12,7 @@ except ImportError:
 
     def __getattr__(name: str):  # type: ignore[misc]
         if name in __all__:
-            raise ImportError(f"Cannot import '{name}' — crewai is not installed. Install it with: pip install crewai")
+            raise ImportError(
+                f"Cannot import '{name}' — crewai is not installed. Install it with: pip install crewai"
+            )
         raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

@@ -11,7 +11,15 @@ from typing import Any
 from policyshield.core.models import RuleConfig, RuleSet
 
 # Fields to compare (skip 'id' since it's the match key)
-_COMPARE_FIELDS = ("description", "when", "then", "message", "severity", "enabled", "approval_strategy")
+_COMPARE_FIELDS = (
+    "description",
+    "when",
+    "then",
+    "message",
+    "severity",
+    "enabled",
+    "approval_strategy",
+)
 
 
 @dataclass
@@ -85,7 +93,9 @@ class PolicyDiffer:
                 new_cmp = new_val.value if hasattr(new_val, "value") else new_val
 
                 if old_cmp != new_cmp:
-                    changes.append(FieldChange(field=fld, old_value=old_cmp, new_value=new_cmp))
+                    changes.append(
+                        FieldChange(field=fld, old_value=old_cmp, new_value=new_cmp)
+                    )
 
             if changes:
                 result.modified.append(RuleModification(rule_id=rid, changes=changes))
@@ -101,12 +111,16 @@ class PolicyDiffer:
 
         for rule in diff.added:
             lines.append(f"+ ADDED: {rule.id}")
-            lines.append(f"  → {rule.then.value} [{rule.severity.value}] {rule.description!r}")
+            lines.append(
+                f"  → {rule.then.value} [{rule.severity.value}] {rule.description!r}"
+            )
             lines.append("")
 
         for rule in diff.removed:
             lines.append(f"- REMOVED: {rule.id}")
-            lines.append(f"  → {rule.then.value} [{rule.severity.value}] {rule.description!r}")
+            lines.append(
+                f"  → {rule.then.value} [{rule.severity.value}] {rule.description!r}"
+            )
             lines.append("")
 
         for mod in diff.modified:
@@ -131,12 +145,21 @@ class PolicyDiffer:
     def diff_to_dict(diff: RuleDiff) -> dict:
         """Convert *diff* to a JSON-serializable dict."""
         return {
-            "added": [{"id": r.id, "then": r.then.value, "severity": r.severity.value} for r in diff.added],
-            "removed": [{"id": r.id, "then": r.then.value, "severity": r.severity.value} for r in diff.removed],
+            "added": [
+                {"id": r.id, "then": r.then.value, "severity": r.severity.value}
+                for r in diff.added
+            ],
+            "removed": [
+                {"id": r.id, "then": r.then.value, "severity": r.severity.value}
+                for r in diff.removed
+            ],
             "modified": [
                 {
                     "rule_id": m.rule_id,
-                    "changes": [{"field": c.field, "old": c.old_value, "new": c.new_value} for c in m.changes],
+                    "changes": [
+                        {"field": c.field, "old": c.old_value, "new": c.new_value}
+                        for c in m.changes
+                    ],
                 }
                 for m in diff.modified
             ],

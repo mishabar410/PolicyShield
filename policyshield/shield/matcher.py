@@ -6,7 +6,13 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from policyshield.core.models import ChainCondition, RuleConfig, RuleSet, Severity, Verdict
+from policyshield.core.models import (
+    ChainCondition,
+    RuleConfig,
+    RuleSet,
+    Severity,
+    Verdict,
+)
 from policyshield.shield.context import ContextEvaluator
 
 # Maximum length for regex patterns to prevent ReDoS
@@ -51,7 +57,9 @@ class CompiledRule:
                 compiled.tool_pattern = re.compile(f"^({'|'.join(escaped)})$")
             else:
                 if len(str(tool)) > MAX_PATTERN_LENGTH:
-                    raise ValueError(f"Tool pattern in rule '{rule.id}' exceeds {MAX_PATTERN_LENGTH} characters")
+                    raise ValueError(
+                        f"Tool pattern in rule '{rule.id}' exceeds {MAX_PATTERN_LENGTH} characters"
+                    )
                 # If the pattern looks like a literal name (no regex metacharacters),
                 # escape it to prevent accidental regex interpretation.
                 tool_str = str(tool)
@@ -94,13 +102,17 @@ class CompiledRule:
                         f"Regex pattern for field '{field_name}' in rule "
                         f"'{rule.id}' exceeds {MAX_PATTERN_LENGTH} characters"
                     )
-                compiled.arg_patterns.append((field_name, predicate, re.compile(value), value))
+                compiled.arg_patterns.append(
+                    (field_name, predicate, re.compile(value), value)
+                )
 
         # Compile sender pattern
         sender = when.get("sender")
         if sender:
             if len(str(sender)) > MAX_PATTERN_LENGTH:
-                raise ValueError(f"Sender pattern in rule '{rule.id}' exceeds {MAX_PATTERN_LENGTH} characters")
+                raise ValueError(
+                    f"Sender pattern in rule '{rule.id}' exceeds {MAX_PATTERN_LENGTH} characters"
+                )
             compiled.sender_pattern = re.compile(f"^{sender}$")
 
         # Extract context conditions
@@ -197,7 +209,9 @@ class MatcherEngine:
 
         matching: list[CompiledRule] = []
         for compiled in candidates:
-            if self._matches(compiled, tool_name, args, session_state, sender, event_buffer, context):
+            if self._matches(
+                compiled, tool_name, args, session_state, sender, event_buffer, context
+            ):
                 matching.append(compiled)
 
         # Sort: lower priority number wins (ascending), then most restrictive verdict as tiebreaker
@@ -224,7 +238,9 @@ class MatcherEngine:
         Returns:
             The most restrictive matching rule, or None.
         """
-        matches = self.find_matching_rules(tool_name, args, session_state, sender, event_buffer, context)
+        matches = self.find_matching_rules(
+            tool_name, args, session_state, sender, event_buffer, context
+        )
         return matches[0] if matches else None
 
     def _matches(
@@ -273,13 +289,21 @@ class MatcherEngine:
                 actual = session_state.get(key)
                 if isinstance(condition, dict):
                     # Comparison operators
-                    if "gt" in condition and not (actual is not None and actual > condition["gt"]):
+                    if "gt" in condition and not (
+                        actual is not None and actual > condition["gt"]
+                    ):
                         return False
-                    if "gte" in condition and not (actual is not None and actual >= condition["gte"]):
+                    if "gte" in condition and not (
+                        actual is not None and actual >= condition["gte"]
+                    ):
                         return False
-                    if "lt" in condition and not (actual is not None and actual < condition["lt"]):
+                    if "lt" in condition and not (
+                        actual is not None and actual < condition["lt"]
+                    ):
                         return False
-                    if "lte" in condition and not (actual is not None and actual <= condition["lte"]):
+                    if "lte" in condition and not (
+                        actual is not None and actual <= condition["lte"]
+                    ):
                         return False
                     if "eq" in condition and actual != condition["eq"]:
                         return False
@@ -301,7 +325,9 @@ class MatcherEngine:
                 return False
 
         # Check chain conditions
-        if compiled.compiled_chain and not self._check_chain(compiled.compiled_chain, event_buffer):
+        if compiled.compiled_chain and not self._check_chain(
+            compiled.compiled_chain, event_buffer
+        ):
             return False
 
         return True

@@ -191,13 +191,16 @@ class PolicyCompiler:
                     errors.append(f"Rule {i}: missing 'when'")
                 elif isinstance(rule["when"], dict):
                     import re as _re
+
                     for field_name in ("tool", "args_match"):
                         pattern_val = rule["when"].get(field_name)
                         if pattern_val and isinstance(pattern_val, str):
                             try:
                                 _re.compile(pattern_val)
                             except _re.error as e:
-                                errors.append(f"Rule {i}: invalid regex in 'when.{field_name}': {e}")
+                                errors.append(
+                                    f"Rule {i}: invalid regex in 'when.{field_name}': {e}"
+                                )
                 if "then" not in rule:
                     errors.append(f"Rule {i}: missing 'then'")
                 elif rule["then"] not in ("BLOCK", "ALLOW", "REDACT", "APPROVE"):
@@ -231,7 +234,9 @@ class PolicyCompiler:
 
         user_msg = f"Convert to PolicyShield YAML rules:\n\n{self._sanitize_description(description)}"
         if errors:
-            user_msg += "\n\nPrevious attempt had errors:\n" + "\n".join(f"- {e}" for e in errors)
+            user_msg += "\n\nPrevious attempt had errors:\n" + "\n".join(
+                f"- {e}" for e in errors
+            )
             user_msg += "\n\nFix these errors and output corrected YAML."
 
         async with httpx.AsyncClient(timeout=10.0) as client:

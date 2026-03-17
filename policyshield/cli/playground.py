@@ -35,7 +35,9 @@ def _print_result(result: object) -> None:
     if hasattr(result, "pii_types") and result.pii_types:
         print(f"    PII detected: {', '.join(result.pii_types)}")
     if hasattr(result, "redacted_args") and result.redacted_args:
-        print(f"    Redacted args: {json.dumps(result.redacted_args, ensure_ascii=False)}")
+        print(
+            f"    Redacted args: {json.dumps(result.redacted_args, ensure_ascii=False)}"
+        )
 
 
 def cmd_playground(rules_path: str) -> int:
@@ -61,7 +63,9 @@ def cmd_playground(rules_path: str) -> int:
     engine = ShieldEngine(ruleset)
 
     print("🛡️  PolicyShield Playground")
-    print(f"   Rules: {ruleset.shield_name} v{ruleset.version} ({engine.rule_count} rules)")
+    print(
+        f"   Rules: {ruleset.shield_name} v{ruleset.version} ({engine.rule_count} rules)"
+    )
     print()
     print("   Enter tool calls to test against your rules.")
     print("   Format: tool_name [arg1=val1 arg2=val2 ...]")
@@ -96,7 +100,9 @@ def cmd_playground(rules_path: str) -> int:
         if line == ":rules" or line == ":r":
             for rule in ruleset.rules:
                 status = "✓" if rule.enabled else "○"
-                print(f"  {status} {rule.id} → {rule.then.value} [{rule.severity.value}]")
+                print(
+                    f"  {status} {rule.id} → {rule.then.value} [{rule.severity.value}]"
+                )
             continue
 
         # Parse tool call
@@ -113,7 +119,11 @@ def cmd_playground(rules_path: str) -> int:
                     args[k] = v
                 else:
                     # Treat as positional — put in "command" key
-                    args["command"] = token if "command" not in args else args["command"] + " " + token
+                    args["command"] = (
+                        token
+                        if "command" not in args
+                        else args["command"] + " " + token
+                    )
 
         # Run check
         try:
@@ -189,5 +199,9 @@ def run_single_check(rules_path: str, tool: str, args_json: str | None = None) -
     result = engine.check(tool, args)
     _print_result(result)
 
-    verdict = result.verdict.value if hasattr(result.verdict, "value") else str(result.verdict)
+    verdict = (
+        result.verdict.value
+        if hasattr(result.verdict, "value")
+        else str(result.verdict)
+    )
     return 0 if verdict == "ALLOW" else 1
