@@ -30,18 +30,14 @@ def create_dashboard_app(
         from starlette.middleware.cors import CORSMiddleware
         from fastapi import Depends, HTTPException, Request
     except ImportError:
-        raise ImportError(
-            "Dashboard requires 'fastapi'. Install with: pip install policyshield[dashboard]"
-        )
+        raise ImportError("Dashboard requires 'fastapi'. Install with: pip install policyshield[dashboard]")
 
     from policyshield import __version__
 
     _dashboard_api_token = os.environ.get("POLICYSHIELD_API_TOKEN") or None
     if _dashboard_api_token == "":
         _dashboard_api_token = None
-        logger.warning(
-            "POLICYSHIELD_API_TOKEN is set to empty string — dashboard auth disabled"
-        )
+        logger.warning("POLICYSHIELD_API_TOKEN is set to empty string — dashboard auth disabled")
 
     async def _verify_dashboard_token(request: Request) -> None:
         if _dashboard_api_token is None:

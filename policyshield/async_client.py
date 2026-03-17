@@ -41,9 +41,7 @@ class AsyncPolicyShieldClient:
         headers: dict[str, str] = {}
         if token:
             headers["Authorization"] = f"Bearer {token}"
-        self._client = httpx.AsyncClient(
-            base_url=base_url, headers=headers, timeout=timeout
-        )
+        self._client = httpx.AsyncClient(base_url=base_url, headers=headers, timeout=timeout)
         self._retries = max_retries
         self._backoff_factor = backoff_factor
 
@@ -77,9 +75,7 @@ class AsyncPolicyShieldClient:
                 await asyncio.sleep(delay)
         raise last_exc  # type: ignore[misc]
 
-    async def check(
-        self, tool_name: str, args: dict | None = None, **kwargs
-    ) -> CheckResult:
+    async def check(self, tool_name: str, args: dict | None = None, **kwargs) -> CheckResult:
         """Async check a tool call against PolicyShield rules."""
         payload = {"tool_name": tool_name, "args": args or {}, **kwargs}
         resp = await self._request("POST", "/check", json=payload)
@@ -102,9 +98,7 @@ class AsyncPolicyShieldClient:
     async def close(self) -> None:
         await self._client.aclose()
 
-    async def post_check(
-        self, tool_name: str, result: str, session_id: str = "default"
-    ) -> dict:
+    async def post_check(self, tool_name: str, result: str, session_id: str = "default") -> dict:
         """Post-call check on tool output for PII."""
         resp = await self._request(
             "POST",

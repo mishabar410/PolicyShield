@@ -79,17 +79,9 @@ class PolicyShieldClient:
             payload["context"] = context
         resp = self._client.post("/api/v1/check", json=payload)
         resp.raise_for_status()
-        return CheckResult(
-            **{
-                k: v
-                for k, v in resp.json().items()
-                if k in CheckResult.__dataclass_fields__
-            }
-        )
+        return CheckResult(**{k: v for k, v in resp.json().items() if k in CheckResult.__dataclass_fields__})
 
-    def post_check(
-        self, tool_name: str, result: str, session_id: str = "default"
-    ) -> dict:
+    def post_check(self, tool_name: str, result: str, session_id: str = "default") -> dict:
         """Post-call check on tool output for PII."""
         resp = self._client.post(
             "/api/v1/post-check",
@@ -169,9 +161,7 @@ class AsyncPolicyShieldClient:
         headers: dict[str, str] = {"Content-Type": "application/json"}
         if api_token:
             headers["Authorization"] = f"Bearer {api_token}"
-        self._client = httpx.AsyncClient(
-            base_url=base_url, headers=headers, timeout=timeout
-        )
+        self._client = httpx.AsyncClient(base_url=base_url, headers=headers, timeout=timeout)
 
     async def check(
         self,
@@ -193,13 +183,7 @@ class AsyncPolicyShieldClient:
             payload["context"] = context
         resp = await self._client.post("/api/v1/check", json=payload)
         resp.raise_for_status()
-        return CheckResult(
-            **{
-                k: v
-                for k, v in resp.json().items()
-                if k in CheckResult.__dataclass_fields__
-            }
-        )
+        return CheckResult(**{k: v for k, v in resp.json().items() if k in CheckResult.__dataclass_fields__})
 
     async def health(self) -> dict:
         """Get server health status."""
@@ -221,9 +205,7 @@ class AsyncPolicyShieldClient:
     async def close(self) -> None:
         await self._client.aclose()
 
-    async def post_check(
-        self, tool_name: str, result: str, session_id: str = "default"
-    ) -> dict:
+    async def post_check(self, tool_name: str, result: str, session_id: str = "default") -> dict:
         """Post-call check on tool output for PII."""
         resp = await self._client.post(
             "/api/v1/post-check",

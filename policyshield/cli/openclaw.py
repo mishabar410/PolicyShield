@@ -33,37 +33,23 @@ def add_openclaw_subcommands(subparsers: argparse._SubParsersAction) -> None:
     oc_subs = oc_parser.add_subparsers(dest="openclaw_command")
 
     # setup
-    setup_p = oc_subs.add_parser(
-        "setup", help="One-command OpenClaw ↔ PolicyShield setup"
-    )
-    setup_p.add_argument(
-        "--rules-dir", default=".", help="Directory for rules.yaml (default: .)"
-    )
+    setup_p = oc_subs.add_parser("setup", help="One-command OpenClaw ↔ PolicyShield setup")
+    setup_p.add_argument("--rules-dir", default=".", help="Directory for rules.yaml (default: .)")
     setup_p.add_argument(
         "--port",
         type=int,
         default=8100,
         help="PolicyShield server port (default: 8100)",
     )
-    setup_p.add_argument(
-        "--no-server", action="store_true", help="Skip starting the server"
-    )
-    setup_p.add_argument(
-        "--api-token", default=None, help="Set API token for server auth"
-    )
+    setup_p.add_argument("--no-server", action="store_true", help="Skip starting the server")
+    setup_p.add_argument("--api-token", default=None, help="Set API token for server auth")
 
     # teardown
-    td_p = oc_subs.add_parser(
-        "teardown", help="Stop the PolicyShield server started by setup"
-    )
-    td_p.add_argument(
-        "--rules-dir", default=".", help="Directory containing .policyshield.pid"
-    )
+    td_p = oc_subs.add_parser("teardown", help="Stop the PolicyShield server started by setup")
+    td_p.add_argument("--rules-dir", default=".", help="Directory containing .policyshield.pid")
 
     # status
-    oc_subs.add_parser(
-        "status", help="Check PolicyShield ↔ OpenClaw integration status"
-    )
+    oc_subs.add_parser("status", help="Check PolicyShield ↔ OpenClaw integration status")
 
 
 def cmd_openclaw(parsed: argparse.Namespace) -> int:
@@ -145,9 +131,7 @@ def _cmd_setup(parsed: argparse.Namespace) -> int:
         # Wait for server to start
         for _ in range(20):
             try:
-                urllib.request.urlopen(
-                    f"http://localhost:{port}/api/v1/health", timeout=1
-                )
+                urllib.request.urlopen(f"http://localhost:{port}/api/v1/health", timeout=1)
                 break
             except Exception:
                 time.sleep(0.5)
@@ -227,13 +211,9 @@ def _cmd_setup(parsed: argparse.Namespace) -> int:
     # Step 5: Verify
     print("→ [5/5] Verifying connection...")
     try:
-        resp = urllib.request.urlopen(
-            f"http://localhost:{port}/api/v1/health", timeout=5
-        )
+        resp = urllib.request.urlopen(f"http://localhost:{port}/api/v1/health", timeout=5)
         data = json.loads(resp.read())
-        print(
-            f"  ✓ Server healthy: {data.get('rules_count', '?')} rules loaded, mode={data.get('mode', '?')}"
-        )
+        print(f"  ✓ Server healthy: {data.get('rules_count', '?')} rules loaded, mode={data.get('mode', '?')}")
     except Exception as e:
         print(f"  ✗ Health check failed: {e}", file=sys.stderr)
         return 1
@@ -265,11 +245,7 @@ def _cmd_teardown(parsed: argparse.Namespace) -> int:
         try:
             _cmdline_path = Path(f"/proc/{pid}/cmdline")
             if _cmdline_path.exists():
-                _proc_name = (
-                    _cmdline_path.read_bytes()
-                    .replace(b"\x00", b" ")
-                    .decode(errors="replace")
-                )
+                _proc_name = _cmdline_path.read_bytes().replace(b"\x00", b" ").decode(errors="replace")
             else:
                 import subprocess as _sp
 
@@ -307,17 +283,13 @@ def _cmd_status() -> int:
     try:
         resp = urllib.request.urlopen("http://localhost:8100/api/v1/health", timeout=2)
         data = json.loads(resp.read())
-        print(
-            f"Server: ✓ running ({data.get('rules_count', '?')} rules, {data.get('mode', '?')})"
-        )
+        print(f"Server: ✓ running ({data.get('rules_count', '?')} rules, {data.get('mode', '?')})")
     except Exception:
         print("Server: ✗ not reachable")
 
     # Check plugin
     if shutil.which("openclaw"):
-        result = subprocess.run(
-            ["openclaw", "plugins", "list"], capture_output=True, text=True
-        )
+        result = subprocess.run(["openclaw", "plugins", "list"], capture_output=True, text=True)
         if "policyshield" in result.stdout.lower():
             print("Plugin: ✓ installed")
         else:

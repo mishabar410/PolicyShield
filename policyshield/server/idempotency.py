@@ -48,8 +48,6 @@ class IdempotencyCache:
             if self._inserts_since_eviction >= self._EVICT_EVERY_N:
                 self._inserts_since_eviction = 0
                 now = monotonic()
-                stale = [
-                    k for k, (ts, _) in self._cache.items() if now - ts >= self._ttl
-                ]
+                stale = [k for k, (ts, _) in self._cache.items() if now - ts >= self._ttl]
                 for k in stale:
                     del self._cache[k]

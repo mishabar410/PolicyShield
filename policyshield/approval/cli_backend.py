@@ -39,9 +39,7 @@ class CLIBackend(ApprovalBackend):
         self._output.write(f"   Message: {request.message}\n")
         self._output.flush()
 
-    def wait_for_response(
-        self, request_id: str, timeout: float = 300.0
-    ) -> ApprovalResponse | None:
+    def wait_for_response(self, request_id: str, timeout: float = 300.0) -> ApprovalResponse | None:
         # Check if already responded programmatically
         if request_id in self._responses:
             self._pending.pop(request_id, None)

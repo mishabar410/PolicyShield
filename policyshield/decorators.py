@@ -58,9 +58,7 @@ def shield(
                 # Issue #205: support callable session_id for per-request resolution
                 sid = session_id() if callable(session_id) else session_id
                 ctx = context() if callable(context) else context
-                result = await engine.check(
-                    name, all_kwargs, session_id=sid, context=ctx
-                )
+                result = await engine.check(name, all_kwargs, session_id=sid, context=ctx)
                 if result.verdict == Verdict.BLOCK:
                     if on_block == "raise":
                         raise PermissionError(f"PolicyShield blocked: {result.message}")
@@ -80,16 +78,12 @@ def shield(
                 # functions with *args or **kwargs variadic signatures. In such
                 # cases, the fallback is kwargs-only rebuild.
                 if result.modified_args:
-                    args, kwargs = _rebuild_args(
-                        func, result.modified_args, args, kwargs
-                    )
+                    args, kwargs = _rebuild_args(func, result.modified_args, args, kwargs)
                 func_result = await func(*args, **kwargs)
                 # Post-check: scan output for PII (Issue #28)
                 if hasattr(engine, "post_check"):
                     try:
-                        await engine.post_check(
-                            name, func_result, session_id=session_id
-                        )
+                        await engine.post_check(name, func_result, session_id=session_id)
                     except Exception:
                         pass  # fail-open on post_check errors
                 return func_result
@@ -120,9 +114,7 @@ def shield(
                         "message": result.message,
                     }
                 if result.modified_args:
-                    args, kwargs = _rebuild_args(
-                        func, result.modified_args, args, kwargs
-                    )
+                    args, kwargs = _rebuild_args(func, result.modified_args, args, kwargs)
                 func_result = func(*args, **kwargs)
                 # Post-check: scan output for PII (Issue #28)
                 if hasattr(engine, "post_check"):
@@ -151,9 +143,7 @@ def guard(
         def run(cmd): ...
     """
     _engine = engine or _get_default_engine()
-    return shield(
-        _engine, tool_name=tool_name, on_block=on_block, session_id=session_id
-    )
+    return shield(_engine, tool_name=tool_name, on_block=on_block, session_id=session_id)
 
 
 _default_engine: Any = None

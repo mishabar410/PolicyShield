@@ -151,9 +151,7 @@ def format_stats(stats: TraceStats) -> str:
     lines.append(f"  Total calls:     {stats.total_calls}")
     lines.append(f"  Sessions:        {stats.session_count}")
     if stats.time_range:
-        lines.append(
-            f"  Time range:      {stats.time_range[0]} → {stats.time_range[1]}"
-        )
+        lines.append(f"  Time range:      {stats.time_range[0]} → {stats.time_range[1]}")
     lines.append(f"  Block rate:      {stats.block_rate * 100:.1f}%")
     lines.append("")
 

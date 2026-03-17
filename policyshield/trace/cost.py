@@ -59,9 +59,7 @@ BUILTIN_PRICING: dict[str, ModelPricing] = {
     "claude-3-haiku": ModelPricing("claude-3-haiku", 0.00025, 0.00125),
 }
 
-DEFAULT_TOOL_PROFILE = ToolCostProfile(
-    "_default", avg_input_tokens=200, avg_output_tokens=500
-)
+DEFAULT_TOOL_PROFILE = ToolCostProfile("_default", avg_input_tokens=200, avg_output_tokens=500)
 
 
 class CostEstimator:
@@ -80,9 +78,7 @@ class CostEstimator:
     def _get_pricing(self) -> ModelPricing:
         if self._model in self._pricing:
             return self._pricing[self._model]
-        raise ValueError(
-            f"No pricing for model '{self._model}'. Available: {list(self._pricing.keys())}"
-        )
+        raise ValueError(f"No pricing for model '{self._model}'. Available: {list(self._pricing.keys())}")
 
     def _get_tool_profile(self, tool: str) -> ToolCostProfile:
         return self._tool_profiles.get(tool, DEFAULT_TOOL_PROFILE)
@@ -155,12 +151,8 @@ def format_cost_estimate(est: CostEstimate) -> str:
     """Format cost estimate for CLI display."""
     lines: list[str] = []
     lines.append(f"Cost Estimate (model: {est.model})")
-    lines.append(
-        f"  Allowed calls:  {est.allowed_calls:>6,d}  →  ${est.estimated_cost_allowed:.2f}"
-    )
-    lines.append(
-        f"  Blocked calls:  {est.blocked_calls:>6,d}  →  ${est.estimated_cost_blocked:.2f} saved"
-    )
+    lines.append(f"  Allowed calls:  {est.allowed_calls:>6,d}  →  ${est.estimated_cost_allowed:.2f}")
+    lines.append(f"  Blocked calls:  {est.blocked_calls:>6,d}  →  ${est.estimated_cost_blocked:.2f} saved")
     lines.append(f"  Total (without shield):  ${est.estimated_cost_total:.2f}")
     lines.append("")
 

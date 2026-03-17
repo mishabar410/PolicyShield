@@ -41,11 +41,7 @@ class InMemoryRateLimiter:
         if now - self._last_cleanup < self._cleanup_interval:
             return
         self._last_cleanup = now
-        stale_keys = [
-            k
-            for k, dq in self._requests.items()
-            if not dq or (now - dq[-1]) > self._window * 2
-        ]
+        stale_keys = [k for k, dq in self._requests.items() if not dq or (now - dq[-1]) > self._window * 2]
         for k in stale_keys:
             del self._requests[k]
 
@@ -60,9 +56,7 @@ class APIRateLimiter:
     ) -> None:
         self._max_requests = max_requests
         self._window = window_seconds
-        self._limiter = InMemoryRateLimiter(
-            max_requests=max_requests, window_seconds=window_seconds
-        )
+        self._limiter = InMemoryRateLimiter(max_requests=max_requests, window_seconds=window_seconds)
 
     def is_allowed(self, key: str) -> bool:
         return self._limiter.is_allowed(key)

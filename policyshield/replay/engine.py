@@ -119,8 +119,6 @@ class ReplayEngine:
             "unchanged": len(results) - len(changed),
             "changed": len(changed),
             "relaxed": sum(1 for r in changed if r.change_type == ChangeType.RELAXED),
-            "tightened": sum(
-                1 for r in changed if r.change_type == ChangeType.TIGHTENED
-            ),
+            "tightened": sum(1 for r in changed if r.change_type == ChangeType.TIGHTENED),
             "modified": sum(1 for r in changed if r.change_type == ChangeType.MODIFIED),
         }

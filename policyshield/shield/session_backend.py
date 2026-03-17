@@ -124,9 +124,7 @@ class InMemorySessionBackend(SessionBackend):
             "total_created": self.total_created,
             "hits": self.hits,
             "misses": self.misses,
-            "hit_ratio": (
-                round(self.hits / total_requests, 3) if total_requests else 0.0
-            ),
+            "hit_ratio": (round(self.hits / total_requests, 3) if total_requests else 0.0),
         }
 
     # --- internals ---
@@ -197,9 +195,7 @@ class RedisSessionBackend(SessionBackend):
         cursor, keys = self._client.scan(0, match=f"{self._prefix}*", count=100)
         total = len(keys)
         while cursor:
-            cursor, keys = self._client.scan(
-                cursor, match=f"{self._prefix}*", count=100
-            )
+            cursor, keys = self._client.scan(cursor, match=f"{self._prefix}*", count=100)
             total += len(keys)
         return total
 

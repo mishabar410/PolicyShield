@@ -251,9 +251,7 @@ def _load_rules_from_dir(dir_path: Path) -> RuleSet:
     return ruleset
 
 
-def _resolve_includes(
-    data: dict, base_dir: Path, _visited: set[Path] | None = None
-) -> dict:
+def _resolve_includes(data: dict, base_dir: Path, _visited: set[Path] | None = None) -> dict:
     """Resolve ``include:`` directives, merging rules from included files."""
     if _visited is None:
         _visited = set()
@@ -313,9 +311,7 @@ def _resolve_extends(rules: list[dict]) -> list[dict]:
             if extends:
                 parent = rules_by_id.get(extends)
                 if parent is None:
-                    raise PolicyShieldParseError(
-                        f"Rule extends unknown parent: {extends}"
-                    )
+                    raise PolicyShieldParseError(f"Rule extends unknown parent: {extends}")
                 # If parent itself still has extends, skip this round
                 if parent.get("extends"):
                     resolved.append(rule)
@@ -348,9 +344,7 @@ def _resolve_extends(rules: list[dict]) -> list[dict]:
     # Final check: any unresolved extends left?
     for rule in rules:
         if rule.get("extends"):
-            raise PolicyShieldParseError(
-                f"Circular or unresolvable extends in rule '{rule.get('id', '?')}'"
-            )
+            raise PolicyShieldParseError(f"Circular or unresolvable extends in rule '{rule.get('id', '?')}'")
 
     return rules
 
@@ -367,9 +361,7 @@ def _parse_output_rule(raw: dict, file_path: str | None = None) -> OutputRule:
         try:
             then = Verdict(raw["then"].upper())
         except (ValueError, AttributeError):
-            raise PolicyShieldParseError(
-                f"Invalid output_rule verdict '{raw['then']}'", file_path
-            )
+            raise PolicyShieldParseError(f"Invalid output_rule verdict '{raw['then']}'", file_path)
 
     return OutputRule(
         id=raw.get("id", f"output_{tool}"),
@@ -409,17 +401,13 @@ def _build_ruleset(data: dict, file_path: str) -> RuleSet:
     from policyshield.core.models import TaintChainConfig
 
     taint_chain_data = data.get("taint_chain", {})
-    taint_chain = (
-        TaintChainConfig(**taint_chain_data) if taint_chain_data else TaintChainConfig()
-    )
+    taint_chain = TaintChainConfig(**taint_chain_data) if taint_chain_data else TaintChainConfig()
 
     # Parse honeypots config (optional)
     honeypots_data = data.get("honeypots")
 
     # Parse output_rules (optional)
-    output_rules = [
-        _parse_output_rule(r, file_path) for r in data.get("output_rules", [])
-    ]
+    output_rules = [_parse_output_rule(r, file_path) for r in data.get("output_rules", [])]
 
     ruleset = RuleSet(
         shield_name=shield_name,

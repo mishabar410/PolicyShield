@@ -194,16 +194,12 @@ BUILTIN_PATTERNS: list[PIIPattern] = [
     ),
     PIIPattern(
         pii_type=PIIType.PASSPORT,
-        pattern=re.compile(
-            r"\b[A-Z]{2}\d{7}\b"
-        ),  # EU format: exactly 2 letters + 7 digits
+        pattern=re.compile(r"\b[A-Z]{2}\d{7}\b"),  # EU format: exactly 2 letters + 7 digits
         label="passport",
     ),
     PIIPattern(
         pii_type=PIIType.DATE_OF_BIRTH,
-        pattern=re.compile(
-            r"\b(?:\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}|\d{4}[/.-]\d{1,2}[/.-]\d{1,2})\b"
-        ),
+        pattern=re.compile(r"\b(?:\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}|\d{4}[/.-]\d{1,2}[/.-]\d{1,2})\b"),
         label="date_of_birth",
     ),
     # --- RU-specific patterns ---
@@ -229,9 +225,7 @@ BUILTIN_PATTERNS: list[PIIPattern] = [
     ),
     PIIPattern(
         pii_type=PIIType.RU_PHONE,
-        pattern=re.compile(
-            r"(?:\+7|8)[\s(-]*\d{3}[\s)-]*\d{3}[\s-]*\d{2}[\s-]*\d{2}\b"
-        ),
+        pattern=re.compile(r"(?:\+7|8)[\s(-]*\d{3}[\s)-]*\d{3}[\s-]*\d{2}[\s-]*\d{2}\b"),
         label="ru_phone",
     ),
 ]
@@ -370,11 +364,7 @@ class PIIDetector:
         """
         if len(text) <= keep_edges * 2:
             return mask_char * len(text)
-        return (
-            text[:keep_edges]
-            + mask_char * (len(text) - keep_edges * 2)
-            + text[-keep_edges:]
-        )
+        return text[:keep_edges] + mask_char * (len(text) - keep_edges * 2) + text[-keep_edges:]
 
     def redact_text(self, text: str) -> str:
         """Scan a string and return a copy with PII values masked.
@@ -415,9 +405,7 @@ class PIIDetector:
                 if match.span[1] > prev.span[1]:
                     extended_text = text[prev.span[0] : match.span[1]]
                     pii_type = (
-                        match.pii_type
-                        if match.span[1] - match.span[0] > prev.span[1] - prev.span[0]
-                        else prev.pii_type
+                        match.pii_type if match.span[1] - match.span[0] > prev.span[1] - prev.span[0] else prev.pii_type
                     )
                     merged[-1] = PIIMatch(
                         pii_type=pii_type,

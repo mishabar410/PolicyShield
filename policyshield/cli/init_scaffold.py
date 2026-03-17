@@ -41,9 +41,7 @@ _SECURITY_RULES: list[dict[str, Any]] = [
         "description": "Block destructive shell commands",
         "when": {
             "tool": "exec",
-            "args_match": {
-                "command": {"regex": r"rm\s+-rf|mkfs|dd\s+if=|format\s+c:|fdisk"}
-            },
+            "args_match": {"command": {"regex": r"rm\s+-rf|mkfs|dd\s+if=|format\s+c:|fdisk"}},
         },
         "then": "block",
         "severity": "critical",
@@ -202,9 +200,7 @@ _OPENCLAW_RULES: list[dict[str, Any]] = [
         "when": {
             "tool": "exec",
             "args_match": {
-                "command": {
-                    "regex": r"\b(rm\s+-rf|rm\s+-r\s+/|mkfs|dd\s+if=|chmod\s+777|chmod\s+-R\s+777)\b"
-                }
+                "command": {"regex": r"\b(rm\s+-rf|rm\s+-r\s+/|mkfs|dd\s+if=|chmod\s+777|chmod\s+-R\s+777)\b"}
             },
         },
         "then": "block",
@@ -216,9 +212,7 @@ _OPENCLAW_RULES: list[dict[str, Any]] = [
         "description": "Block remote code execution via curl|sh",
         "when": {
             "tool": "exec",
-            "args_match": {
-                "command": {"regex": r"curl.*\|.*sh|wget.*\|.*sh|curl.*\|.*bash"}
-            },
+            "args_match": {"command": {"regex": r"curl.*\|.*sh|wget.*\|.*sh|curl.*\|.*bash"}},
         },
         "then": "block",
         "severity": "critical",
@@ -244,9 +238,7 @@ _OPENCLAW_RULES: list[dict[str, Any]] = [
         "description": "Block environment variable dumps",
         "when": {
             "tool": "exec",
-            "args_match": {
-                "command": {"regex": r"\benv\b|\bprintenv\b|\bset\b.*export"}
-            },
+            "args_match": {"command": {"regex": r"\benv\b|\bprintenv\b|\bset\b.*export"}},
         },
         "then": "block",
         "severity": "high",
@@ -507,9 +499,7 @@ def _to_yaml_str(data: dict[str, Any], indent: int = 0) -> str:
     """Convert a dict to YAML string using pyyaml."""
     import yaml
 
-    return yaml.dump(
-        data, default_flow_style=False, allow_unicode=True, sort_keys=False
-    )
+    return yaml.dump(data, default_flow_style=False, allow_unicode=True, sort_keys=False)
 
 
 def scaffold(
@@ -646,9 +636,7 @@ def scaffold(
     else:
         test_file.write_text(
             "# Auto-generated test cases for rules\n"
-            + yaml.dump(
-                test_data, default_flow_style=False, allow_unicode=True, sort_keys=False
-            ),
+            + yaml.dump(test_data, default_flow_style=False, allow_unicode=True, sort_keys=False),
             encoding="utf-8",
         )
         created.append("tests/test_rules.yaml")

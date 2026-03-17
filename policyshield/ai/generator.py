@@ -94,9 +94,7 @@ def _build_examples(tool_names: list[str] | None) -> str:
     if tool_names:
         recs = recommend_rules(tool_names)
         for rec in recs[:3]:
-            examples.append(
-                f"# Recommended for '{rec.tool_name}' ({rec.danger_level.value}):"
-            )
+            examples.append(f"# Recommended for '{rec.tool_name}' ({rec.danger_level.value}):")
             examples.append(rec.yaml_snippet)
 
     return "\n\n".join(examples)
@@ -153,9 +151,7 @@ async def generate_rules(
     user_msg = f"Generate PolicyShield YAML rules for:\n\n{description}"
     if tool_names:
         classifications = classify_tools(tool_names)
-        tool_info = "\n".join(
-            f"  - {name}: {level.value}" for name, level in classifications.items()
-        )
+        tool_info = "\n".join(f"  - {name}: {level.value}" for name, level in classifications.items())
         user_msg += f"\n\nAvailable tools and their danger levels:\n{tool_info}"
 
     # Select provider
@@ -166,9 +162,7 @@ async def generate_rules(
         llm_call = _call_anthropic
         model = model or "claude-sonnet-4-20250514"
     else:
-        raise ValueError(
-            f"Unsupported provider: {provider}. Use 'openai' or 'anthropic'."
-        )
+        raise ValueError(f"Unsupported provider: {provider}. Use 'openai' or 'anthropic'.")
 
     yaml_text = ""
     last_error: str | None = None
@@ -204,9 +198,7 @@ async def _call_openai(system: str, user: str, model: str) -> str:
     try:
         from openai import AsyncOpenAI
     except ImportError:
-        raise RuntimeError(
-            "openai package is required. Install with: pip install openai"
-        )
+        raise RuntimeError("openai package is required. Install with: pip install openai")
 
     client = AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
     response = await client.chat.completions.create(
@@ -226,9 +218,7 @@ async def _call_anthropic(system: str, user: str, model: str) -> str:
     try:
         from anthropic import AsyncAnthropic
     except ImportError:
-        raise RuntimeError(
-            "anthropic package is required. Install with: pip install anthropic"
-        )
+        raise RuntimeError("anthropic package is required. Install with: pip install anthropic")
 
     client = AsyncAnthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
     response = await client.messages.create(

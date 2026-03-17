@@ -182,13 +182,9 @@ class AsyncShieldEngine(BaseShieldEngine):
 
         for pname, detector_fn in _get_detectors().items():
             try:
-                det_result = await asyncio.to_thread(
-                    detector_fn, tool_name=tool_name, args=raw_args
-                )
+                det_result = await asyncio.to_thread(detector_fn, tool_name=tool_name, args=raw_args)
                 if isinstance(det_result, _DR) and det_result.detected:
-                    logger.warning(
-                        "Plugin detector '%s' triggered: %s", pname, det_result.message
-                    )
+                    logger.warning("Plugin detector '%s' triggered: %s", pname, det_result.message)
                     return ShieldResult(
                         verdict=Verdict.BLOCK,
                         rule_id=f"__plugin__{pname}",
@@ -209,9 +205,7 @@ class AsyncShieldEngine(BaseShieldEngine):
 
         # Budget check — cost-based per-session/per-hour limits (atomic check+record)
         if self._budget_tracker is not None:
-            budget_ok, budget_msg = self._budget_tracker.check_and_record(
-                session_id, tool_name
-            )
+            budget_ok, budget_msg = self._budget_tracker.check_and_record(session_id, tool_name)
             if not budget_ok:
                 return ShieldResult(
                     verdict=Verdict.BLOCK,
@@ -226,9 +220,7 @@ class AsyncShieldEngine(BaseShieldEngine):
                 return ShieldResult(
                     verdict=Verdict.BLOCK,
                     rule_id="__pii_taint__",
-                    message=(
-                        f"Session tainted: {session.taint_details}. Outgoing calls blocked until reviewed."
-                    ),
+                    message=(f"Session tainted: {session.taint_details}. Outgoing calls blocked until reviewed."),
                 )
 
         # Session state for condition matching
@@ -238,9 +230,7 @@ class AsyncShieldEngine(BaseShieldEngine):
             matcher = self._matcher
             rule_set = self._rule_set
             pii_detector = self._pii  # Issue #109: snapshot PII detector
-            event_buffer = self._session_mgr.get_event_buffer(
-                session_id
-            )  # Issue #207: inside lock
+            event_buffer = self._session_mgr.get_event_buffer(session_id)  # Issue #207: inside lock
 
         # Offload CPU-bound matching to thread
         try:
@@ -266,15 +256,10 @@ class AsyncShieldEngine(BaseShieldEngine):
 
         if match is None:
             # LLM Guard — check for threats even when no rule matches
-            if self._llm_guard is not None and getattr(
-                self._llm_guard, "enabled", False
-            ):
+            if self._llm_guard is not None and getattr(self._llm_guard, "enabled", False):
                 try:
                     guard_result = await self._llm_guard.analyze(tool_name, args)
-                    if (
-                        guard_result.is_threat
-                        and guard_result.risk_score >= self._llm_guard.risk_threshold
-                    ):
+                    if guard_result.is_threat and guard_result.risk_score >= self._llm_guard.risk_threshold:
                         return ShieldResult(
                             verdict=Verdict.BLOCK,
                             rule_id="__llm_guard__",
@@ -314,9 +299,7 @@ class AsyncShieldEngine(BaseShieldEngine):
             )
         elif rule.then == Verdict.REDACT:
             # redact_dict scans for PII internally — no need for a separate scan
-            redacted, pii_matches = await asyncio.to_thread(
-                pii_detector.redact_dict, args
-            )
+            redacted, pii_matches = await asyncio.to_thread(pii_detector.redact_dict, args)
             for pm in pii_matches:
                 self._session_mgr.add_taint(session_id, pm.pii_type)
             result = self._verdict_builder.redact(
@@ -346,9 +329,7 @@ class AsyncShieldEngine(BaseShieldEngine):
                     event_buffer=event_buffer,
                     context=context,
                 )
-                shadow_verdict = (
-                    shadow_match.rule.then if shadow_match else Verdict.ALLOW
-                )
+                shadow_verdict = shadow_match.rule.then if shadow_match else Verdict.ALLOW
                 if shadow_match and shadow_match.rule.then != result.verdict:
                     logger.info(
                         "SHADOW: tool=%s verdict_diff: current=%s shadow=%s (rule=%s)",
@@ -362,11 +343,7 @@ class AsyncShieldEngine(BaseShieldEngine):
                         session_id=session_id,
                         tool=tool_name,
                         verdict=shadow_verdict if shadow_match else Verdict.ALLOW,
-                        rule_id=(
-                            f"__shadow__{shadow_match.rule.id}"
-                            if shadow_match
-                            else "__shadow__"
-                        ),
+                        rule_id=(f"__shadow__{shadow_match.rule.id}" if shadow_match else "__shadow__"),
                     )
             except Exception as e:
                 logger.warning("Shadow evaluation error: %s", e)
@@ -412,9 +389,7 @@ class AsyncShieldEngine(BaseShieldEngine):
         if hasattr(self._approval_backend, "_circuit_breaker"):
             cb = self._approval_backend._circuit_breaker
             if not cb.is_available():
-                verdict = (
-                    Verdict.BLOCK if cb.fallback_verdict == "BLOCK" else Verdict.ALLOW
-                )
+                verdict = Verdict.BLOCK if cb.fallback_verdict == "BLOCK" else Verdict.ALLOW
                 return ShieldResult(
                     verdict=verdict,
                     rule_id=rule.id,
@@ -431,9 +406,7 @@ class AsyncShieldEngine(BaseShieldEngine):
 
         # Check cache first
         if self._approval_cache is not None:
-            cached = self._approval_cache.get(
-                tool_name, rule.id, session_id, strategy=strategy
-            )
+            cached = self._approval_cache.get(tool_name, rule.id, session_id, strategy=strategy)
             if cached is not None:
                 if cached.approved:
                     return self._verdict_builder.allow(rule=rule, args=args)
@@ -489,6 +462,4 @@ class AsyncShieldEngine(BaseShieldEngine):
         Returns:
             PostCheckResult with PII matches and optional redacted output.
         """
-        return await asyncio.to_thread(
-            self._post_check_sync, tool_name, result, session_id
-        )
+        return await asyncio.to_thread(self._post_check_sync, tool_name, result, session_id)

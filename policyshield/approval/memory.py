@@ -60,9 +60,7 @@ class InMemoryBackend(ApprovalBackend):
             return
         now = monotonic()
         with self._lock:
-            expired = [
-                k for k, ts in self._created_at.items() if now - ts > self._gc_ttl
-            ]
+            expired = [k for k, ts in self._created_at.items() if now - ts > self._gc_ttl]
             for k in expired:
                 self._requests.pop(k, None)
                 self._responses.pop(k, None)
@@ -126,9 +124,7 @@ class InMemoryBackend(ApprovalBackend):
                     }
             return {"status": "pending", "responder": None}
 
-    def wait_for_response(
-        self, request_id: str, timeout: float = 300.0
-    ) -> ApprovalResponse | None:
+    def wait_for_response(self, request_id: str, timeout: float = 300.0) -> ApprovalResponse | None:
         # Issue #186: Read event under lock to prevent race with stop()
         with self._lock:
             event = self._events.get(request_id)

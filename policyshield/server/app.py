@@ -55,9 +55,7 @@ def _rules_hash(engine: AsyncShieldEngine) -> str:
     ruleset = engine.rules
     parts = [f"{ruleset.shield_name}:{ruleset.version}:{len(ruleset.rules)}"]
     for r in ruleset.rules:
-        parts.append(
-            f"|{r.id}:{r.then.value}:{r.severity}:{r.enabled}:{r.priority}:{r.when}"
-        )
+        parts.append(f"|{r.id}:{r.then.value}:{r.severity}:{r.enabled}:{r.priority}:{r.when}")
     parts.append(f"|dv:{ruleset.default_verdict.value}")
     for orule in getattr(ruleset, "output_rules", None) or []:
         parts.append(f"|o:{getattr(orule, 'id', '')}")
@@ -141,13 +139,9 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
             result = await engine.check("__self_test__", {})
             # Issue #218: Log verdict level — BLOCK from wildcard rules is still a valid engine
             if result.verdict.value == "BLOCK":
-                _logger.warning(
-                    "Self-test returned BLOCK (likely wildcard rule) — engine is operational"
-                )
+                _logger.warning("Self-test returned BLOCK (likely wildcard rule) — engine is operational")
             else:
-                _logger.info(
-                    "Startup self-test passed: verdict=%s", result.verdict.value
-                )
+                _logger.info("Startup self-test passed: verdict=%s", result.verdict.value)
         except Exception as e:
             _logger.critical("Startup self-test FAILED: %s", e)
             raise RuntimeError(f"Engine self-test failed: {e}") from e
@@ -248,9 +242,7 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
         if request.method in ("POST", "PUT", "PATCH"):
             if request.url.path in _json_only_paths:
                 ct = request.headers.get("content-type", "")
-                if (
-                    not ct or "application/json" not in ct
-                ):  # Issue #165: reject missing CT too
+                if not ct or "application/json" not in ct:  # Issue #165: reject missing CT too
                     return JSONResponse(
                         status_code=415,
                         content={
@@ -330,9 +322,7 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
         # phase. Use per-endpoint timeouts for streaming endpoints.
         if request.url.path.startswith("/api/"):
             try:
-                return await asyncio.wait_for(
-                    call_next(request), timeout=_request_timeout
-                )
+                return await asyncio.wait_for(call_next(request), timeout=_request_timeout)
             except asyncio.TimeoutError:
                 _logger.error(
                     "Request timeout (%.1fs) for %s",
@@ -354,9 +344,7 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
 
     _admin_limiter = _AdminRL(max_requests=10, window_seconds=60)
     _trusted_proxies: set[str] = {
-        h.strip()
-        for h in os.environ.get("POLICYSHIELD_TRUSTED_PROXIES", "").split(",")
-        if h.strip()
+        h.strip() for h in os.environ.get("POLICYSHIELD_TRUSTED_PROXIES", "").split(",") if h.strip()
     }
 
     @app.middleware("http")
@@ -370,9 +358,7 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
             else:
                 client_ip = direct_ip
             if not request.client:
-                _logger.warning(
-                    "Admin rate-limit: request.client is None (proxy misconfiguration?)"
-                )
+                _logger.warning("Admin rate-limit: request.client is None (proxy misconfiguration?)")
             if not _admin_limiter.is_allowed(client_ip):
                 return JSONResponse(
                     status_code=429,
@@ -393,15 +379,11 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
         if request.url.path in check_paths:
             client_key = request.client.host if request.client else "unknown"
             if not request.client:
-                _logger.warning(
-                    "API rate-limit: request.client is None (proxy misconfiguration?)"
-                )
+                _logger.warning("API rate-limit: request.client is None (proxy misconfiguration?)")
             # Use hash of API token as key if available (prevents prefix-rotation bypass)
             auth = request.headers.get("Authorization", "")
             if auth.startswith("Bearer ") and len(auth) > 7:
-                client_key = (
-                    f"token:{hashlib.sha256(auth[7:].encode()).hexdigest()[:16]}"
-                )
+                client_key = f"token:{hashlib.sha256(auth[7:].encode()).hexdigest()[:16]}"
             if not _api_limiter.is_allowed(client_key):
                 return JSONResponse(
                     status_code=429,
@@ -420,9 +402,7 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
     @app.exception_handler(Exception)
     async def shield_error_handler(request: Request, exc: Exception):
         """Return machine-readable verdict even on internal errors."""
-        _logger.error(
-            "Unhandled exception in %s: %s", request.url.path, exc, exc_info=True
-        )
+        _logger.error("Unhandled exception in %s: %s", request.url.path, exc, exc_info=True)
         verdict = "ALLOW" if getattr(engine, "_fail_open", False) else "BLOCK"
         detail: dict = {
             "verdict": verdict,
@@ -496,9 +476,7 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
             redacted_output=result.redacted_output,
         )
 
-    @app.get(
-        "/api/v1/constraints", response_model=ConstraintsResponse, dependencies=auth
-    )
+    @app.get("/api/v1/constraints", response_model=ConstraintsResponse, dependencies=auth)
     async def constraints() -> ConstraintsResponse:
         return ConstraintsResponse(summary=engine.get_policy_summary())
 
@@ -570,9 +548,7 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
         )
 
     # ── Approval poll timeout (316) ──
-    _approval_poll_timeout = float(
-        os.environ.get("POLICYSHIELD_APPROVAL_POLL_TIMEOUT", 30)
-    )
+    _approval_poll_timeout = float(os.environ.get("POLICYSHIELD_APPROVAL_POLL_TIMEOUT", 30))
 
     @app.post(
         "/api/v1/check-approval",
@@ -594,9 +570,7 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
             responder=result.get("responder"),
         )
 
-    @app.post(
-        "/api/v1/clear-taint", response_model=ClearTaintResponse, dependencies=auth
-    )
+    @app.post("/api/v1/clear-taint", response_model=ClearTaintResponse, dependencies=auth)
     async def clear_taint(req: ClearTaintRequest) -> ClearTaintResponse:
         """Clear PII taint from a session, re-enabling outgoing calls."""
         # Issue #199: Use SessionManager.clear_taint() for atomic get+clear
@@ -612,9 +586,7 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
         """Respond to a pending approval request (approve or deny)."""
         backend = engine.approval_backend
         if backend is None:
-            raise HTTPException(
-                status_code=500, detail="No approval backend configured"
-            )
+            raise HTTPException(status_code=500, detail="No approval backend configured")
         # Issue #217: Run sync backend.respond() in thread to avoid blocking event loop
         await asyncio.to_thread(
             backend.respond,
@@ -827,9 +799,7 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
                 )
 
     # ── Dashboard static files ──
-    _dashboard_static = (
-        Path(__file__).parent.parent / "dashboard" / "static"
-    ).resolve()
+    _dashboard_static = (Path(__file__).parent.parent / "dashboard" / "static").resolve()
 
     @app.get("/dashboard")
     @app.get("/dashboard/")

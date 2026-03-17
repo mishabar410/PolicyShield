@@ -54,11 +54,7 @@ class ToolStats:
             "call_count": self.call_count,
             "block_count": self.block_count,
             "block_rate": round(self.block_rate, 4),
-            "avg_latency_ms": (
-                round(self.avg_latency_ms, 2)
-                if self.avg_latency_ms is not None
-                else None
-            ),
+            "avg_latency_ms": (round(self.avg_latency_ms, 2) if self.avg_latency_ms is not None else None),
         }
 
 
@@ -234,9 +230,7 @@ class TraceAggregator:
             max_ts,
         )
 
-    def _compute_top_tools(
-        self, records: list[dict], limit: int = 10
-    ) -> list[ToolStats]:
+    def _compute_top_tools(self, records: list[dict], limit: int = 10) -> list[ToolStats]:
         tool_data: dict[str, dict] = {}
         for r in records:
             t = r.get("tool", "unknown")
@@ -267,9 +261,7 @@ class TraceAggregator:
         stats.sort(key=lambda s: s.call_count, reverse=True)
         return stats[:limit]
 
-    def _compute_top_blocked_tools(
-        self, all_tools: list[ToolStats], limit: int = 10
-    ) -> list[ToolStats]:
+    def _compute_top_blocked_tools(self, all_tools: list[ToolStats], limit: int = 10) -> list[ToolStats]:
         blocked = [t for t in all_tools if t.block_count > 0]
         blocked.sort(key=lambda s: s.block_count, reverse=True)
         return blocked[:limit]
@@ -283,16 +275,11 @@ class TraceAggregator:
                 key = (pt, tool)
                 counts[key] = counts.get(key, 0) + 1
 
-        entries = [
-            PIIHeatmapEntry(pii_type=k[0], tool=k[1], count=v)
-            for k, v in counts.items()
-        ]
+        entries = [PIIHeatmapEntry(pii_type=k[0], tool=k[1], count=v) for k, v in counts.items()]
         entries.sort(key=lambda e: e.count, reverse=True)
         return entries
 
-    def _compute_timeline(
-        self, records: list[dict], window: TimeWindow
-    ) -> list[TimeSeriesPoint]:
+    def _compute_timeline(self, records: list[dict], window: TimeWindow) -> list[TimeSeriesPoint]:
         bucket_s = window.bucket_seconds
         start_ts = window.start.timestamp()
         end_ts = window.end.timestamp()

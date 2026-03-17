@@ -78,9 +78,7 @@ class PolicyShieldTool(BaseTool):
         if result.verdict == Verdict.APPROVE:
             approval_id = getattr(result, "approval_id", "") or ""
             if self.block_behavior == "raise":
-                raise ToolException(
-                    f"PolicyShield requires approval: {result.message} (id={approval_id})"
-                )
+                raise ToolException(f"PolicyShield requires approval: {result.message} (id={approval_id})")
             return f"APPROVAL REQUIRED: {result.message} (approval_id={approval_id})"
 
         if result.verdict == Verdict.REDACT:
@@ -128,12 +126,8 @@ class PolicyShieldTool(BaseTool):
             if result.verdict == Verdict.APPROVE:
                 approval_id = getattr(result, "approval_id", "") or ""
                 if self.block_behavior == "raise":
-                    raise ToolException(
-                        f"PolicyShield requires approval: {result.message} (id={approval_id})"
-                    )
-                return (
-                    f"APPROVAL REQUIRED: {result.message} (approval_id={approval_id})"
-                )
+                    raise ToolException(f"PolicyShield requires approval: {result.message} (id={approval_id})")
+                return f"APPROVAL REQUIRED: {result.message} (approval_id={approval_id})"
 
             if result.verdict == Verdict.REDACT:
                 tool_input = result.modified_args or tool_input
@@ -147,9 +141,7 @@ class PolicyShieldTool(BaseTool):
                     output = await self.wrapped_tool._arun(tool_input)
             else:
                 if isinstance(tool_input, dict):
-                    output = await asyncio.to_thread(
-                        self.wrapped_tool._run, **tool_input
-                    )
+                    output = await asyncio.to_thread(self.wrapped_tool._run, **tool_input)
                 else:
                     output = await asyncio.to_thread(self.wrapped_tool._run, tool_input)
 
@@ -158,9 +150,7 @@ class PolicyShieldTool(BaseTool):
                 try:
                     await self.async_engine.post_check(
                         tool_name=self.name,
-                        result=(
-                            {"output": output} if isinstance(output, str) else output
-                        ),
+                        result=({"output": output} if isinstance(output, str) else output),
                         session_id=self.session_id,
                     )
                 except Exception:
@@ -184,9 +174,4 @@ def shield_all_tools(
         tools = [ShellTool(), WikipediaTool(), ...]
         safe_tools = shield_all_tools(tools, engine)
     """
-    return [
-        PolicyShieldTool(
-            wrapped_tool=t, engine=engine, async_engine=async_engine, **kwargs
-        )
-        for t in tools
-    ]
+    return [PolicyShieldTool(wrapped_tool=t, engine=engine, async_engine=async_engine, **kwargs) for t in tools]

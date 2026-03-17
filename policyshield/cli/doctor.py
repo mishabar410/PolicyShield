@@ -102,9 +102,7 @@ def run_doctor(
             data = yaml.safe_load(rules_path.read_text()) or {}
             rules = data.get("rules", [])
             if rules:
-                report.add(
-                    Check("Rules file", True, 10, f"✓ {rules_path}: {len(rules)} rules")
-                )
+                report.add(Check("Rules file", True, 10, f"✓ {rules_path}: {len(rules)} rules"))
             else:
                 report.add(
                     Check(
@@ -141,9 +139,7 @@ def run_doctor(
     rules_data = data if rules_path.exists() else {}
     default_v = rules_data.get("default_verdict", "allow")
     if default_v == "block":
-        report.add(
-            Check("Default verdict", True, 15, "✓ default_verdict: block (secure)")
-        )
+        report.add(Check("Default verdict", True, 15, "✓ default_verdict: block (secure)"))
     else:
         report.add(
             Check(
@@ -227,14 +223,11 @@ def run_doctor(
 
     # --- Check 7: Exec/shell protection ---
     has_exec_block = any(
-        r.get("then") == "block"
-        and _tool_matches(r.get("when", {}), {"exec", "shell", "run_command", "system"})
+        r.get("then") == "block" and _tool_matches(r.get("when", {}), {"exec", "shell", "run_command", "system"})
         for r in rules
     )
     if has_exec_block:
-        report.add(
-            Check("Exec protection", True, 10, "✓ Shell/exec blocking rules present")
-        )
+        report.add(Check("Exec protection", True, 10, "✓ Shell/exec blocking rules present"))
     else:
         report.add(
             Check(
@@ -264,11 +257,7 @@ def run_doctor(
     # --- Check 9: Approval flows ---
     has_approve = any(r.get("then") == "approve" for r in rules)
     if has_approve:
-        report.add(
-            Check(
-                "Approval flows", True, 10, "✓ Human-in-the-loop approval rules present"
-            )
-        )
+        report.add(Check("Approval flows", True, 10, "✓ Human-in-the-loop approval rules present"))
     else:
         report.add(
             Check(

@@ -126,9 +126,7 @@ class TraceRecorder:
             candidate = self._output_dir / f"trace_{timestamp}_{counter}.jsonl"
             if not candidate.exists():
                 return candidate
-        raise RuntimeError(
-            f"Cannot generate unique trace file path after {max_counter} attempts in {self._output_dir}"
-        )
+        raise RuntimeError(f"Cannot generate unique trace file path after {max_counter} attempts in {self._output_dir}")
 
     def record(
         self,
@@ -257,9 +255,7 @@ class TraceRecorder:
             if len(self._buffer) > max_retained:
                 dropped = len(self._buffer) - max_retained
                 self._buffer = self._buffer[-max_retained:]
-                logger.warning(
-                    "Trace buffer overflow: dropped %d oldest records", dropped
-                )
+                logger.warning("Trace buffer overflow: dropped %d oldest records", dropped)
                 # Issue #73: Notify via callback
                 if self._on_buffer_overflow:
                     try:

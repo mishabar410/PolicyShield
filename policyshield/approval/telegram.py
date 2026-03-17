@@ -115,9 +115,7 @@ class TelegramApprovalBackend(ApprovalBackend):
             # so the request can be resolved via respond() API
             self._ensure_polling()
 
-    def wait_for_response(
-        self, request_id: str, timeout: float = 300.0
-    ) -> ApprovalResponse | None:
+    def wait_for_response(self, request_id: str, timeout: float = 300.0) -> ApprovalResponse | None:
         event = self._events.get(request_id)
         if event is None:
             return None

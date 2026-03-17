@@ -100,9 +100,7 @@ class CrewAIShieldTool:
         if result.verdict == Verdict.APPROVE:
             approval_id = getattr(result, "approval_id", "") or ""
             if self.on_block == "raise":
-                raise ToolCallBlockedError(
-                    f"PolicyShield requires approval: {result.message} (id={approval_id})"
-                )
+                raise ToolCallBlockedError(f"PolicyShield requires approval: {result.message} (id={approval_id})")
             return f"APPROVAL REQUIRED: {result.message} (approval_id={approval_id})"
 
         if result.verdict == Verdict.REDACT:

@@ -25,9 +25,7 @@ def cmd_quickstart() -> int:
     if framework == "OpenClaw":
         tools = _discover_openclaw_tools()
         if not tools:
-            tools = _ask_list(
-                "Could not auto-discover. Enter tool names (comma-separated):"
-            )
+            tools = _ask_list("Could not auto-discover. Enter tool names (comma-separated):")
     else:
         tools = _ask_list("Enter your tool names (comma-separated):")
 
@@ -112,16 +110,10 @@ def _discover_openclaw_tools() -> list[str]:
 
         resp = urllib.request.urlopen("http://localhost:3000/api/tools", timeout=3)
         data = json.loads(resp.read())
-        tools = [
-            t.get("name", t.get("function", {}).get("name", ""))
-            for t in data
-            if isinstance(t, dict)
-        ]
+        tools = [t.get("name", t.get("function", {}).get("name", "")) for t in data if isinstance(t, dict)]
         tools = [t for t in tools if t]
         if tools:
-            print(
-                f"  ✓ Discovered {len(tools)} tools from OpenClaw: {', '.join(tools[:5])}..."
-            )
+            print(f"  ✓ Discovered {len(tools)} tools from OpenClaw: {', '.join(tools[:5])}...")
         return tools
     except Exception:
         return []

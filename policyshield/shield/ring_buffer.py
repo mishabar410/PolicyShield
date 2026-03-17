@@ -90,10 +90,7 @@ class EventRingBuffer:
             within_seconds: Only events within this many seconds.
             verdict: Filter by verdict (e.g. "BLOCK", "ALLOW").
         """
-        return (
-            len(self.find_recent(tool, within_seconds=within_seconds, verdict=verdict))
-            > 0
-        )
+        return len(self.find_recent(tool, within_seconds=within_seconds, verdict=verdict)) > 0
 
     @property
     def events(self) -> list[ToolEvent]:

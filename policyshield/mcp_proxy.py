@@ -168,9 +168,7 @@ def create_mcp_proxy_server(
         rules_snapshot = list(engine.rules.rules)
         tools = []
         for rule in rules_snapshot:
-            tool_pattern = (
-                rule.when.get("tool") if isinstance(rule.when, dict) else None
-            )
+            tool_pattern = rule.when.get("tool") if isinstance(rule.when, dict) else None
             if tool_pattern and tool_pattern != "*":
                 # Issue #169: Skip regex patterns — only expose literal tool names
                 import re as _re

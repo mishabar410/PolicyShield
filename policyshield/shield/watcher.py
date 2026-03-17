@@ -95,9 +95,7 @@ class RuleWatcher:
                     self._last_error = None
             except (FileNotFoundError, PermissionError) as e:
                 # Issue #25: Transient FS errors don't count as failures
-                logger.warning(
-                    "Watcher transient error (not counting as failure): %s", e
-                )
+                logger.warning("Watcher transient error (not counting as failure): %s", e)
             except Exception as e:
                 self._consecutive_failures += 1
                 self._last_error = str(e)

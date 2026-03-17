@@ -90,9 +90,7 @@ def render_timeline_text(timeline: IncidentTimeline) -> str:
         icon = "!!" if event.is_violation else "OK"
         pii_flag = " PII" if event.pii_detected else ""
         rule = f" (rule: {event.rule_id})" if event.rule_id else ""
-        lines.append(
-            f"  {i:3d}. [{event.timestamp}] {icon} {event.tool} -> {event.verdict}{rule}{pii_flag}"
-        )
+        lines.append(f"  {i:3d}. [{event.timestamp}] {icon} {event.tool} -> {event.verdict}{rule}{pii_flag}")
         if event.message:
             lines.append(f"       {event.message}")
 

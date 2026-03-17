@@ -55,9 +55,7 @@ def fetch_tools(
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             data = json.loads(resp.read())
     except urllib.error.URLError as e:
-        raise OpenClawConnectionError(
-            f"Cannot connect to OpenClaw at {base_url}: {e}"
-        ) from e
+        raise OpenClawConnectionError(f"Cannot connect to OpenClaw at {base_url}: {e}") from e
     except json.JSONDecodeError as e:
         raise OpenClawAPIError(f"Invalid JSON from OpenClaw: {e}") from e
 

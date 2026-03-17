@@ -47,14 +47,10 @@ class SlackApprovalBackend(ApprovalBackend):
         self._store.submit(request)
         self._send_slack_notification(request)
 
-    def wait_for_response(
-        self, request_id: str, timeout: float = 300.0
-    ) -> ApprovalResponse | None:
+    def wait_for_response(self, request_id: str, timeout: float = 300.0) -> ApprovalResponse | None:
         return self._store.wait_for_response(request_id, timeout)
 
-    def respond(
-        self, request_id: str, approved: bool, responder: str = "", comment: str = ""
-    ) -> None:
+    def respond(self, request_id: str, approved: bool, responder: str = "", comment: str = "") -> None:
         self._store.respond(request_id, approved, responder, comment)
 
     def pending(self) -> list[ApprovalRequest]:
@@ -100,9 +96,7 @@ class SlackApprovalBackend(ApprovalBackend):
                 resp.raise_for_status()
             logger.info("Slack notification sent for approval %s", request.request_id)
         except Exception:
-            logger.warning(
-                "Failed to send Slack notification for %s", request.request_id
-            )
+            logger.warning("Failed to send Slack notification for %s", request.request_id)
 
     def health(self) -> dict[str, Any]:
         # Issue #59: Real connectivity check instead of always-true

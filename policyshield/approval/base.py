@@ -59,9 +59,7 @@ class ApprovalBackend(ABC):
         """Submit an approval request."""
 
     @abstractmethod
-    def wait_for_response(
-        self, request_id: str, timeout: float = 300.0
-    ) -> ApprovalResponse | None:
+    def wait_for_response(self, request_id: str, timeout: float = 300.0) -> ApprovalResponse | None:
         """Wait for a response to an approval request.
 
         Returns None on timeout.

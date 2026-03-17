@@ -72,16 +72,10 @@ class PolicyBot:
 
         # Issue #62: Chat ID whitelist for authentication
         allowed = os.environ.get("POLICYSHIELD_BOT_ALLOWED_CHATS", "")
-        self._allowed_chats: set[int] = (
-            {int(x.strip()) for x in allowed.split(",") if x.strip()}
-            if allowed
-            else set()
-        )
+        self._allowed_chats: set[int] = {int(x.strip()) for x in allowed.split(",") if x.strip()} if allowed else set()
 
         # Issue #127: Pending compilations keyed by (chat_id, user_id)
-        self._pending: dict[tuple[int, int], tuple[str, float]] = (
-            {}
-        )  # Issue #153: (yaml, timestamp)
+        self._pending: dict[tuple[int, int], tuple[str, float]] = {}  # Issue #153: (yaml, timestamp)
         self._pending_ttl: float = 3600.0  # 1 hour TTL for pending compilations
 
     @property
@@ -188,9 +182,7 @@ class PolicyBot:
 
         # Issue #62: Check chat whitelist
         if self._allowed_chats and chat_id not in self._allowed_chats:
-            await self._send(
-                chat_id, "⛔ Unauthorized. Your chat ID is not in the allowed list."
-            )
+            await self._send(chat_id, "⛔ Unauthorized. Your chat ID is not in the allowed list.")
             return
 
         # Command routing
@@ -283,9 +275,7 @@ class PolicyBot:
     async def _cmd_resume(self, chat_id: int) -> None:
         try:
             await self._server_post("/api/v1/resume")
-            await self._send(
-                chat_id, "✅ *Kill switch deactivated.* Normal operation resumed."
-            )
+            await self._send(chat_id, "✅ *Kill switch deactivated.* Normal operation resumed.")
         except Exception as e:
             await self._send(chat_id, f"❌ Failed to resume: `{e}`")
 
@@ -293,9 +283,7 @@ class PolicyBot:
     # Compile & Deploy
     # ------------------------------------------------------------------
 
-    async def _handle_compile(
-        self, chat_id: int, user_id: int, description: str
-    ) -> None:
+    async def _handle_compile(self, chat_id: int, user_id: int, description: str) -> None:
         """Compile NL description to YAML and show preview."""
         await self._send(chat_id, "⏳ Compiling your policy...")
 
@@ -319,9 +307,7 @@ class PolicyBot:
         self._pending[(chat_id, user_id)] = (result.yaml_text, _time.monotonic())
         # Evict expired entries
         now = _time.monotonic()
-        expired = [
-            k for k, (_, ts) in self._pending.items() if now - ts > self._pending_ttl
-        ]
+        expired = [k for k, (_, ts) in self._pending.items() if now - ts > self._pending_ttl]
         for k in expired:
             del self._pending[k]
 
@@ -366,9 +352,7 @@ class PolicyBot:
         else:
             await self._answer_callback(callback_id, "Unknown action")
 
-    async def _deploy(
-        self, chat_id: int, user_id: int, message_id: int, callback_id: str
-    ) -> None:
+    async def _deploy(self, chat_id: int, user_id: int, message_id: int, callback_id: str) -> None:
         """Merge YAML into existing rules and reload the server."""
         entry = self._pending.pop((chat_id, user_id), None)
         if not entry:
@@ -394,14 +378,8 @@ class PolicyBot:
             new_ids = {r["id"] for r in new_rules if isinstance(r, dict) and "id" in r}
 
             if self._rules_path.exists():
-                existing_data = yaml.safe_load(
-                    self._rules_path.read_text(encoding="utf-8")
-                )
-                existing_rules = (
-                    existing_data.get("rules", [])
-                    if isinstance(existing_data, dict)
-                    else []
-                )
+                existing_data = yaml.safe_load(self._rules_path.read_text(encoding="utf-8"))
+                existing_rules = existing_data.get("rules", []) if isinstance(existing_data, dict) else []
                 merged_rules = [r for r in existing_rules if r.get("id") not in new_ids]
                 merged_rules.extend(new_rules)
                 if isinstance(existing_data, dict):
@@ -519,15 +497,11 @@ def run_bot(
     """Entry point for ``policyshield bot`` CLI command."""
     _token = token or os.environ.get("POLICYSHIELD_BOT_TOKEN", "")
     _rules = rules_path or os.environ.get("POLICYSHIELD_BOT_RULES_PATH", "./rules.yaml")
-    _server = server_url or os.environ.get(
-        "POLICYSHIELD_SERVER_URL", "http://localhost:8100"
-    )
+    _server = server_url or os.environ.get("POLICYSHIELD_SERVER_URL", "http://localhost:8100")
     _admin = admin_token or os.environ.get("POLICYSHIELD_ADMIN_TOKEN")
 
     if not _token:
-        raise ValueError(
-            "Bot token required. Set POLICYSHIELD_BOT_TOKEN or pass --token."
-        )
+        raise ValueError("Bot token required. Set POLICYSHIELD_BOT_TOKEN or pass --token.")
 
     bot = PolicyBot(
         bot_token=_token,

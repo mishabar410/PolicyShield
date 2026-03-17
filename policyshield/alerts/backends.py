@@ -28,9 +28,7 @@ class ConsoleBackend(AlertBackend):
         self._use_logger = use_logger
 
     def send(self, alert: Alert) -> bool:
-        icon = {"CRITICAL": "🚨", "WARNING": "⚠️", "INFO": "ℹ️"}.get(
-            alert.severity.value, "📌"
-        )
+        icon = {"CRITICAL": "🚨", "WARNING": "⚠️", "INFO": "ℹ️"}.get(alert.severity.value, "📌")
         msg = f"{icon} [{alert.severity.value}] {alert.rule_name}: {alert.message}"
         if self._use_logger:
             logger.warning(msg)
@@ -42,9 +40,7 @@ class ConsoleBackend(AlertBackend):
 class WebhookBackend(AlertBackend):
     """Sends alerts via HTTP POST to a webhook URL."""
 
-    def __init__(
-        self, url: str, headers: dict | None = None, timeout: int = 10
-    ) -> None:
+    def __init__(self, url: str, headers: dict | None = None, timeout: int = 10) -> None:
         self._url = url
         self._headers = headers or {"Content-Type": "application/json"}
         self._timeout = timeout
@@ -53,9 +49,7 @@ class WebhookBackend(AlertBackend):
 
     def send(self, alert: Alert) -> bool:
         try:
-            resp = self._client.post(
-                self._url, json=alert.to_dict(), headers=self._headers
-            )
+            resp = self._client.post(self._url, json=alert.to_dict(), headers=self._headers)
             return 200 <= resp.status_code < 300
         except Exception as e:
             logger.error("Webhook send failed: %s", e)
@@ -101,9 +95,7 @@ class TelegramBackend(AlertBackend):
         self._client = httpx.Client(timeout=10)
 
     def send(self, alert: Alert) -> bool:
-        icon = {"CRITICAL": "🚨", "WARNING": "⚠️", "INFO": "ℹ️"}.get(
-            alert.severity.value, "📌"
-        )
+        icon = {"CRITICAL": "🚨", "WARNING": "⚠️", "INFO": "ℹ️"}.get(alert.severity.value, "📌")
         text = f"{icon} [{alert.severity.value}] {alert.rule_name}\n{alert.message}"
         url = f"https://api.telegram.org/bot{self._bot_token}/sendMessage"
         try:
@@ -144,24 +136,12 @@ class AlertDispatcher:
         for bcfg in backends_cfg:
             btype = bcfg.get("type", "")
             if btype == "console":
-                dispatcher.add_backend(
-                    ConsoleBackend(use_logger=bcfg.get("use_logger", False))
-                )
+                dispatcher.add_backend(ConsoleBackend(use_logger=bcfg.get("use_logger", False)))
             elif btype == "webhook":
-                dispatcher.add_backend(
-                    WebhookBackend(url=bcfg["url"], headers=bcfg.get("headers"))
-                )
+                dispatcher.add_backend(WebhookBackend(url=bcfg["url"], headers=bcfg.get("headers")))
             elif btype == "slack":
-                dispatcher.add_backend(
-                    SlackBackend(
-                        webhook_url=bcfg["webhook_url"], channel=bcfg.get("channel")
-                    )
-                )
+                dispatcher.add_backend(SlackBackend(webhook_url=bcfg["webhook_url"], channel=bcfg.get("channel")))
             elif btype == "telegram":
-                dispatcher.add_backend(
-                    TelegramBackend(
-                        bot_token=bcfg["bot_token"], chat_id=bcfg["chat_id"]
-                    )
-                )
+                dispatcher.add_backend(TelegramBackend(bot_token=bcfg["bot_token"], chat_id=bcfg["chat_id"]))
 
         return dispatcher

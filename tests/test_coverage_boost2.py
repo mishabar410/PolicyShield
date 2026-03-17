@@ -57,12 +57,17 @@ class TestVerifyTokenPaths:
 
         monkeypatch.setenv("POLICYSHIELD_API_TOKEN", "test-secret")
         import policyshield.server.app as _app
+
         _app._token_cache_ts = 0.0
 
         engine = AsyncShieldEngine(
-            RuleSet(shield_name="t", version=1, rules=[
-                RuleConfig(id="r1", when={"tool": "t"}, then=Verdict.ALLOW),
-            ])
+            RuleSet(
+                shield_name="t",
+                version=1,
+                rules=[
+                    RuleConfig(id="r1", when={"tool": "t"}, then=Verdict.ALLOW),
+                ],
+            )
         )
         return TestClient(create_app(engine))
 
@@ -160,9 +165,9 @@ class TestBuildEngineFromConfigExtended:
         with patch("policyshield.config.loader.RemoteRuleLoader", create=True) as MockLoader:
             mock_loader = MagicMock()
             MockLoader.return_value = mock_loader
-            with patch.dict("sys.modules", {
-                "policyshield.shield.remote_loader": MagicMock(RemoteRuleLoader=MockLoader)
-            }):
+            with patch.dict(
+                "sys.modules", {"policyshield.shield.remote_loader": MagicMock(RemoteRuleLoader=MockLoader)}
+            ):
                 engine = build_engine_from_config(cfg)
                 assert engine is not None
 
@@ -183,9 +188,9 @@ class TestBuildEngineFromConfigExtended:
         with patch("policyshield.config.loader.RemoteRuleLoader", create=True) as MockLoader:
             mock_loader = MagicMock()
             MockLoader.return_value = mock_loader
-            with patch.dict("sys.modules", {
-                "policyshield.shield.remote_loader": MagicMock(RemoteRuleLoader=MockLoader)
-            }):
+            with patch.dict(
+                "sys.modules", {"policyshield.shield.remote_loader": MagicMock(RemoteRuleLoader=MockLoader)}
+            ):
                 engine = build_async_engine_from_config(cfg)
                 assert engine is not None
 

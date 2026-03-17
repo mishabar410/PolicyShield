@@ -15,11 +15,7 @@ def _engine():
     rules = RuleSet(
         shield_name="test",
         version=1,
-        rules=[
-            RuleConfig(
-                id="block-exec", when={"tool": "exec"}, then=Verdict.BLOCK, message="blocked"
-            )
-        ],
+        rules=[RuleConfig(id="block-exec", when={"tool": "exec"}, then=Verdict.BLOCK, message="blocked")],
     )
     return AsyncShieldEngine(rules)
 
@@ -129,5 +125,3 @@ class TestServerEdgePaths:
         """List rules returns rules."""
         resp = client.get("/api/v1/rules")
         assert resp.status_code == 200
-
-

@@ -29,9 +29,7 @@ class SessionManager:
         self._lock = threading.Lock()
         self._eviction_counter = 0
         self._eviction_every_n = 100
-        self._backend = backend or InMemorySessionBackend(
-            max_size=max_sessions, ttl_seconds=ttl_seconds
-        )
+        self._backend = backend or InMemorySessionBackend(max_size=max_sessions, ttl_seconds=ttl_seconds)
 
     def _serialize_session(self, session: SessionState) -> dict:
         """Serialize SessionState to dict for backend storage."""
@@ -40,9 +38,7 @@ class SessionManager:
             "created_at": session.created_at.isoformat(),
             "total_calls": session.total_calls,
             "tool_counts": dict(session.tool_counts),
-            "taints": [
-                t.value if hasattr(t, "value") else str(t) for t in session.taints
-            ],
+            "taints": [t.value if hasattr(t, "value") else str(t) for t in session.taints],
         }
 
     def _sync_to_backend(self, session: SessionState) -> None:
@@ -215,9 +211,7 @@ class SessionManager:
         """Check if a session has exceeded its TTL (by last access)."""
         # Issue #173: Use last_accessed if available, otherwise created_at
         last_active = session.last_accessed or session.created_at
-        return (
-            datetime.now(timezone.utc) - last_active
-        ).total_seconds() >= self._ttl_seconds
+        return (datetime.now(timezone.utc) - last_active).total_seconds() >= self._ttl_seconds
 
     def _maybe_evict(self) -> None:
         """Periodically evict expired sessions (amortized). Must be called with lock held."""

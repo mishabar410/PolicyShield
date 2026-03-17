@@ -192,15 +192,11 @@ def create_mcp_server(engine: Any, admin_token: str | None = None) -> Any:
 
             elif name == "kill_switch":
                 provided = arguments.get("admin_token")
-                if admin_token is None or not hmac.compare_digest(
-                    str(provided or ""), admin_token
-                ):
+                if admin_token is None or not hmac.compare_digest(str(provided or ""), admin_token):
                     return [
                         TextContent(
                             type="text",
-                            text=json.dumps(
-                                {"error": "Unauthorized: invalid admin_token"}
-                            ),
+                            text=json.dumps({"error": "Unauthorized: invalid admin_token"}),
                         )
                     ]
                 reason = arguments.get("reason", "MCP kill switch")
@@ -214,42 +210,30 @@ def create_mcp_server(engine: Any, admin_token: str | None = None) -> Any:
 
             elif name == "resume":
                 provided = arguments.get("admin_token")
-                if admin_token is None or not hmac.compare_digest(
-                    str(provided or ""), admin_token
-                ):
+                if admin_token is None or not hmac.compare_digest(str(provided or ""), admin_token):
                     return [
                         TextContent(
                             type="text",
-                            text=json.dumps(
-                                {"error": "Unauthorized: invalid admin_token"}
-                            ),
+                            text=json.dumps({"error": "Unauthorized: invalid admin_token"}),
                         )
                     ]
                 await asyncio.to_thread(engine.resume)
-                return [
-                    TextContent(type="text", text=json.dumps({"status": "resumed"}))
-                ]
+                return [TextContent(type="text", text=json.dumps({"status": "resumed"}))]
 
             elif name == "reload":
                 provided = arguments.get("admin_token")
-                if admin_token is None or not hmac.compare_digest(
-                    str(provided or ""), admin_token
-                ):
+                if admin_token is None or not hmac.compare_digest(str(provided or ""), admin_token):
                     return [
                         TextContent(
                             type="text",
-                            text=json.dumps(
-                                {"error": "Unauthorized: invalid admin_token"}
-                            ),
+                            text=json.dumps({"error": "Unauthorized: invalid admin_token"}),
                         )
                     ]
                 await asyncio.to_thread(engine.reload_rules)
                 return [
                     TextContent(
                         type="text",
-                        text=json.dumps(
-                            {"status": "ok", "rules_count": engine.rule_count}
-                        ),
+                        text=json.dumps({"status": "ok", "rules_count": engine.rule_count}),
                     )
                 ]
 
@@ -258,11 +242,7 @@ def create_mcp_server(engine: Any, admin_token: str | None = None) -> Any:
                 summary = await asyncio.to_thread(engine.get_policy_summary)
                 return [TextContent(type="text", text=summary)]
 
-            return [
-                TextContent(
-                    type="text", text=json.dumps({"error": f"Unknown tool: {name}"})
-                )
-            ]
+            return [TextContent(type="text", text=json.dumps({"error": f"Unknown tool: {name}"}))]
 
         except (KeyError, ValueError, TypeError) as e:
             # Client errors: safe to return details
@@ -271,13 +251,7 @@ def create_mcp_server(engine: Any, admin_token: str | None = None) -> Any:
             # Internal errors: log but don't expose details
             import logging
 
-            logging.getLogger(__name__).exception(
-                "Unexpected error in MCP tool call: %s", name
-            )
-            return [
-                TextContent(
-                    type="text", text=json.dumps({"error": "Internal server error"})
-                )
-            ]
+            logging.getLogger(__name__).exception("Unexpected error in MCP tool call: %s", name)
+            return [TextContent(type="text", text=json.dumps({"error": "Internal server error"}))]
 
     return server

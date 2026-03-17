@@ -21,9 +21,7 @@ class MetricsCollector:
         self._approval_denied = 0
         self._approval_timeout = 0
         self._max_response_times = 1000  # Rolling window
-        self._approval_response_times: deque[float] = deque(
-            maxlen=self._max_response_times
-        )
+        self._approval_response_times: deque[float] = deque(maxlen=self._max_response_times)
 
     def record(self, verdict: str, latency_ms: float) -> None:
         with self._lock:
@@ -36,9 +34,7 @@ class MetricsCollector:
         with self._lock:
             self._approval_submitted += 1
 
-    def record_approval_resolved(
-        self, *, approved: bool, response_time_ms: float
-    ) -> None:
+    def record_approval_resolved(self, *, approved: bool, response_time_ms: float) -> None:
         with self._lock:
             if approved:
                 self._approval_approved += 1
@@ -62,23 +58,13 @@ class MetricsCollector:
                 f"policyshield_latency_ms_avg {avg:.2f}",
             ]
             for verdict, count in self._verdict_counts.items():
-                lines.append(
-                    f'policyshield_verdicts_total{{verdict="{verdict}"}} {count}'
-                )
+                lines.append(f'policyshield_verdicts_total{{verdict="{verdict}"}} {count}')
             # Approval metrics
-            lines.append(
-                f"policyshield_approvals_submitted_total {self._approval_submitted}"
-            )
-            lines.append(
-                f"policyshield_approvals_approved_total {self._approval_approved}"
-            )
+            lines.append(f"policyshield_approvals_submitted_total {self._approval_submitted}")
+            lines.append(f"policyshield_approvals_approved_total {self._approval_approved}")
             lines.append(f"policyshield_approvals_denied_total {self._approval_denied}")
-            lines.append(
-                f"policyshield_approvals_timeout_total {self._approval_timeout}"
-            )
+            lines.append(f"policyshield_approvals_timeout_total {self._approval_timeout}")
             if self._approval_response_times:
-                avg_ms = sum(self._approval_response_times) / len(
-                    self._approval_response_times
-                )
+                avg_ms = sum(self._approval_response_times) / len(self._approval_response_times)
                 lines.append(f"policyshield_approval_response_time_avg_ms {avg_ms:.1f}")
             return "\n".join(lines) + "\n"

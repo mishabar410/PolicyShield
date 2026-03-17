@@ -133,7 +133,6 @@ def rules_to_yaml(
     import yaml
 
     data = rules_to_yaml_dict(rules, shield_name, default_verdict)
-    return (
-        "# Auto-generated PolicyShield rules\n# Review and adjust as needed before use\n"
-        + yaml.dump(data, default_flow_style=False, sort_keys=False)
+    return "# Auto-generated PolicyShield rules\n# Review and adjust as needed before use\n" + yaml.dump(
+        data, default_flow_style=False, sort_keys=False
     )
