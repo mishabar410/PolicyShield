@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import threading
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 from policyshield.core.models import PIIType, SessionState
 from policyshield.shield.ring_buffer import EventRingBuffer

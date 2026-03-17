@@ -28,7 +28,7 @@ class TestRemoteRuleLoader:
             mock_client.__exit__ = MagicMock(return_value=False)
             mock_cls.return_value = mock_client
 
-            loader = RemoteRuleLoader(url="http://test.local/rules.yaml")
+            loader = RemoteRuleLoader(url="https://test.local/rules.yaml")
             ruleset = loader.fetch_once()
             assert ruleset is not None
             assert len(ruleset.rules) == 1
@@ -42,7 +42,7 @@ class TestRemoteRuleLoader:
             mock_client.__exit__ = MagicMock(return_value=False)
             mock_cls.return_value = mock_client
 
-            loader = RemoteRuleLoader(url="http://test.local/rules.yaml")
+            loader = RemoteRuleLoader(url="https://test.local/rules.yaml")
             ruleset = loader.fetch_once()
             assert ruleset is None
 
@@ -58,7 +58,7 @@ class TestRemoteRuleLoader:
             mock_client.__exit__ = MagicMock(return_value=False)
             mock_cls.return_value = mock_client
 
-            loader = RemoteRuleLoader(url="http://test.local/rules.yaml", signature_key="secret")
+            loader = RemoteRuleLoader(url="https://test.local/rules.yaml", signature_key="secret")
             ruleset = loader.fetch_once()
             assert ruleset is not None
 
@@ -73,7 +73,7 @@ class TestRemoteRuleLoader:
             mock_client.__exit__ = MagicMock(return_value=False)
             mock_cls.return_value = mock_client
 
-            loader = RemoteRuleLoader(url="http://test.local/rules.yaml", signature_key="secret")
+            loader = RemoteRuleLoader(url="https://test.local/rules.yaml", signature_key="secret")
             ruleset = loader.fetch_once()
             assert ruleset is None
 
@@ -86,5 +86,5 @@ class TestRemoteRuleLoader:
             mock_client.__exit__ = MagicMock(return_value=False)
             mock_cls.return_value = mock_client
 
-            loader = RemoteRuleLoader(url="http://test.local/rules.yaml")
+            loader = RemoteRuleLoader(url="https://test.local/rules.yaml")
             assert loader.fetch_once() is None

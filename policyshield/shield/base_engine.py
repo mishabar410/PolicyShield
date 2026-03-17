@@ -13,11 +13,6 @@ from pathlib import Path
 from time import monotonic
 from typing import Any
 
-
-@functools.lru_cache(maxsize=512)
-def _compile_pattern(pattern: str) -> _re_module.Pattern:
-    return _re_module.compile(pattern)
-
 from policyshield.approval.base import ApprovalBackend, ApprovalRequest
 from policyshield.approval.cache import ApprovalCache, ApprovalStrategy
 from policyshield.core.models import (
@@ -33,6 +28,12 @@ from policyshield.shield.pii import PIIDetector
 from policyshield.shield.session import SessionManager
 from policyshield.shield.verdict import VerdictBuilder
 from policyshield.trace.recorder import TraceRecorder
+
+
+@functools.lru_cache(maxsize=512)
+def _compile_pattern(pattern: str) -> _re_module.Pattern:
+    return _re_module.compile(pattern)
+
 
 logger = logging.getLogger("policyshield")
 

@@ -125,14 +125,14 @@ class TestRemoteRuleLoader:
     def test_init(self):
         from policyshield.shield.remote_loader import RemoteRuleLoader
 
-        loader = RemoteRuleLoader(url="http://example.com/rules.yaml", refresh_interval=60.0)
-        assert loader._url == "http://example.com/rules.yaml"
+        loader = RemoteRuleLoader(url="https://example.com/rules.yaml", refresh_interval=60.0)
+        assert loader._url == "https://example.com/rules.yaml"
         assert loader._refresh_interval == 60.0
 
     def test_start_stop(self):
         from policyshield.shield.remote_loader import RemoteRuleLoader
 
-        loader = RemoteRuleLoader(url="http://nonexistent.invalid/rules.yaml", refresh_interval=0.1)
+        loader = RemoteRuleLoader(url="https://nonexistent.invalid/rules.yaml", refresh_interval=0.1)
         loader.start()
         assert loader._thread is not None
         loader.stop()
@@ -141,6 +141,6 @@ class TestRemoteRuleLoader:
     def test_fetch_once_error(self):
         from policyshield.shield.remote_loader import RemoteRuleLoader
 
-        loader = RemoteRuleLoader(url="http://nonexistent.invalid/rules.yaml")
+        loader = RemoteRuleLoader(url="https://nonexistent.invalid/rules.yaml")
         result = loader.fetch_once()
         assert result is None

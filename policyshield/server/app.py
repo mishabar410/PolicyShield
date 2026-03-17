@@ -268,6 +268,7 @@ def create_app(engine: AsyncShieldEngine, enable_watcher: bool = False) -> FastA
                 chunks.append(chunk)
             # Re-inject the fully-read body so downstream handlers can read it
             body = b"".join(chunks)
+            request._body = body  # type: ignore[attr-defined]
             async def _receive():
                 return {"type": "http.request", "body": body, "more_body": False}
             request._receive = _receive  # type: ignore[attr-defined]

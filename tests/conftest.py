@@ -3,6 +3,21 @@
 import pytest
 
 
+@pytest.fixture(autouse=True)
+def _reset_token_cache(monkeypatch):
+    """Reset the server token cache before every test.
+
+    The cache uses time.monotonic() with a 5s TTL, so stale tokens
+    from a previous test can bleed into the next one. Resetting the
+    timestamp forces a fresh read from the environment.
+    """
+    import policyshield.server.app as _app
+
+    _app._token_cache_ts = 0.0
+    _app._CACHED_API_TOKEN = None
+    _app._CACHED_ADMIN_TOKEN = None
+
+
 @pytest.fixture
 def server_rules(tmp_path):
     """Shared rules fixture for server tests."""

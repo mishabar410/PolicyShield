@@ -129,7 +129,6 @@ def _cmd_setup(parsed: argparse.Namespace) -> int:
         print(f"  ✓ Server running (PID {server_process.pid})")
         pid_file = Path(rules_dir) / ".policyshield.pid"
         pid_file.write_text(str(server_process.pid))
-        import stat as _stat
         pid_file.chmod(0o600)
     else:
         print("→ [2/5] Skipping server start (--no-server)")

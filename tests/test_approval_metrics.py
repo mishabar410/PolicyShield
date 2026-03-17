@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections import deque
+
 from policyshield.server.metrics import MetricsCollector
 
 
@@ -36,6 +38,7 @@ class TestApprovalMetrics:
     def test_rolling_window_capped(self):
         mc = MetricsCollector()
         mc._max_response_times = 5
+        mc._approval_response_times = deque(maxlen=5)
         for i in range(10):
             mc.record_approval_resolved(approved=True, response_time_ms=float(i))
         assert len(mc._approval_response_times) == 5

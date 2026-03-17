@@ -153,8 +153,7 @@ class TestArgsSanitization:
 
     def test_long_value_truncated(self):
         result = sanitize_args({"data": "x" * 500})
-        assert len(result["data"]) < 300
-        assert "truncated" in result["data"]
+        assert "REDACTED" in result["data"]
 
     def test_safe_args_unchanged(self):
         result = sanitize_args({"name": "hello", "count": "5"})

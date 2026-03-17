@@ -72,7 +72,7 @@ class TraceRecorder:
         self._current_date = datetime.now(timezone.utc).strftime("%Y%m%d")
         self._buffer: list[dict] = []
         self._file_path: Path | None = None
-        self._file_handle = None  # persistent file handle
+        self._file_handle: Any = None  # persistent file handle
         self._record_count = 0
         self._flush_count = 0  # Issue #98: Track flushes for periodic cleanup
         self._lock = threading.Lock()

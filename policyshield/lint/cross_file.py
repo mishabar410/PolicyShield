@@ -58,7 +58,7 @@ def find_cross_file_issues(rule_files: list[Path]) -> list[CrossFileIssue]:
 
     # Check for shadowing — build tool_pattern → [(file, rule)] map in one pass
     from collections import defaultdict as _dd
-    pattern_map: dict[str, list[tuple[Path, object]]] = _dd(list)
+    pattern_map: dict[str, list[tuple[Path, RuleConfig]]] = _dd(list)
     for file_path, rules in file_rules:
         for rule in rules:
             pattern = str(rule.when.get("tool", ".*"))

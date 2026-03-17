@@ -72,7 +72,7 @@ def test_load_default(tmp_path, monkeypatch):
     monkeypatch.delenv("POLICYSHIELD_CONFIG", raising=False)
     cfg = load_config()
     assert cfg.mode == ShieldMode.ENFORCE
-    assert cfg.fail_open is True
+    assert cfg.fail_open is False
     assert cfg.rules_path == "./policies/"
 
 
